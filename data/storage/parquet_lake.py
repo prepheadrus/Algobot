@@ -148,6 +148,7 @@ class ParquetDataLake:
         """
         return symbol.replace('/', '_').replace(':', '_')
 
+
     def _find_actual_symbol_path(self, symbol: str) -> str:
         """
         Diskteki gerçek klasör adını (BTC_USDT, BTC_USDT_USDT, BTC vb.) glob ile bulur.
@@ -182,6 +183,7 @@ class ParquetDataLake:
         default_path = self._symbol_to_path(symbol)
         logger.debug(f"[DEBUG] Veri yolu diskte bulunamadı, varsayılan kullanılacak: {(base_dir / default_path).absolute()}")
         return default_path
+
 
     def _get_base_path(self, symbol: str, timeframe: str) -> Path:
         """
