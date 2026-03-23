@@ -37,24 +37,24 @@ async def get_trade_history(
         memory_trades = []
         if hasattr(paper_engine.position_manager, 'trade_history'):
             mem_raw = paper_engine.position_manager.trade_history.get_recent(limit)
-            for t in mem_raw:
-                # DB formatına normalize et
-                trade_dict = t.to_dict()
-                memory_trades.append({
-                    "id": trade_dict.get('id'),
-                    "symbol": trade_dict.get('symbol'),
-                    "direction": trade_dict.get('direction'),
-                    "entry_price": trade_dict.get('entry_price'),
-                    "exit_price": trade_dict.get('exit_price'),
-                    "size": trade_dict.get('size'),
-                    "leverage": trade_dict.get('leverage'),
-                    "pnl_usd": trade_dict.get('pnl'),
-                    "pnl_percent": trade_dict.get('pnl_percent', 0.0),
-                    "reason": trade_dict.get('reason'),
-                    "strategy_id": trade_dict.get('strategy_id'),
-                    "closed_at": trade_dict.get('closed_at'),
-                    "bot_id": trade_dict.get('bot_id')
-                })
+            memory_trades = [
+                {
+                    "id": getattr(t, 'id', None),
+                    "symbol": getattr(t, 'symbol', None),
+                    "direction": t.direction.value if hasattr(t, 'direction') and hasattr(t.direction, 'value') else getattr(t, 'direction', None),
+                    "entry_price": getattr(t, 'entry_price', None),
+                    "exit_price": getattr(t, 'exit_price', None),
+                    "size": getattr(t, 'size', None),
+                    "leverage": getattr(t, 'leverage', None),
+                    "pnl_usd": getattr(t, 'pnl', None),
+                    "pnl_percent": getattr(t, 'pnl_percent', 0.0),
+                    "reason": getattr(t, 'reason', None),
+                    "strategy_id": getattr(t, 'strategy_id', None),
+                    "closed_at": t.closed_at.isoformat() if hasattr(t, 'closed_at') and hasattr(t.closed_at, 'isoformat') else getattr(t, 'closed_at', None),
+                    "bot_id": getattr(t, 'bot_id', None)
+                }
+                for t in mem_raw
+            ]
 
         logger.info(f"📊 [TRADES] Memory'den {len(memory_trades)} işlem çekildi")
 
@@ -135,13 +135,14 @@ async def get_trade_stats() -> Dict[str, Any]:
         memory_trades = []
         if hasattr(paper_engine.position_manager, 'trade_history'):
             mem_raw = paper_engine.position_manager.trade_history.trades
-            for t in mem_raw:
-                trade_dict = t.to_dict()
-                memory_trades.append({
-                    "id": trade_dict.get('id'),
-                    "pnl_usd": trade_dict.get('pnl'),
-                    "strategy_id": trade_dict.get('strategy_id')
-                })
+            memory_trades = [
+                {
+                    "id": getattr(t, 'id', None),
+                    "pnl_usd": getattr(t, 'pnl', None),
+                    "strategy_id": getattr(t, 'strategy_id', None)
+                }
+                for t in mem_raw
+            ]
         
         # 3. Merge - DUPLICATE ÖNLEME (KRİTİK!)
         # DB'deki tüm ID'leri topla (normalize edilmiş)
