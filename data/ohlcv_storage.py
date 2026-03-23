@@ -200,8 +200,8 @@ class OHLCVStorage:
         if self.BASE_DIR.exists():
             for symbol_dir in self.BASE_DIR.iterdir():
                 if symbol_dir.is_dir():
-                    # BTC_USDT -> BTC/USDT formatına çevir
-                    symbol_name = symbol_dir.name.replace('_', '/')
+                    from core.exchange import normalize_symbol
+                    symbol_name = normalize_symbol(symbol_dir.name)
                     symbols.append(symbol_name)
         
         return symbols

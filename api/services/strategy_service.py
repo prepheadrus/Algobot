@@ -234,36 +234,46 @@ class StrategyService:
                 timeframe = closed_trades[0].get('timeframe') or \
                            closed_trades[0].get('metadata', {}).get('timeframe') or "1h"
 
-            # Flat file'dan çek (HIZLI!)
+            # Yeni Hibrit DataService ile çek (1m disk + RAM resample)
             try:
-                from data.ohlcv_storage import get_storage
+                from api.services.data_service import DataService
                 from datetime import datetime, timedelta
 
-                storage = get_storage()
+                ds = DataService()
                 end_date = datetime.utcnow()
                 start_date = end_date - timedelta(days=10)
 
-                df = storage.load_ohlcv(symbol, timeframe, start_date, end_date)
+                df = await ds.get_cached_or_fetch_data(symbol, timeframe, start_date, end_date)
 
                 if df is not None and not df.empty:
+                    # DataFrame'in indeksini timestamp sütunu yapıp formata uyduruyoruz
+                    if 'timestamp' not in df.columns:
+                        df_reset = df.reset_index()
+                        if 'index' in df_reset.columns and pd.api.types.is_datetime64_any_dtype(df_reset['index']):
+                            df_reset.rename(columns={'index': 'timestamp'}, inplace=True)
+                        elif df.index.name in ['timestamp', 'time', 'date']:
+                            df_reset.rename(columns={df.index.name: 'timestamp'}, inplace=True)
+                        df = df_reset
+
                     klines = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']].values.tolist()
-                    logger.info(f"  ✅ {len(klines)} mum flat file'dan yüklendi")
+                    logger.info(f"  ✅ {len(klines)} mum Hybrid DataLayer'dan yüklendi (Timeframe: {timeframe})")
                 else:
-                    # Flat file yoksa DB'den çek
+                    # Fallback
                     klines = await db_manager.get_klines(symbol, timeframe, limit=1000)
-                    # Eğer seçilen timeframe boşsa (örn: default 1h ama veri sadece 1m ise), 1m dene
                     if not klines and timeframe != "1m":
                         logger.info(f"ℹ️ {timeframe} için veri bulunamadı, 1m deneniyor: {symbol}")
                         timeframe = "1m"
                         klines = await db_manager.get_klines(symbol, timeframe, limit=1000)
             except Exception as e:
-                logger.warning(f"  ⚠️ Flat file okuma hatası, DB'den çekiliyor: {e}")
+                logger.warning(f"  ⚠️ Veri okuma hatası, DB'den fallback: {e}")
                 klines = await db_manager.get_klines(symbol, timeframe, limit=1000)
 
             
-            # Lightweight Charts yükselen zaman sırası (ascending) bekler. 
-            # DB'den DESC (azalan) geldiği için ters çeviriyoruz.
-            klines.reverse()
+            # DB'den geliyorsa azalan sırada olabilir, ama DataService ascending döner.
+            # Timestamp'in sırasını kontrol et (eski -> yeni olması lazım)
+            if klines and len(klines) > 1:
+                if klines[0][0] > klines[-1][0]:
+                    klines.reverse()
             
             # Format klines for Lightweight Charts (Saniye cinsinden timestamp zorunlu)
             formatted_candles = []

@@ -52,7 +52,12 @@ def normalize_symbol(symbol: str) -> str:
     symbol = symbol.strip()
 
     # Adım 2: _ veya - yerine / koy (BTC_USDT → BTC/USDT, BTC-USDT → BTC/USDT)
-    symbol = symbol.replace('_', '/').replace('-', '/')
+    # EĞER 2'DEN FAZLA PARÇA VARSA (örn: BTC_USDT_USDT), ilkini / yap, diğerini : yap
+    parts = symbol.replace('-', '_').split('_')
+    if len(parts) == 3:
+        symbol = f"{parts[0]}/{parts[1]}:{parts[2]}"
+    else:
+        symbol = symbol.replace('_', '/').replace('-', '/')
 
     # Adım 2.5: PERP suffix kontrolü (BTC/USDT/PERP → BTC/USDT:USDT)
     if '/PERP' in symbol.upper():

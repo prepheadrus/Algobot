@@ -474,7 +474,8 @@ class DataLakeStorage:
             if not symbol_dir.is_dir():
                 continue
 
-            symbol = symbol_dir.name.replace('_', '/')
+            from core.exchange import normalize_symbol
+            symbol = normalize_symbol(symbol_dir.name)
             stats['total_symbols'] += 1
             stats['symbols'][symbol] = {
                 'timeframes': 0,
