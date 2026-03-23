@@ -210,6 +210,8 @@ class WFOEngine:
         data = await data_service.get_cached_or_fetch_data(symbol, timeframe, start_date, end_date)
         
         if data is not None:
+            if data.index.tzinfo is not None:
+                data.index = data.index.tz_convert(None)
             logger.info(f"📊 [WFO] {len(data)} mum yüklendi (Hibrit Sağlayıcı)")
         
         return data
@@ -494,6 +496,11 @@ async def start_wfo_background_task(
                 param_grid=param_grid
             )
 
+            if not result:
+                logger.warning(f"⚠️ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
+                await asyncio.sleep(60)
+                continue
+
             # Eğer overfitting yoksa parametreleri güncelle
             if result and not result.get('overfitting', True):
                 logger.info(f"✅ [WFO] Parametreler güncellendi: {result.get('best_params', {})}")
@@ -514,7 +521,8 @@ async def start_wfo_background_task(
             break
         except Exception as e:
             logger.error(f"❌ [WFO] Arka plan hatası: {e}")
-            await asyncio.sleep(3600)  # 1 saat bekle ve tekrar dene
+            logger.info(f"⏳ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
+            await asyncio.sleep(60)  # 60 saniye bekle ve tekrar dene
 
 
 # Singleton instance

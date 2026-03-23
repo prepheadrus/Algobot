@@ -144,10 +144,9 @@ class ParquetDataLake:
             symbol: Sembol adı (örn: BTC/USDT)
 
         Returns:
-            Dosya yolu için sembol (örn: BTC/USDT)
+            Dosya yolu için sembol (örn: BTC_USDT)
         """
-        # Sembol formatını koru (nested directory için)
-        return symbol.replace(':', '_')
+        return symbol.replace('/', '_').replace(':', '_')
 
     def _get_base_path(self, symbol: str, timeframe: str) -> Path:
         """
