@@ -58,21 +58,42 @@ class DataSynchronizer:
         await _save_to_lake(df_1m.copy())
 
     async def sync_all_from_db_to_lake(self, symbol: str) -> None:
-        """Periyodik tam senkronizasyon (DB -> Data Lake) - Asenkron işleme."""
+        """Periyodik tam senkronizasyon (DataService -> Data Lake) - Asenkron işleme."""
         try:
             current_minute = int(pd.Timestamp.now().timestamp()) // 60
             if current_minute % 5 == 0:
-                logger.info(f"🔄 [DATA LAKE] {symbol} için tam senkronizasyon başlatılıyor...")
+                logger.info(f"🔄 [DATA LAKE] {symbol} için tam senkronizasyon başlatılıyor (Hybrid Data Layer)...")
 
-                all_klines = await db_manager.get_klines(symbol, '1m', limit=100000)
+                from api.services.data_service import DataService
+                ds = DataService()
 
-                if all_klines and len(all_klines) > 0:
+                # Retrieve the full 1m master data using the hybrid layer. Let it figure out disk vs DB vs API.
+                df = await ds.get_cached_or_fetch_data(symbol, '1m')
+
+                if df is not None and not df.empty:
+                    # Formata uygun listeye çevir
+                    if 'timestamp' not in df.columns:
+                        df_reset = df.reset_index()
+                        if 'index' in df_reset.columns and pd.api.types.is_datetime64_any_dtype(df_reset['index']):
+                            df_reset.rename(columns={'index': 'timestamp'}, inplace=True)
+                        elif df.index.name in ['timestamp', 'time', 'date']:
+                            df_reset.rename(columns={df.index.name: 'timestamp'}, inplace=True)
+                        df = df_reset
+
+                    # Extract as list of values like the old get_klines expected, to minimize disruption in _sync_lake
+                    all_klines = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']].values.tolist()
+
                     async def _sync_lake(klines_data):
                         try:
                             from data.indicators import StrategyIndicators
 
                             all_df = pd.DataFrame(klines_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                            all_df['timestamp'] = pd.to_datetime(all_df['timestamp'], unit='ms')
+
+                            if pd.api.types.is_numeric_dtype(all_df['timestamp']):
+                                all_df['timestamp'] = pd.to_datetime(all_df['timestamp'], unit='ms')
+                            else:
+                                all_df['timestamp'] = pd.to_datetime(all_df['timestamp'])
+
                             all_df.set_index('timestamp', inplace=True)
 
                             save_all_df = all_df.copy()
