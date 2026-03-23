@@ -26,6 +26,7 @@ Dosya Yapısı:
 
 import os
 import time  # 🔒 File lock retry için
+import asyncio
 import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
@@ -202,7 +203,7 @@ class DataLakeStorage:
             logger.warning(f"⚠️ [DATA LAKE] Dosya okuma hatası: {e}")
             return None
 
-    def save(self, symbol: str, timeframe: str, df: pd.DataFrame, append: bool = False) -> bool:
+    async def save(self, symbol: str, timeframe: str, df: pd.DataFrame, append: bool = False) -> bool:
         """
         Veriyi parquet dosyasına kaydet.
 
@@ -236,7 +237,7 @@ class DataLakeStorage:
                 if append and file_path.exists():
                     # Mevcut dosyaya ekle
                     try:
-                        existing_df = pd.read_parquet(file_path)
+                        existing_df = await asyncio.to_thread(pd.read_parquet, file_path)
                     except Exception as read_err:
                         # Bozuk dosyayı sil ve yeniden başlat
                         logger.warning(f"⚠️ [DATA LAKE] Bozuk Parquet dosyası, siliniyor: {file_path} - {read_err}")
@@ -253,11 +254,11 @@ class DataLakeStorage:
                     # Tekrar integrity kontrolü
                     combined_df = self._ensure_integrity(combined_df, timeframe)
 
-                    combined_df.to_parquet(file_path, compression=self.COMPRESSION, index=False)
+                    await asyncio.to_thread(combined_df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
                     logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum EKLENDI (toplam: {len(combined_df)} mum)")
                 else:
                     # Yeni dosya yaz
-                    df.to_parquet(file_path, compression=self.COMPRESSION, index=False)
+                    await asyncio.to_thread(df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
                     logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum KAYDEDILDI")
 
                 return True
@@ -266,7 +267,7 @@ class DataLakeStorage:
                 # Windows file lock hatası - bekle ve tekrar dene
                 if attempt < max_retries - 1:
                     logger.warning(f"⚠️ [DATA LAKE] File lock hatası ({attempt+1}/{max_retries}), {retry_delay}s bekleniyor... {file_path}")
-                    time.sleep(retry_delay)
+                    await asyncio.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
                     logger.error(f"❌ [DATA LAKE] Dosya yazma hatası (File Lock): {perm_err} - {file_path}")
@@ -275,7 +276,7 @@ class DataLakeStorage:
                 # Dosya silinmiş, yeniden oluştur
                 if attempt < max_retries - 1:
                     logger.warning(f"⚠️ [DATA LAKE] Dosya bulunamadı ({attempt+1}/{max_retries}), yeniden deneniyor... {file_path}")
-                    time.sleep(retry_delay)
+                    await asyncio.sleep(retry_delay)
                 else:
                     logger.error(f"❌ [DATA LAKE] Dosya yazma hatası (Not Found): {not_found_err} - {file_path}")
                     return False
@@ -413,7 +414,7 @@ class DataLakeStorage:
         if len(df) > 0:
             df_reset = df.copy()
             df_reset.reset_index(inplace=True)
-            self.save(symbol, timeframe, df_reset)
+            await self.save(symbol, timeframe, df_reset)
             logger.info(f"✅ [DATA LAKE] {symbol} {timeframe} → Resample edildi ve kaydedildi ({len(df)} mum)")
 
         return df.tail(limit) if len(df) >= limit else df

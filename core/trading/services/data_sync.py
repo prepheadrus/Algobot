@@ -33,14 +33,14 @@ class DataSynchronizer:
             logger.error(f"❌ [GAP DETECTION] Hata: {e}")
 
     async def update_data_lake(self, symbol: str, df_1m: pd.DataFrame) -> None:
-        """Yeni mum geldiğinde tüm timeframeleri Data Lake'e asenkron thread üzerinden kaydeder."""
-        def _save_to_lake(df_1m_copy):
+        """Yeni mum geldiğinde tüm timeframeleri Data Lake'e asenkron kaydeder."""
+        async def _save_to_lake(df_1m_copy):
             try:
                 from data.indicators import StrategyIndicators
 
                 # 1m veriyi kaydet
                 df_1m_copy.reset_index(inplace=True)
-                self.data_lake.save(symbol, '1m', df_1m_copy, append=True)
+                await self.data_lake.save(symbol, '1m', df_1m_copy, append=True)
 
                 # Diğer TF'leri resample ve kaydet
                 for tf in ['5m', '15m', '1h', '4h']:
@@ -49,16 +49,16 @@ class DataSynchronizer:
                     if not df_tf.empty:
                         save_df_tf = df_tf.copy()
                         save_df_tf.reset_index(inplace=True)
-                        self.data_lake.save(symbol, tf, save_df_tf, append=True)
+                        await self.data_lake.save(symbol, tf, save_df_tf, append=True)
                 logger.debug(f"💾 [DATA LAKE] {symbol} güncellendi (TÜM TF'ler)")
             except Exception as lake_err:
                 logger.debug(f"⚠️ [DATA LAKE] Güncelleme hatası: {lake_err}")
 
-        # Veriyi kopyalayarak arka planda işlet, event loop'u bloke etme
-        await asyncio.to_thread(_save_to_lake, df_1m.copy())
+        # Bekleyerek çağır, async def zaten event loop'u bloklamaz
+        await _save_to_lake(df_1m.copy())
 
     async def sync_all_from_db_to_lake(self, symbol: str) -> None:
-        """Periyodik tam senkronizasyon (DB -> Data Lake) - Ağır IO, thread içinde."""
+        """Periyodik tam senkronizasyon (DB -> Data Lake) - Asenkron işleme."""
         try:
             current_minute = int(pd.Timestamp.now().timestamp()) // 60
             if current_minute % 5 == 0:
@@ -67,7 +67,7 @@ class DataSynchronizer:
                 all_klines = await db_manager.get_klines(symbol, '1m', limit=100000)
 
                 if all_klines and len(all_klines) > 0:
-                    def _sync_lake(klines_data):
+                    async def _sync_lake(klines_data):
                         try:
                             from data.indicators import StrategyIndicators
 
@@ -77,7 +77,7 @@ class DataSynchronizer:
 
                             save_all_df = all_df.copy()
                             save_all_df.reset_index(inplace=True)
-                            self.data_lake.save(symbol, '1m', save_all_df, append=False)
+                            await self.data_lake.save(symbol, '1m', save_all_df, append=False)
 
                             for tf in ['5m', '15m', '1h', '4h']:
                                 df_tf = StrategyIndicators.resample_data(all_df, tf)
@@ -85,12 +85,12 @@ class DataSynchronizer:
                                 if not df_tf.empty:
                                     save_tf = df_tf.copy()
                                     save_tf.reset_index(inplace=True)
-                                    self.data_lake.save(symbol, tf, save_tf, append=False)
+                                    await self.data_lake.save(symbol, tf, save_tf, append=False)
                             logger.info(f"✅ [DATA LAKE] {symbol} TAM SENKRONİZASYON tamamlandı ({len(all_df)} mum)")
                         except Exception as e:
-                            logger.debug(f"⚠️ [DATA LAKE] İçi Thread hatası: {e}")
+                            logger.debug(f"⚠️ [DATA LAKE] İçi asenkron hata: {e}")
 
-                    await asyncio.to_thread(_sync_lake, all_klines)
+                    await _sync_lake(all_klines)
         except Exception as sync_err:
             logger.debug(f"⚠️ [DATA LAKE] Tam senkronizasyon hatası: {sync_err}")
 
