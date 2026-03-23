@@ -66,3 +66,7 @@ TIMESCALE_DB_URL = os.getenv("TIMESCALE_DB_URL", "")
 REDIS_URL = os.getenv("REDIS_URL", "")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
+
+# CORS ve Güvenlik
+_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+ALLOWED_ORIGINS = [origin.strip() for origin in _origins_str.split(",")]
