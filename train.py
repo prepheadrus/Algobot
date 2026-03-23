@@ -2,7 +2,6 @@ import asyncio
 import pandas as pd
 import numpy as np
 import os
-import pickle
 import traceback
 
 from core.exchange import ExchangeManager
@@ -86,9 +85,8 @@ def train_and_save_model(X, y):
     xgb_wrapper = XGBoostModel()
     xgb_wrapper.train(X_train, y_train, X_val, y_val, num_boost_round=200)
     
-    filepath = os.path.join(MODEL_DIR, "xgb_model.pkl")
-    with open(filepath, 'wb') as f:
-        pickle.dump(xgb_wrapper, f)
+    filepath = os.path.join(MODEL_DIR, "xgb_model.json")
+    xgb_wrapper.save_model(filepath)
         
     logger.info(f"Süper Model Eğitildi ve Başarıyla Kaydedildi! -> {filepath}")
 

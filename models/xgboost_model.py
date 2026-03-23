@@ -1,6 +1,8 @@
 import xgboost as xgb
 import numpy as np
 import pandas as pd
+import json
+import os
 from core.logger import logger
 
 class XGBoostModel:
@@ -54,3 +56,64 @@ class XGBoostModel:
         
         dtest = xgb.DMatrix(X_test)
         return self.model.predict(dtest)
+
+    def save_model(self, filepath: str):
+        """Modeli güvenli bir şekilde JSON formatında ve meta verilerini ayrı olarak kaydeder."""
+        if self.model is None:
+            raise ValueError("Model henüz eğitilmedi. Kaydedilecek bir model yok.")
+
+        # Ensure the path ends with .json
+        if not filepath.endswith('.json'):
+            filepath += '.json'
+
+        # Modelin kendisini native method ile güvenli olarak JSON formatında kaydet
+        self.model.save_model(filepath)
+
+        # Meta verilerini ayrı bir json dosyasına kaydet
+        metadata = {
+            'params': self.params
+        }
+
+        base_dir = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        name_without_ext = os.path.splitext(filename)[0]
+        metadata_filepath = os.path.join(base_dir, f"{name_without_ext}_metadata.json")
+
+        with open(metadata_filepath, 'w') as f:
+            json.dump(metadata, f, indent=4)
+
+        logger.info(f"Model {filepath} konumuna ve meta veriler {metadata_filepath} konumuna başarıyla kaydedildi.")
+
+    @classmethod
+    def load_model(cls, filepath: str) -> "XGBoostModel":
+        """Modeli ve meta verilerini güvenli bir şekilde yükler."""
+        if not filepath.endswith('.json'):
+            filepath += '.json'
+
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Model dosyası bulunamadı: {filepath}")
+
+        base_dir = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        name_without_ext = os.path.splitext(filename)[0]
+        metadata_filepath = os.path.join(base_dir, f"{name_without_ext}_metadata.json")
+
+        params = None
+        if os.path.exists(metadata_filepath):
+            try:
+                with open(metadata_filepath, 'r') as f:
+                    metadata = json.load(f)
+                    params = metadata.get('params')
+            except Exception as e:
+                logger.warning(f"Metadata okunamadı veya bozuk: {e}")
+
+        # Yeni bir instance oluştur
+        instance = cls(params=params)
+
+        # Booster nesnesini oluştur ve yükle
+        booster = xgb.Booster()
+        booster.load_model(filepath)
+        instance.model = booster
+
+        logger.info(f"Model {filepath} konumundan başarıyla yüklendi.")
+        return instance
