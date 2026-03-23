@@ -1,7 +1,7 @@
 import uvicorn
 import asyncio
 from core.logger import logger
-from core.config import CONFIG
+from core.config import CONFIG, API_HOST
 
 # Event Tracer import (Sistem Röntgeni - Event-Driven Architecture Diagnostic)
 from core.diagnostics.event_tracer import start_event_tracer, event_tracer
@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
         uvicorn.run(
             "api.server:app",
-            host="0.0.0.0",
+            host=API_HOST,
             port=port,
             log_level=CONFIG['bot']['log_level'].lower(),
             reload=True if CONFIG['bot']['environment'] == 'development' else False
