@@ -234,7 +234,17 @@ logger.info("✅ Trades router eklendi")
 # ============================================================================
 
 try:
-    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+    static_app = StaticFiles(directory="frontend", html=True)
+
+    async def custom_static_app(scope, receive, send):
+        # Ignore websocket requests to prevent AssertionError in StaticFiles
+        if scope["type"] == "websocket":
+            # Just close the websocket connection gracefully if it falls through to here
+            await send({"type": "websocket.close", "code": 1000})
+            return
+        await static_app(scope, receive, send)
+
+    app.mount("/", custom_static_app, name="frontend")
     logger.info("✅ Frontend dosyaları mount edildi")
 except Exception as e:
     logger.warning(f"⚠️ Frontend mount hatası: {e}")
