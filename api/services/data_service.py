@@ -100,18 +100,21 @@ class DataService:
         if df_1m is not None and not df_1m.empty:
             logger.info(f"💾 [HYBRID DATA] Diskte {len(df_1m)} adet 1m mum bulundu.")
 
-            # Zaman kontrolü: tz_localize / tz_convert garantisi
-            if df_1m.index.tzinfo is None:
-                df_1m.index = df_1m.index.tz_localize('UTC')
-            else:
-                df_1m.index = df_1m.index.tz_convert('UTC')
+            # Zaman kontrolü: tz_localize / tz_convert garantisi - SONRADAN NAIVE YAPILACAK
+            if df_1m.index.tzinfo is not None:
+                df_1m.index = df_1m.index.tz_convert(None)
         else:
             logger.info(f"⚠️ [HYBRID DATA] Diskte 1m Master Data bulunamadı.")
             df_1m = pd.DataFrame()
 
         # 2. Gap Fill (Diskteki son veri ile günümüz arasını tamamla veya API'den tümünü çek)
-        current_time_utc = pd.Timestamp(datetime.now(timezone.utc))
-        target_end_ts = pd.Timestamp(end_date).tz_convert('UTC') if end_date else current_time_utc
+        current_time_utc = pd.Timestamp(datetime.now(timezone.utc)).tz_localize(None)
+
+        target_end_ts = current_time_utc
+        if end_date:
+            target_end_ts = pd.Timestamp(end_date)
+            if target_end_ts.tzinfo is not None:
+                target_end_ts = target_end_ts.tz_convert(None)
 
         # Fetching parameters
         api_fetch_required = False
@@ -122,7 +125,10 @@ class DataService:
             api_fetch_required = True
             # WFOEngine vb. bir `days` parametresi aracılığıyla `start_date` verdiyse:
             if start_date:
-                gap_minutes = (target_end_ts - (pd.Timestamp(start_date).tz_convert('UTC') if hasattr(start_date, 'tzinfo') else pd.Timestamp(start_date, tz='UTC'))).total_seconds() / 60
+                start_ts_naive = pd.Timestamp(start_date)
+                if start_ts_naive.tzinfo is not None:
+                    start_ts_naive = start_ts_naive.tz_convert(None)
+                gap_minutes = (target_end_ts - start_ts_naive).total_seconds() / 60
                 fetch_limit = min(int(gap_minutes) + 10, 1500)
             else:
                 fetch_limit = 1500
@@ -144,9 +150,9 @@ class DataService:
             if klines:
                 df_gap = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 if isinstance(df_gap['timestamp'].iloc[0], str):
-                    df_gap['timestamp'] = pd.to_datetime(df_gap['timestamp'], utc=True)
+                    df_gap['timestamp'] = pd.to_datetime(df_gap['timestamp'], utc=True).dt.tz_localize(None)
                 else:
-                    df_gap['timestamp'] = pd.to_datetime(df_gap['timestamp'], unit='ms', utc=True)
+                    df_gap['timestamp'] = pd.to_datetime(df_gap['timestamp'], unit='ms', utc=True).dt.tz_localize(None)
                 df_gap.set_index('timestamp', inplace=True)
 
                 if not df_1m.empty:
@@ -160,10 +166,14 @@ class DataService:
         # 3. Tarih Aralığı Filtresi (Tekrar Uygula - Güvenlik İçin)
         if not df_1m.empty:
             if start_date:
-                start_ts = pd.Timestamp(start_date).tz_convert('UTC') if hasattr(start_date, 'tzinfo') else pd.Timestamp(start_date, tz='UTC')
+                start_ts = pd.Timestamp(start_date)
+                if start_ts.tzinfo is not None:
+                    start_ts = start_ts.tz_convert(None)
                 df_1m = df_1m[df_1m.index >= start_ts]
             if end_date:
-                end_ts = pd.Timestamp(end_date).tz_convert('UTC') if hasattr(end_date, 'tzinfo') else pd.Timestamp(end_date, tz='UTC')
+                end_ts = pd.Timestamp(end_date)
+                if end_ts.tzinfo is not None:
+                    end_ts = end_ts.tz_convert(None)
                 df_1m = df_1m[df_1m.index <= end_ts]
 
         if df_1m.empty:
