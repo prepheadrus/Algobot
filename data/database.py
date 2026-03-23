@@ -364,6 +364,37 @@ class DatabaseManager:
             )
             await self.sqlite_conn.commit()
 
+    async def save_klines_bulk(self, symbol, klines_data, timeframe='1m'):
+        """Verileri toplu olarak (BULK) kaydeder (Sadece boşlukları doldurur, güncelleme yapmaz)."""
+        if not klines_data:
+            return
+
+        # Verileri hazırla (UTC Timestamp ile)
+        records = []
+        for kline in klines_data:
+            ts_utc = pd.to_datetime(kline[0], unit='ms', utc=True).to_pydatetime()
+            records.append((ts_utc, symbol, timeframe, kline[1], kline[2], kline[3], kline[4], kline[5]))
+
+        if self.engine_type == "postgres":
+            async with self.db_pool.acquire() as conn:
+                # PostgreSQL executemany using ON CONFLICT DO NOTHING
+                await conn.executemany("""
+                    INSERT INTO klines (timestamp, symbol, timeframe, open, high, low, close, volume)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (timestamp, symbol, timeframe) DO NOTHING;
+                """, records)
+        else:
+            # SQLite Kaydı - LOCK İLE executemany (INSERT OR IGNORE)
+            # aiosqlite 'executemany' transactions directly handle concurrency internally but we use the _execute_with_lock wrapper to enforce the app-level lock.
+            await self._execute_with_lock(
+                self.sqlite_conn.executemany,
+                """
+                INSERT OR IGNORE INTO klines (timestamp, symbol, timeframe, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, records
+            )
+            await self.sqlite_conn.commit()
+
     async def get_candle_range(self, symbol, timeframe='1m'):
         """
         Veritabanındaki bir sembole ait en eski ve en yeni mum tarihlerini mili saniye (ms) cinsinden döner.

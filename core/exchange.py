@@ -1232,9 +1232,8 @@ class ExchangeManager:
                         logger.info(f"💾 [SAVE] {len(all_gap_ohlcv)} gap mumu SQLite'a kaydediliyor...")
 
                         try:
-                            for candle in all_gap_ohlcv:
-                                await db_manager.save_kline(symbol, candle, '1m')
-                            logger.info(f"OK [SAVE] Tüm gap mumları SQLite'a kaydedildi.")
+                            await db_manager.save_klines_bulk(symbol, all_gap_ohlcv, '1m')
+                            logger.info(f"OK [SAVE] Tüm gap mumları SQLite'a kaydedildi (BULK).")
                         except Exception as save_err:
                             logger.error(f"ERROR [SAVE] SQLite kayıt hatası: {save_err}")
 
