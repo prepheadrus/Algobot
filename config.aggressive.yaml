@@ -110,5 +110,5 @@ candle_lock:
   interval: 1
 
 candle_close_lock:
-  enabled: true
+  enabled: false
   check_interval: 5

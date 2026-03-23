@@ -962,51 +962,12 @@ class ExchangeManager:
             logger.info(f"📊 [BOT PARAMS] symbol={symbol}, strategy_id={strategy_id}, timeframe={timeframe}")
 
             # ========================================================================
-            # KATI MUM KAPANış KİLİDİ (Strict Candle Close Lock)
+            # KATI MUM KAPANış KİLİDİ İPTAL EDİLDİ
             # ========================================================================
-            from core.config import CONFIG
-
-            candle_lock_config = CONFIG.get('candle_close_lock', {})
-            candle_lock_enabled = candle_lock_config.get('enabled', True)
-
-            if candle_lock_enabled:
-                # Son mumun kapanış zamanını kontrol et
-                if not df.empty:
-                    last_candle_time = df.index[-1]
-
-                    # Timezone düzeltme: Her ikisini de UTC yap
-                    if last_candle_time.tzinfo is None:
-                        # tz-naive ise UTC yap
-                        last_candle_time = last_candle_time.tz_localize('UTC')
-
-                    current_time = pd.Timestamp.now(tz='UTC')
-
-                    # Mum kapanış süresini hesapla (timeframe'e göre)
-                    tf_minutes = int(''.join(filter(str.isdigit, timeframe)))
-                    if 'm' in timeframe:
-                        candle_duration_minutes = tf_minutes
-                    elif 'h' in timeframe:
-                        candle_duration_minutes = tf_minutes * 60
-                    else:
-                        candle_duration_minutes = 1
-
-                    # Son mumun yaşı (saniye) - artık timezone'lar uyumlu
-                    candle_age_seconds = (current_time - last_candle_time).total_seconds()
-
-                    # Mum kapanışına ne kadar kaldı?
-                    # 🔧 DÜZELTME: %50 → %30 (daha hızlı sinyal, mumun ilk yarısını atla)
-                    candle_close_threshold = candle_duration_minutes * 60 * 0.30  # %30 kapanmış
-
-                    if candle_age_seconds < candle_close_threshold:
-                        # Mum henüz kapanmadı, sinyali atla
-                        remaining_seconds = (candle_duration_minutes * 60) - candle_age_seconds
-                        
-                        # 🔧 SADECE ilk 10 saniyede logla (spam önleme)
-                        if candle_age_seconds < 10:
-                            logger.debug(
-                                f"⏳ [CANDLE LOCK] {symbol} ({timeframe}) mum kapanmadı | Kalan: {remaining_seconds:.0f}s"
-                            )
-                        return  # Sinyal üretme, mum kapanışını bekle
+            # Not: run_strategy_poller, yeni bir mum başladığı anda _process_bot_task
+            # fonksiyonunu tam bir kere çağırır. Bu esnada son mum zaten yeni açılan
+            # mum olurken bir önceki mum tamamlanmıştır. Strateji üretme işleminin
+            # engellenmemesi için bu kilit devredışı bırakıldı.
 
             # Strateji sinyali üret
             strategy = paper_engine.strategies.get(symbol)
