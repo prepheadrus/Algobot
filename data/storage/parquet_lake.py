@@ -459,10 +459,19 @@ class ParquetDataLake:
                 # RAM'de birleştir (vektörize)
                 combined_df = pd.concat(dfs)
 
+                # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
+                if combined_df.index.tzinfo is None:
+                    combined_df.index = combined_df.index.tz_localize('UTC')
+                else:
+                    combined_df.index = combined_df.index.tz_convert('UTC')
+
+                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
+                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+
                 # Tarih aralığını filtrele
                 combined_df = combined_df[
-                    (combined_df.index >= pd.Timestamp(start_date, tz='UTC')) &
-                    (combined_df.index <= pd.Timestamp(end_date, tz='UTC'))
+                    (combined_df.index >= start_ts) &
+                    (combined_df.index <= end_ts)
                 ]
 
                 # NaN temizliği
@@ -490,10 +499,19 @@ class ParquetDataLake:
                 if df is None or df.empty:
                     return None
 
+                # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
+                if df.index.tzinfo is None:
+                    df.index = df.index.tz_localize('UTC')
+                else:
+                    df.index = df.index.tz_convert('UTC')
+
+                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
+                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+
                 # Tarih aralığını filtrele
                 df = df[
-                    (df.index >= pd.Timestamp(start_date, tz='UTC')) &
-                    (df.index <= pd.Timestamp(end_date, tz='UTC'))
+                    (df.index >= start_ts) &
+                    (df.index <= end_ts)
                 ]
 
                 # NaN temizliği
@@ -587,14 +605,23 @@ class ParquetDataLake:
                         # PyArrow ile aç (memory-mapped)
                         parquet_file = pq.ParquetFile(file_path)
 
+                        start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
+                        end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+
                         # Batches halinde oku (50k satır)
                         for batch in parquet_file.iter_batches(batch_size=batch_size):
                             df_batch = batch.to_pandas()
 
+                            # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
+                            if df_batch.index.tzinfo is None:
+                                df_batch.index = df_batch.index.tz_localize('UTC')
+                            else:
+                                df_batch.index = df_batch.index.tz_convert('UTC')
+
                             # Tarih aralığını filtrele
                             df_batch = df_batch[
-                                (df_batch.index >= pd.Timestamp(start_date, tz='UTC')) &
-                                (df_batch.index <= pd.Timestamp(end_date, tz='UTC'))
+                                (df_batch.index >= start_ts) &
+                                (df_batch.index <= end_ts)
                             ]
 
                             if not df_batch.empty:
@@ -615,14 +642,23 @@ class ParquetDataLake:
                 # PyArrow ile aç
                 parquet_file = pq.ParquetFile(partition_path)
 
+                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
+                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+
                 # Batches halinde oku
                 for batch in parquet_file.iter_batches(batch_size=batch_size):
                     df_batch = batch.to_pandas()
 
+                    # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
+                    if df_batch.index.tzinfo is None:
+                        df_batch.index = df_batch.index.tz_localize('UTC')
+                    else:
+                        df_batch.index = df_batch.index.tz_convert('UTC')
+
                     # Tarih aralığını filtrele
                     df_batch = df_batch[
-                        (df_batch.index >= pd.Timestamp(start_date, tz='UTC')) &
-                        (df_batch.index <= pd.Timestamp(end_date, tz='UTC'))
+                        (df_batch.index >= start_ts) &
+                        (df_batch.index <= end_ts)
                     ]
 
                     if not df_batch.empty:
