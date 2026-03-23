@@ -1,3 +1,4 @@
+import pytest
 """
 WFO Hot-Reload Test Script
 
@@ -10,6 +11,7 @@ import asyncio
 import yaml
 from pathlib import Path
 
+@pytest.mark.asyncio
 async def test_wfo_hot_reload():
     """Test WFO configuration via API."""
     

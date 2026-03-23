@@ -138,20 +138,54 @@ class ParquetDataLake:
 
     def _symbol_to_path(self, symbol: str) -> str:
         """
-        Sembol ismini dosya yolu formatına çevir.
+        Sembol ismini dosya yolu formatına çevir. (Fallback/Varsayılan yöntem)
 
         Args:
             symbol: Sembol adı (örn: BTC/USDT)
 
         Returns:
-            Dosya yolu için sembol (örn: BTC/USDT)
+            Dosya yolu için sembol (örn: BTC_USDT)
         """
-        # Sembol formatını koru (nested directory için)
-        return symbol.replace(':', '_')
+        return symbol.replace('/', '_').replace(':', '_')
+
+    def _find_actual_symbol_path(self, symbol: str) -> str:
+        """
+        Diskteki gerçek klasör adını (BTC_USDT, BTC_USDT_USDT, BTC vb.) glob ile bulur.
+        Bulamazsa varsayılan _symbol_to_path değerini döndürür.
+        """
+        base_dir = self.BASE_DIR / self.exchange
+        if not base_dir.exists():
+            return self._symbol_to_path(symbol)
+
+        # Olası klasör isimleri
+        base = symbol.split('/')[0] if '/' in symbol else symbol
+
+        # 1. Tam Eşleşme (BTC_USDT, BTC_USDT_USDT)
+        exact_variants = [
+            symbol.replace('/', '_').replace(':', '_'),
+            f"{base}_USDT_USDT",
+            f"{base}_USDT"
+        ]
+
+        for variant in exact_variants:
+            if (base_dir / variant).exists() and (base_dir / variant).is_dir():
+                logger.debug(f"[DEBUG] Veri yolu bulundu (Exact Match): {(base_dir / variant).absolute()}")
+                return variant
+
+        # 2. İçinde Base geçen klasör (Recursive Glob benzeri)
+        for folder in base_dir.iterdir():
+            if folder.is_dir() and folder.name.startswith(base):
+                logger.debug(f"[DEBUG] Veri yolu bulundu (Fuzzy Match): {folder.absolute()}")
+                return folder.name
+
+        # Bulunamadıysa varsayılan
+        default_path = self._symbol_to_path(symbol)
+        logger.debug(f"[DEBUG] Veri yolu diskte bulunamadı, varsayılan kullanılacak: {(base_dir / default_path).absolute()}")
+        return default_path
 
     def _get_base_path(self, symbol: str, timeframe: str) -> Path:
         """
-        Sembol ve timeframe için base path al.
+        Sembol ve timeframe için base path al. (Deep Path Discovery ile)
 
         Args:
             symbol: Sembol adı
@@ -160,7 +194,7 @@ class ParquetDataLake:
         Returns:
             Base path
         """
-        symbol_path = self._symbol_to_path(symbol)
+        symbol_path = self._find_actual_symbol_path(symbol)
         return self.BASE_DIR / self.exchange / symbol_path / timeframe
 
     def _get_partition_path(self, symbol: str, timeframe: str, date: datetime) -> Path:
