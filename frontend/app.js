@@ -2464,7 +2464,7 @@ class WebSocketClient {
 
         // WebSocket URL (same host as API)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const wsUrl = `${protocol}//${window.location.host}/api/v1/ws`;
 
         console.log(`🔌 [WS] Connecting to ${wsUrl}...`);
 

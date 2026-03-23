@@ -1,0 +1,185 @@
+[32m14:31:13 | INFO     | 📬 Event Bus initialized (Singleton)[0m
+[32m14:31:14 | INFO     | 🎉 [MİMARİ] Faz 4 Tamamlandı: İndikatör Kütüphanesi 5 Modüle Parçalandı[0m
+[32m14:31:14 | INFO     | 🔍 Event Tracer hazır[0m
+[32m14:31:17 | INFO     | 🔧 [AUTO-GRID] Generator initialized[0m
+[32m14:31:17 | INFO     | 🧠 [WFO] Engine initialized (TPE Sampler, 4 workers)[0m
+[32m14:31:17 | INFO     | 🎉 [WFO] Zero-Touch Bayesian Optimizasyon Motoru Aktif[0m
+[32m14:31:17 | INFO     | 📦 [EDA] State Replication aktif (local_active_bots, local_active_strategies)[0m
+[32m14:31:17 | INFO     | ✅ Binance API anahtarları yüklendi. Yüksek rate limit aktif.[0m
+[32m14:31:17 | INFO     | BINANCE borsa motoru WebSocket desteğiyle başlatıldı.[0m
+[32m14:31:17 | INFO     | 📬 [EDA] Event subscriptions kuruldu (bot.started, bot.stopped)[0m
+[32m14:31:17 | INFO     | 🎉 [EDA] Kısır Döngü Kırıldı - %100 Olay Güdümlü Mimari Aktif[0m
+[32m14:31:17 | INFO     | [0m
+[32m14:31:17 | INFO     | 🔍 EVENT TRACER BAŞLATILIYOR...[0m
+[32m14:31:17 | INFO     |    Sistem röntgeni aktif - Tüm event'ler izleniyor[0m
+[32m14:31:17 | INFO     | [0m
+[32m14:31:17 | INFO     | ✅ Event Tracer aktif[0m
+[32m14:31:17 | INFO     | 🚀 BOT TASK'LARI BAŞLATILIYOR...[0m
+[32m14:31:17 | INFO     | ======================================================================[0m
+[32m14:31:17 | INFO     | 🔍 EVENT TRACER BAŞLATILIYOR - Sistem Röntgeni[0m
+[32m14:31:17 | INFO     | ======================================================================[0m
+[32m14:31:17 | INFO     | ✅ Event Tracer aktif - Tüm event'ler dinleniyor[0m
+[32m14:31:17 | INFO     | ----------------------------------------------------------------------[0m
+[32m14:31:17 | INFO     | ✅ Event Tracer başlatıldı[0m
+[32m14:31:17 | INFO     | [0m
+[32m14:31:17 | INFO     | 🚀 BOT ARKA PLAN TASK'LARI BAŞLATILIYOR...[0m
+[32m14:31:17 | INFO     | ============================================================[0m
+[32m14:31:17 | INFO     | 🚀 Event Bus başlatıldı (5 worker)[0m
+[32m14:31:17 | INFO     | ✅ Event Bus başlatıldı (5 worker)[0m
+[32m14:31:17 | INFO     | 🔄 [AUTO-SYNC] config.yaml boş, Parquet Data Lake'den semboller yükleniyor...[0m
+[32m14:31:17 | INFO     | 🏗️ [PARQUET LAKE] Superalgos MTF Mimarisi Devrede[0m
+[32m14:31:17 | INFO     | 📁 [PARQUET LAKE] Base: /app/data/ohlcv[0m
+[32m14:31:17 | INFO     | 🏢 [PARQUET LAKE] Exchange: binance[0m
+[32m14:31:17 | INFO     | 💾 [PARQUET LAKE] Compression: snappy[0m
+[32m14:31:17 | INFO     | 🚀 [PARQUET LAKE] PyArrow: ✅[0m
+[33m14:31:17 | WARNING  | ⚠️ Parquet Data Lake boş! Veri Laboratuvarı'ndan veri indirin.[0m
+[32m14:31:17 | INFO     | ℹ️ Aktif sembol yok - Dashboard'dan bot başlatabilirsiniz[0m
+[32m14:31:17 | INFO     | 🧠 [WFO] Walk-Forward Optimization aktif[0m
+[32m14:31:17 | INFO     | ============================================================[0m
+[32m14:31:17 | INFO     | ✅ TÜM ARKA PLAN TASK'LARI BAŞLATILDI![0m
+[32m14:31:17 | INFO     |    Bot şimdi piyasayı dinliyor ve işlem yapıyor...[0m
+[32m14:31:17 | INFO     | ============================================================[0m
+[32m14:31:17 | INFO     | [0m
+[32m14:31:17 | INFO     | 🌐 FastAPI Dashboard başlatılıyor...[0m
+[32m14:31:17 | INFO     |    Port: 3000[0m
+[32m14:31:17 | INFO     |    Reload: True[0m
+[32m14:31:17 | INFO     | [0m
+[32m14:31:17 | INFO     | ============================================================[0m
+[32m14:31:17 | INFO     | ✅ BOT TAM OLARAK BAŞLATILDI![0m
+[32m14:31:17 | INFO     |    Dashboard: http://localhost:3000[0m
+[32m14:31:17 | INFO     |    Piyasa dinleniyor... İşlemler başlıyor...[0m
+[32m14:31:17 | INFO     | ============================================================[0m
+[32m14:31:17 | INFO     | [0m
+INFO:     Will watch for changes in these directories: ['/app']
+INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
+INFO:     Started reloader process [7380] using StatReload
+[32m14:31:17 | INFO     | 📬 Event Bus initialized (Singleton)[0m
+[32m14:31:18 | INFO     | 🎉 [MİMARİ] Faz 4 Tamamlandı: İndikatör Kütüphanesi 5 Modüle Parçalandı[0m
+[32m14:31:18 | INFO     | 🔍 Event Tracer hazır[0m
+[32m14:31:20 | INFO     | 🔧 [AUTO-GRID] Generator initialized[0m
+[32m14:31:20 | INFO     | 🧠 [WFO] Engine initialized (TPE Sampler, 4 workers)[0m
+[32m14:31:20 | INFO     | 🎉 [WFO] Zero-Touch Bayesian Optimizasyon Motoru Aktif[0m
+[32m14:31:20 | INFO     | 📦 [EDA] State Replication aktif (local_active_bots, local_active_strategies)[0m
+[32m14:31:20 | INFO     | ✅ Binance API anahtarları yüklendi. Yüksek rate limit aktif.[0m
+[32m14:31:20 | INFO     | BINANCE borsa motoru WebSocket desteğiyle başlatıldı.[0m
+[32m14:31:20 | INFO     | 📬 [EDA] Event subscriptions kuruldu (bot.started, bot.stopped)[0m
+[32m14:31:20 | INFO     | 🎉 [EDA] Kısır Döngü Kırıldı - %100 Olay Güdümlü Mimari Aktif[0m
+[32m14:31:20 | INFO     | 📊 Position Manager initialized[0m
+[32m14:31:20 | INFO     | ⚠️ Risk Engine initialized (max_risk=200.00%)[0m
+[32m14:31:20 | INFO     | 🤖 Bot Manager initialized[0m
+[32m14:31:20 | INFO     | 📄 PaperTrader (Refactored) initialized[0m
+[32m14:31:21 | INFO     | ✅ System router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Bot router eklendi[0m
+[32m14:31:21 | INFO     | ✅ ML router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Strategy router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Data router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Strategy Builder router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Backtest router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Trades router eklendi[0m
+[32m14:31:21 | INFO     | ✅ Frontend dosyaları mount edildi[0m
+[32m14:31:21 | INFO     | 🎉 [MİMARİ] Faz 2 Tamamlandı: API Katmanı Modülerleştirildi (1374 satır -> ~160 satır)[0m
+INFO:     Started server process [7571]
+INFO:     Waiting for application startup.
+[32m14:31:21 | INFO     | 🚀 FastAPI Sunucusu başlatılıyor...[0m
+[32m14:31:21 | INFO     | 📬 [CRITICAL] Event handler'lar kayıt ediliyor...[0m
+[32m14:31:21 | INFO     | 📬 [EDA] Event handlers başlatıldı (signal, position, bot, price)[0m
+[32m14:31:21 | INFO     | 🚀 Event Bus başlatılıyor...[0m
+[32m14:31:21 | INFO     | 🚀 Event Bus başlatıldı (5 worker)[0m
+[32m14:31:21 | INFO     | 💾 Veritabanı bağlantısı başlatılıyor...[0m
+[33m14:31:21 | WARNING  | PostgreSQL bağlantısı başarısız, SQLite'a geçiliyor: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)[0m
+[32m14:31:21 | INFO     | Aşama 1.5: Docker Gerektirmeyen Yerel Hafıza (SQLite) aktif -> cryptobot.db[0m
+[32m14:31:21 | INFO     | SQLite optimizasyonları aktif: WAL mode, 60s timeout, busy_timeout=60000[0m
+[32m14:31:21 | INFO     | ✅ trades tablosu leverage REAL olarak güncellendi[0m
+[32m14:31:21 | INFO     | Veritabanı şeması (sqlite) doğrulandı.[0m
+[32m14:31:21 | INFO     | ⏳ Veritabanı bağlantısı doğrulanıyor (2s)...[0m
+[32m14:31:23 | INFO     | 📁 İndirme görevleri yükleniyor...[0m
+[32m14:31:23 | INFO     | 📁 0 yarım kalan indirme görevi veritabanından geri yüklendi ve BAŞLATILDI.[0m
+[32m14:31:23 | INFO     | 🚀 Bot task'ları başlatılıyor...[0m
+[32m14:31:23 | INFO     | 🔄 [AUTO-SYNC] config.yaml boş, Parquet Data Lake'den semboller yükleniyor...[0m
+[32m14:31:23 | INFO     | 🏗️ [PARQUET LAKE] Superalgos MTF Mimarisi Devrede[0m
+[32m14:31:23 | INFO     | 📁 [PARQUET LAKE] Base: /app/data/ohlcv[0m
+[32m14:31:23 | INFO     | 🏢 [PARQUET LAKE] Exchange: binance[0m
+[32m14:31:23 | INFO     | 💾 [PARQUET LAKE] Compression: snappy[0m
+[32m14:31:23 | INFO     | 🚀 [PARQUET LAKE] PyArrow: ✅[0m
+[32m14:31:23 | INFO     | ℹ️ Parquet Data Lake boş - Dashboard'dan bot başlatabilirsiniz[0m
+[32m14:31:23 | INFO     | ✅ 0 bot task'ı ve Event Engine başlatıldı[0m
+[32m14:31:23 | INFO     | 🧠 [WFO] Otonom optimizasyon sistemi başlatılıyor...[0m
+INFO:     Application startup complete.
+INFO:     127.0.0.1:54272 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54272 - "GET /lightweight-charts.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54294 - "GET /app.js?v=2026031521 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54308 - "GET /js/strategy_report.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54272 - "GET /strategy-builder.js?v=2026031011 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54308 - "GET /services/api-client.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /components/charts/chart-renderer.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54272 - "GET /state/store.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54294 - "GET /components/bots/bot-manager.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/bot/bots/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54294 - "GET /api/v1/dashboard-metrics HTTP/1.1" 200 OK
+[32m14:31:52 | INFO     | 📋 Strateji listesi isteniyor[0m
+INFO:     127.0.0.1:54272 - "GET /api/v1/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54308 - "GET /api/v1/dashboard-metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54308 - "GET /api/v1/data/symbols-with-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/symbols-with-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/all-download-tasks HTTP/1.1" 200 OK
+[32m14:31:52 | INFO     | 📊 Envanter sorgusu: 0 kayıt bulundu[0m
+[32m14:31:52 | INFO     | 📊 Toplam mum sayısı: 0[0m
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/inventory HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/stats HTTP/1.1" 200 OK
+[32m14:31:52 | INFO     | Marketler henüz yüklenmemiş, Binance'ten çekiliyor...[0m
+[31m14:31:53 | ERROR    | Market Listesi Çekme Hatası: binance GET https://api.binance.com/sapi/v1/capital/config/getall?timestamp=1774276312913&recvWindow=60000&signature=539e4d355cc72352bd34e8120089d6028ecafc420966c6d4cbf4f38422532aed 451  {
+  "code": 0,
+  "msg": "Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms. Please contact customer service if you believe you received this message in error."
+}[0m
+INFO:     127.0.0.1:54286 - "GET /api/v1/exchange/markets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/config/bot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/config/risk HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/config/advanced HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/symbols-with-data HTTP/1.1" 200 OK
+[32m14:31:53 | INFO     | 📭 Kaydedilmiş strateji bulunamadı[0m
+[32m14:31:53 | INFO     | ✅ 6 manuel strateji yüklendi (backward compatibility)[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+INFO:     127.0.0.1:54286 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[32m14:31:53 | INFO     | 📭 Kaydedilmiş strateji bulunamadı[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+INFO:     127.0.0.1:54286 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/ml/training-history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/symbols-with-data HTTP/1.1" 200 OK
+[32m14:31:53 | INFO     | 📭 Kaydedilmiş strateji bulunamadı[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+[32m14:31:53 | INFO     | 🔍 strategy klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | 🔍 strategy/custom klasöründe strateji aranıyor...[0m
+[32m14:31:53 | INFO     | ✅ Strateji bulundu: custom_smartmoney (SmartMoneyStrategy)[0m
+[32m14:31:53 | INFO     | 🎨 Custom strateji eklendi: custom_smartmoney[0m
+[32m14:31:53 | INFO     | 📊 Toplam 7 strateji bulundu[0m
+INFO:     127.0.0.1:54286 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54286 - "GET /api/v1/data/symbols-with-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54322 - "WebSocket /api/v1/ws" [accepted]
+[32m14:31:53 | INFO     | 🔌 [WS] Frontend connected (1 clients)[0m
+INFO:     connection open
+[32m14:31:53 | INFO     | 📬 [WS] Event Bus subscriber started (broadcasting to frontend)[0m
+[32m14:31:56 | INFO     | 🔌 [WS] Frontend disconnected (0 clients)[0m
+INFO:     connection closed
