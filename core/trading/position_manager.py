@@ -40,7 +40,7 @@ import asyncio
 
 from core.logger import logger
 from core.trading.entities.position import Position, PositionDirection
-from shared.events.events import PositionPartialClosedEvent
+from shared.events.events import PositionPartialClosedEvent, StopLossUpdatedEvent
 from core.trading.entities.trade import Trade, TradeHistory
 from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
 from strategy.risk import RiskManagement
@@ -559,26 +559,14 @@ class PositionManager:
                 f"{position.symbol} Breakeven koruması aktif edildi! "
                 f"Fiyat: ${current_price:.2f}, Entry: ${position.entry_price:.2f}"
             )
+            # Eski stop loss
+            old_stop = position.stop_loss
+
             # Breakeven aktif et (immutable)
             old_stop_loss = position.stop_loss
             position = position.activate_breakeven(commission_buffer=0.001)
 
-            if position.stop_loss != old_stop_loss:
-                logger.info(f"[RISK] [EVENT] Stop-Loss Updated: {position.symbol} -> {position.stop_loss}")
-                try:
-                    from shared.events.events import StopLossUpdatedEvent
-                    breakeven_event = StopLossUpdatedEvent(
-                        bot_id=position.bot_id,
-                        symbol=position.symbol,
-                        direction=position.direction,
-                        old_stop=old_stop_loss if old_stop_loss is not None else 0.0,
-                        new_stop=position.stop_loss if position.stop_loss is not None else 0.0,
-                        current_price=current_price,
-                        reason="breakeven_protection"
-                    )
-                    await event_bus.publish(breakeven_event.to_event())
-                except Exception as e:
-                    logger.error(f"Event bus publish failed for breakeven StopLossUpdatedEvent: {e}")
+
 
         # ========================================================================
         # AŞAMA 3: İZ SÜREN STOP (TRAILING) - BREAKEVEN KORUMALI
@@ -590,12 +578,23 @@ class PositionManager:
             atr_multiplier=atr_multiplier
         )
 
-        # Stop loss güncellenmişse logla
+        # Stop loss güncellenmişse logla ve event fırlat
         if updated_position.stop_loss != position.stop_loss:
             logger.debug(
                 f"[RISK] 3 Aşamalı Kâr Koruma - AŞAMA 3: "
                 f"{position.symbol} Trailing stop güncellendi: ${position.stop_loss:.2f} → ${updated_position.stop_loss:.2f}"
             )
+
+            # Event fırlat
+            sl_event = StopLossUpdatedEvent(
+                bot_id=updated_position.bot_id,
+                symbol=updated_position.symbol,
+                direction=updated_position.direction,
+                old_stop=position.stop_loss,
+                new_stop=updated_position.stop_loss,
+                current_price=current_price
+            )
+            await event_bus.publish(sl_event.to_event())
 
         return updated_position
     
