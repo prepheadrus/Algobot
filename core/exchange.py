@@ -51,8 +51,17 @@ def normalize_symbol(symbol: str) -> str:
     # Adım 1: Gereksiz karakterleri temizle
     symbol = symbol.strip()
 
-    # Adım 2: _ yerine / koy (BTC_USDT → BTC/USDT)
-    symbol = symbol.replace('_', '/')
+    # Adım 2: _ veya - yerine / koy (BTC_USDT → BTC/USDT, BTC-USDT → BTC/USDT)
+    symbol = symbol.replace('_', '/').replace('-', '/')
+
+    # Adım 2.5: PERP suffix kontrolü (BTC/USDT/PERP → BTC/USDT:USDT)
+    if '/PERP' in symbol.upper():
+        symbol = symbol.upper().replace('/PERP', '')
+        if '/' in symbol:
+            quote = symbol.split('/')[-1]
+            symbol = f"{symbol}:{quote}"
+        else:
+            symbol = f"{symbol}/USDT:USDT"
 
     # Adım 3: :USDT veya :USD kısmını temizle (BTC/USDT:USDT → BTC/USDT)
     # YENİ: Futures semboller için :USDT koru!
