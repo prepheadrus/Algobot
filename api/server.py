@@ -37,7 +37,7 @@ from api.routers.trades import router as trades_router
 # LIFESPAN EVENTS
 # ============================================================================
 
-from core.config import CONFIG, API_HOST
+from core.config import CONFIG, API_HOST, ALLOWED_ORIGINS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -195,7 +195,7 @@ app = FastAPI(
 # CORS ayarları
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
