@@ -4,7 +4,7 @@ Data Service
 Business logic for data operations.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Final
 from datetime import datetime
 import pandas as pd
 
@@ -18,6 +18,8 @@ from api.schemas.data import (
     DataDeleteRequest,
     DataPauseRequest,
 )
+
+MARKET_TYPE_KEYWORDS: Final = ('perp', 'future', 'vadeli', 'swap')
 
 
 class DataService:
@@ -233,9 +235,15 @@ class DataService:
     
     def _normalize_market_type(self, market_type_str: str, symbol: str) -> str:
         """Converts user-facing market type strings into system-level 'spot' or 'future' types."""
+        if market_type_str is None or pd.isna(market_type_str):
+            if ':' in symbol or symbol.endswith('-SWAP'):
+                return 'future'
+            return 'spot'
+
         lowered_str = str(market_type_str).lower()
-        if any(keyword in lowered_str for keyword in ['perp', 'future', 'vadeli', 'swap']):
-            return 'future'
+        for keyword in MARKET_TYPE_KEYWORDS:
+            if keyword in lowered_str:
+                return 'future'
         if ':' in symbol or symbol.endswith('-SWAP'):
             return 'future'
         return 'spot'
