@@ -147,7 +147,7 @@ class ParquetDataLake:
             Dosya yolu için sembol (örn: BTC_USDT)
         """
         return symbol.replace('/', '_').replace(':', '_')
-<<<<<<< fix-wfo-timezone-and-parquet-lake-14925137137714812537
+
 
     def _find_actual_symbol_path(self, symbol: str) -> str:
         """
@@ -183,8 +183,7 @@ class ParquetDataLake:
         default_path = self._symbol_to_path(symbol)
         logger.debug(f"[DEBUG] Veri yolu diskte bulunamadı, varsayılan kullanılacak: {(base_dir / default_path).absolute()}")
         return default_path
-=======
->>>>>>> main
+
 
     def _get_base_path(self, symbol: str, timeframe: str) -> Path:
         """

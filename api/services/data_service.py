@@ -121,27 +121,14 @@ class DataService:
         fetch_limit = 0
 
         if df_1m.empty:
-<<<<<<< fix-wfo-timezone-and-parquet-lake-14925137137714812537
+
             # Blocker (False Positive Protection): Eğer diskte 1m veri yoksa, API'den küçük bir limit çekip veri yok demek yerine
             # Parquet 1m Master Data'nın zorunlu olmasını sağlıyoruz. WFO'yu veya stratejiyi 1500 mumla aldatmamak için
             # None dönüp hata atıyoruz, böylece arka plan processi beklemeye geçer.
             logger.error(f"❌ [HYBRID DATA] (BLOCKER) Diskte {symbol} için {MASTER_TIMEFRAME} Master Data bulunamadı!")
             logger.warning(f"⚠️ [HYBRID DATA] Tam geçmiş veri indirmesi başlatılmadan botlar veya optimizasyonlar çalışamaz.")
             return None
-=======
-            # Hiç veri yok, C durumu: Doğrudan API'den çek (maks limit)
-            api_fetch_required = True
-            # WFOEngine vb. bir `days` parametresi aracılığıyla `start_date` verdiyse:
-            if start_date:
-                start_ts_naive = pd.Timestamp(start_date)
-                if start_ts_naive.tzinfo is not None:
-                    start_ts_naive = start_ts_naive.tz_convert(None)
-                gap_minutes = (target_end_ts - start_ts_naive).total_seconds() / 60
-                fetch_limit = min(int(gap_minutes) + 10, 1500)
-            else:
-                fetch_limit = 1500
-            logger.info(f"🔄 [HYBRID DATA] (C) Diskte hiç veri yok. API'den {fetch_limit} mumluk tam yükleme tetiklenecek.")
->>>>>>> main
+
         else:
             last_candle_ts = df_1m.index.max()
             gap_minutes = (target_end_ts - last_candle_ts).total_seconds() / 60
