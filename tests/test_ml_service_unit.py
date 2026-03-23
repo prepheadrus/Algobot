@@ -134,3 +134,100 @@ class TestMLServiceDeleteHistory:
         mock_remove.assert_called_once_with("artifacts/ml_training_history.json")
         # History should NOT be cleared if it failed
         assert self.ml_service.training_history == [{"id": 1}, {"id": 2}]
+
+
+class TestMLServiceCheckModel:
+    """Tests for check_model method of MLService."""
+
+    def setup_method(self):
+        self.ml_service = MLService()
+        self.symbol = "BTC/USDT"
+        self.timeframe = "1h"
+        self.mock_model_paths = {
+            'xgboost_path': 'artifacts/models/BTC_USDT_1h_xgb.json',
+            'rf_path': 'artifacts/models/BTC_USDT_1h_rf.joblib',
+            'metadata_path': 'artifacts/models/BTC_USDT_1h_meta.json'
+        }
+
+    @patch("api.services.ml_service.os.path.exists")
+    @patch("ml.model_training.get_model_paths")
+    def test_check_model_all_exist(self, mock_get_paths, mock_exists):
+        """Test check_model when all model files exist."""
+        # Setup
+        mock_get_paths.return_value = self.mock_model_paths
+        mock_exists.return_value = True
+
+        # Execute
+        result = self.ml_service.check_model(self.symbol, self.timeframe)
+
+        # Verify
+        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
+        assert mock_exists.call_count == 3
+
+        assert result["status"] == "success"
+        assert result["model_exists"] is True
+        assert result["model_path"] == self.mock_model_paths['xgboost_path']
+        assert result["message"] == "Model bulundu"
+
+        ensemble_status = result["ensemble_status"]
+        assert ensemble_status["xgboost"] is True
+        assert ensemble_status["random_forest"] is True
+        assert ensemble_status["metadata"] is True
+        assert ensemble_status["full_ensemble"] is True
+
+    @patch("api.services.ml_service.os.path.exists")
+    @patch("ml.model_training.get_model_paths")
+    def test_check_model_none_exist(self, mock_get_paths, mock_exists):
+        """Test check_model when no model files exist."""
+        # Setup
+        mock_get_paths.return_value = self.mock_model_paths
+        mock_exists.return_value = False
+
+        # Execute
+        result = self.ml_service.check_model(self.symbol, self.timeframe)
+
+        # Verify
+        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
+        assert mock_exists.call_count == 3
+
+        assert result["status"] == "success"
+        assert result["model_exists"] is False
+        assert result["model_path"] is None
+        assert result["message"] == "Model bulunamadı"
+
+        ensemble_status = result["ensemble_status"]
+        assert ensemble_status["xgboost"] is False
+        assert ensemble_status["random_forest"] is False
+        assert ensemble_status["metadata"] is False
+        assert ensemble_status["full_ensemble"] is False
+
+    @patch("api.services.ml_service.os.path.exists")
+    @patch("ml.model_training.get_model_paths")
+    def test_check_model_partial_exist(self, mock_get_paths, mock_exists):
+        """Test check_model when only some model files exist."""
+        # Setup
+        mock_get_paths.return_value = self.mock_model_paths
+
+        # Make XGBoost exist, but others not
+        def mock_exists_side_effect(path):
+            return path == self.mock_model_paths['xgboost_path']
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        # Execute
+        result = self.ml_service.check_model(self.symbol, self.timeframe)
+
+        # Verify
+        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
+        assert mock_exists.call_count == 3
+
+        assert result["status"] == "success"
+        assert result["model_exists"] is True
+        assert result["model_path"] == self.mock_model_paths['xgboost_path']
+        assert result["message"] == "Model bulundu"
+
+        ensemble_status = result["ensemble_status"]
+        assert ensemble_status["xgboost"] is True
+        assert ensemble_status["random_forest"] is False
+        assert ensemble_status["metadata"] is False
+        assert ensemble_status["full_ensemble"] is False
