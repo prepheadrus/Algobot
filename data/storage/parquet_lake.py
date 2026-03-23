@@ -867,8 +867,9 @@ class ParquetDataLake:
             if not symbol_dir.is_dir():
                 continue
 
-            # [SYMBOL FIX] Klasör adını normalize et (örn: /BTC → BTC/USDT)
-            symbol_raw = symbol_dir.name.replace('_', '/')
+            # [SYMBOL FIX] Klasör adını normalize et (örn: /BTC_USDT_USDT → BTC/USDT:USDT)
+            # symbol_raw = symbol_dir.name.replace('_', '/') # Bu satır BTC/USDT/USDT ürettiği için CCXT ValueError veriyordu
+            symbol_raw = symbol_dir.name
             from core.exchange import normalize_symbol
             symbol = normalize_symbol(symbol_raw)
 
