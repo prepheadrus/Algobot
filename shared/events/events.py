@@ -178,6 +178,42 @@ class BotStartedEvent:
 
 
 @dataclass
+class PositionPartialClosedEvent:
+    """
+    Pozisyon kısmi olarak kapatıldı (Kâr alma).
+
+    Publisher: PositionManager
+    Subscribers: Dashboard, Logger, RiskManager
+    """
+    bot_id: str
+    symbol: str
+    direction: PositionDirection
+    exit_price: float
+    size_closed: float
+    pnl: float
+    pnl_percent: float
+    remaining_size: float
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+    def to_event(self, source: str = "position_manager") -> Event:
+        return Event(
+            type="position.partial_closed",
+            payload={
+                'bot_id': self.bot_id,
+                'symbol': self.symbol,
+                'direction': self.direction.value,
+                'exit_price': self.exit_price,
+                'size_closed': self.size_closed,
+                'pnl': self.pnl,
+                'pnl_percent': self.pnl_percent,
+                'remaining_size': self.remaining_size
+            },
+            timestamp=self.timestamp,
+            source=source
+        )
+
+
+@dataclass
 class BotStoppedEvent:
     """
     Bot durduruldu.
@@ -1148,6 +1184,7 @@ EVENT_REGISTRY = {
     # Position Events
     "position.opened": PositionOpenedEvent,
     "position.closed": PositionClosedEvent,
+    "position.partial_closed": PositionPartialClosedEvent,
     "position.updated": PositionUpdatedEvent,
     "position.stoploss_updated": StopLossUpdatedEvent,
     "position.liquidated": PositionLiquidatedEvent,
