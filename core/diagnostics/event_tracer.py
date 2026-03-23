@@ -20,6 +20,7 @@ Kullanım:
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
+from collections import Counter
 from enum import Enum
 
 from core.logger import logger
@@ -91,7 +92,8 @@ class EventTracer:
         """
         self.enabled = enabled
         self.show_payload = show_payload
-        self.event_count: Dict[str, int] = {}
+        self.event_count = Counter()
+        self.total_events = 0
         self.start_time: Optional[datetime] = None
         self._running = False
         
@@ -143,7 +145,8 @@ class EventTracer:
         
         # Event sayısını artır
         category = self._get_category(event.type)
-        self.event_count[category.value] = self.event_count.get(category.value, 0) + 1
+        self.event_count[category.value] += 1
+        self.total_events += 1
         
         # Renkli output
         self._print_event(event, category)
@@ -298,7 +301,7 @@ class EventTracer:
             return
         
         duration = datetime.utcnow() - self.start_time
-        total_events = sum(self.event_count.values())
+        total_events = self.total_events
         
         logger.info("=" * 70)
         logger.info("📊 EVENT İSTATİSTİKLERİ")
@@ -308,7 +311,7 @@ class EventTracer:
         logger.info("-" * 70)
         
         # Kategori bazlı dağılım
-        for category, count in sorted(self.event_count.items(), key=lambda x: x[1], reverse=True):
+        for category, count in self.event_count.most_common():
             percentage = (count / total_events * 100) if total_events > 0 else 0
             color = self._get_color(EventCategory(category))
             
@@ -332,8 +335,8 @@ class EventTracer:
         return {
             'running': self._running,
             'start_time': self.start_time.isoformat() if self.start_time else None,
-            'total_events': sum(self.event_count.values()),
-            'by_category': self.event_count.copy(),
+            'total_events': self.total_events,
+            'by_category': dict(self.event_count),
         }
 
 
