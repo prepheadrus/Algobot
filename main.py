@@ -92,9 +92,9 @@ async def start_background_tasks():
         try:
             from core.wfo_engine import start_wfo_background_task
 
-            for symbol in symbols:
-                strategy = StrategyManager.get_strategy('trend_master')
-                if strategy:
+            strategy = StrategyManager.get_strategy('trend_master')
+            if strategy:
+                for symbol in symbols:
                     asyncio.create_task(
                         start_wfo_background_task(
                             symbol=symbol,
