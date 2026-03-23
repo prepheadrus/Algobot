@@ -431,6 +431,12 @@ class ParquetDataLake:
         Returns:
             Birleştirilmiş DataFrame veya None
         """
+        # Ensure start_date and end_date are tz-naive for directory comparison
+        if start_date.tzinfo is not None:
+            start_date = start_date.replace(tzinfo=None)
+        if end_date.tzinfo is not None:
+            end_date = end_date.replace(tzinfo=None)
+
         try:
             if self._is_intraday(timeframe):
                 # Gün bazlı partition - tüm YYYY/MM/DD/data.parquet dosyalarını bul
@@ -584,6 +590,12 @@ class ParquetDataLake:
         Yields:
             pd.DataFrame: Her batch için DataFrame
         """
+        # Ensure start_date and end_date are tz-naive for directory comparison
+        if start_date.tzinfo is not None:
+            start_date = start_date.replace(tzinfo=None)
+        if end_date.tzinfo is not None:
+            end_date = end_date.replace(tzinfo=None)
+
         try:
             if self._is_intraday(timeframe):
                 # Gün bazlı partition - tüm dosyaları bul
@@ -739,6 +751,11 @@ class ParquetDataLake:
             start_date: Başlangıç tarihi (None ise tümü)
             end_date: Bitiş tarihi (None ise tümü)
         """
+        if start_date and start_date.tzinfo is not None:
+            start_date = start_date.replace(tzinfo=None)
+        if end_date and end_date.tzinfo is not None:
+            end_date = end_date.replace(tzinfo=None)
+
         # Eğer timeframe None ise, TÜM timeframe'leri sil
         if timeframe is None:
             logger.info(f"🗑️ [PARQUET] {symbol} için TÜM timeframe'ler siliniyor...")
