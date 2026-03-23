@@ -190,7 +190,7 @@ class WFOEngine:
     
     async def _fetch_data(self, symbol: str, timeframe: str, days: int) -> pd.DataFrame:
         """
-        Parquet Lake'ten veri çek.
+        Hibrit Veri Sağlayıcıdan veri çek (Diskten 1m, RAM'de resample).
         
         Args:
             symbol: Sembol
@@ -200,16 +200,17 @@ class WFOEngine:
         Returns:
             OHLCV DataFrame
         """
-        lake = get_parquet_lake('binance')
+        from api.services.data_service import DataService
+        data_service = DataService()
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Vektörize okuma
-        data = await lake.load_datasets(symbol, timeframe, start_date, end_date)
+        # Hibrit veri okuma
+        data = await data_service.get_cached_or_fetch_data(symbol, timeframe, start_date, end_date)
         
         if data is not None:
-            logger.info(f"📊 [WFO] {len(data)} mum yüklendi")
+            logger.info(f"📊 [WFO] {len(data)} mum yüklendi (Hibrit Sağlayıcı)")
         
         return data
     
