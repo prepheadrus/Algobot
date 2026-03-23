@@ -564,6 +564,7 @@ class StopLossUpdatedEvent:
     old_stop: float
     new_stop: float
     current_price: float
+    reason: str = "trailing_stop"
     timestamp: datetime = field(default_factory=datetime.utcnow)
     
     def to_event(self, source: str = "position_manager") -> Event:
@@ -575,7 +576,8 @@ class StopLossUpdatedEvent:
                 'direction': self.direction.value,
                 'old_stop': self.old_stop,
                 'new_stop': self.new_stop,
-                'current_price': self.current_price
+                'current_price': self.current_price,
+                'reason': self.reason
             },
             timestamp=self.timestamp,
             source=source

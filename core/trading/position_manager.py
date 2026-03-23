@@ -563,18 +563,10 @@ class PositionManager:
             old_stop = position.stop_loss
 
             # Breakeven aktif et (immutable)
+            old_stop_loss = position.stop_loss
             position = position.activate_breakeven(commission_buffer=0.001)
 
-            # Event fırlat
-            sl_event = StopLossUpdatedEvent(
-                bot_id=position.bot_id,
-                symbol=position.symbol,
-                direction=position.direction,
-                old_stop=old_stop,
-                new_stop=position.stop_loss,
-                current_price=current_price
-            )
-            await event_bus.publish(sl_event.to_event())
+
 
         # ========================================================================
         # AŞAMA 3: İZ SÜREN STOP (TRAILING) - BREAKEVEN KORUMALI
