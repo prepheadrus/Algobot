@@ -560,8 +560,25 @@ class PositionManager:
                 f"Fiyat: ${current_price:.2f}, Entry: ${position.entry_price:.2f}"
             )
             # Breakeven aktif et (immutable)
+            old_stop_loss = position.stop_loss
             position = position.activate_breakeven(commission_buffer=0.001)
-            # TODO: StopLossUpdatedEvent fırlat (Event Bus entegrasyonu)
+
+            if position.stop_loss != old_stop_loss:
+                logger.info(f"[RISK] [EVENT] Stop-Loss Updated: {position.symbol} -> {position.stop_loss}")
+                try:
+                    from shared.events.events import StopLossUpdatedEvent
+                    breakeven_event = StopLossUpdatedEvent(
+                        bot_id=position.bot_id,
+                        symbol=position.symbol,
+                        direction=position.direction,
+                        old_stop=old_stop_loss if old_stop_loss is not None else 0.0,
+                        new_stop=position.stop_loss if position.stop_loss is not None else 0.0,
+                        current_price=current_price,
+                        reason="breakeven_protection"
+                    )
+                    await event_bus.publish(breakeven_event.to_event())
+                except Exception as e:
+                    logger.error(f"Event bus publish failed for breakeven StopLossUpdatedEvent: {e}")
 
         # ========================================================================
         # AŞAMA 3: İZ SÜREN STOP (TRAILING) - BREAKEVEN KORUMALI
