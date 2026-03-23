@@ -602,18 +602,9 @@ class DataService:
 
                 # Geçersiz semboller için özel temizleme (tüm varyasyonları sil)
                 if is_invalid_symbol:
-                    # Tüm download_tasks'ları kontrol et ve sil
-                    sql_all = "SELECT symbol, market_type FROM download_tasks"
-                    if self.db_manager.engine_type == "sqlite":
-                        async with self.db_manager.sqlite_conn.execute(sql_all) as cursor:
-                            all_tasks = await cursor.fetchall()
-                            for row in all_tasks:
-                                db_symbol = row[0]
-                                db_mt = row[1]
-                                if '-- SEÇİNİZ --' in db_symbol or 'SEÇİNİZ' in db_symbol or db_symbol == '':
-                                    await self.db_manager.delete_download_task(db_symbol, db_mt)
-                                    logger.info(f"🗑️ Geçersiz görev temizlendi: {db_symbol}_{db_mt}")
-                                    deleted_count += 1
+                    # Tüm download_tasks'ları toplu olarak temizle
+                    cleared = await self.db_manager.cleanup_invalid_download_tasks()
+                    deleted_count += cleared
                 else:
                     # DB'den sil
                     await self.db_manager.delete_download_task(symbol_clean, mt)

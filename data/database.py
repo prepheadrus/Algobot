@@ -1154,6 +1154,29 @@ class DatabaseManager:
             await self.sqlite_conn.execute(sql, params)
             await self.sqlite_conn.commit()
 
+    async def cleanup_invalid_download_tasks(self) -> int:
+        """Geçersiz sembollere sahip indirme görevlerini toplu olarak siler."""
+        sql = """
+            DELETE FROM download_tasks
+            WHERE symbol LIKE '%-- SEÇİNİZ --%'
+               OR symbol LIKE '%SEÇİNİZ%'
+               OR symbol = ''
+               OR symbol = '-'
+        """
+        deleted_count = 0
+        if self.engine_type == "postgres":
+            async with self.db_pool.acquire() as conn:
+                result = await conn.execute(sql)
+                deleted_count = int(result.split()[-1]) if result else 0
+        else:
+            async with self.sqlite_conn.execute(sql) as cursor:
+                deleted_count = cursor.rowcount
+            await self.sqlite_conn.commit()
+
+        if deleted_count > 0:
+            logger.info(f"🗑️ {deleted_count} geçersiz indirme görevi temizlendi.")
+        return deleted_count
+
     async def delete_klines_for_symbol(self, symbol: str):
         """Belirli bir sembole ait tüm indirilmiş mum verilerini siler (Varyasyonlar dahil)."""
         # Hem tam eşleşenleri hem de 'BTC/USDT:USDT' gibi varyasyonları silmek için
