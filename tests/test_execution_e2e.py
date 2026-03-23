@@ -159,7 +159,7 @@ class ExecutionE2ETest:
 
             for i, (high, low) in enumerate(price_sequence):
                 # Trailing stop güncelle
-                updated_position = self.position_manager.update_trailing_stop(
+                updated_position = await self.position_manager.update_trailing_stop(
                     long_position,
                     current_high=high,
                     current_low=low
@@ -218,7 +218,7 @@ class ExecutionE2ETest:
             logger.info(f"\n   Fiyat Akışı:")
 
             for i, (high, low) in enumerate(price_sequence_short):
-                updated_position = self.position_manager.update_trailing_stop(
+                updated_position = await self.position_manager.update_trailing_stop(
                     short_position,
                     current_high=high,
                     current_low=low

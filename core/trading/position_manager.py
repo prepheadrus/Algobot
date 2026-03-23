@@ -40,6 +40,7 @@ import asyncio
 
 from core.logger import logger
 from core.trading.entities.position import Position, PositionDirection
+from shared.events.events import PositionPartialClosedEvent
 from core.trading.entities.trade import Trade, TradeHistory
 from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
 from strategy.risk import RiskManagement
@@ -471,7 +472,7 @@ class PositionManager:
     # TRAILING STOP GÜNCELLEME
     # ========================================================================
 
-    def update_trailing_stop(
+    async def update_trailing_stop(
         self,
         position: Position,
         current_high: float,
@@ -517,9 +518,36 @@ class PositionManager:
                 f"{position.symbol} Kısmi kâr alma tetiklendi! "
                 f"Fiyat: ${current_price:.2f}, TP: ${position.take_profit:.2f}"
             )
-            # Bayrağı güncelle (immutable)
-            position = dataclasses.replace(position, partial_profit_taken=True)
-            # TODO: PositionPartialClosedEvent fırlat (Event Bus entegrasyonu)
+
+            # Kapanacak miktarı hesapla (%50)
+            size_closed = position.size * 0.5
+            remaining_size = position.size - size_closed
+
+            # PnL hesapla
+            pnl = position.unrealized_pnl(current_price) * 0.5
+            pnl_percent = position.unrealized_pnl_percent(current_price)
+
+            # Bayrağı ve boyutu güncelle (immutable)
+            # Not: margin de yarıya inmeli (size ile orantılı)
+            position = dataclasses.replace(
+                position,
+                size=remaining_size,
+                margin=position.margin * 0.5,
+                partial_profit_taken=True
+            )
+
+            # Event fırlat
+            partial_event = PositionPartialClosedEvent(
+                bot_id=position.bot_id,
+                symbol=position.symbol,
+                direction=position.direction,
+                exit_price=current_price,
+                size_closed=size_closed,
+                pnl=pnl,
+                pnl_percent=pnl_percent,
+                remaining_size=remaining_size
+            )
+            await event_bus.publish(partial_event.to_event())
 
         # ========================================================================
         # AŞAMA 2: BAŞA BAŞ (BREAKEVEN) KORUMASI
