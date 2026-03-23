@@ -121,12 +121,14 @@ class DataService:
         fetch_limit = 0
 
         if df_1m.empty:
+
             # Blocker (False Positive Protection): Eğer diskte 1m veri yoksa, API'den küçük bir limit çekip veri yok demek yerine
             # Parquet 1m Master Data'nın zorunlu olmasını sağlıyoruz. WFO'yu veya stratejiyi 1500 mumla aldatmamak için
             # None dönüp hata atıyoruz, böylece arka plan processi beklemeye geçer.
             logger.error(f"❌ [HYBRID DATA] (BLOCKER) Diskte {symbol} için {MASTER_TIMEFRAME} Master Data bulunamadı!")
             logger.warning(f"⚠️ [HYBRID DATA] Tam geçmiş veri indirmesi başlatılmadan botlar veya optimizasyonlar çalışamaz.")
             return None
+
         else:
             last_candle_ts = df_1m.index.max()
             gap_minutes = (target_end_ts - last_candle_ts).total_seconds() / 60
