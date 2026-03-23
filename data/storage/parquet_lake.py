@@ -275,7 +275,7 @@ class ParquetDataLake:
 
         logger.debug(f"💾 [PARQUET] {path.relative_to(self.BASE_DIR)} kaydedildi ({len(write_df)} satır)")
 
-    async def _read_parquet_thread(self, path: Path) -> Optional[pd.DataFrame]:
+    def _read_parquet_thread(self, path: Path) -> Optional[pd.DataFrame]:
         """
         Parquet okuma işlemi (thread'de çalışır).
 
@@ -345,7 +345,7 @@ class ParquetDataLake:
 
                         if append and partition_path.exists():
                             # Mevcut dosyaya ekle (async fonksiyon - doğrudan await)
-                            existing_df = await self._read_parquet_thread(partition_path)
+                            existing_df = await asyncio.to_thread(self._read_parquet_thread, partition_path)
                             if existing_df is not None and not existing_df.empty:
                                 # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
                                 if existing_df.index.tzinfo is None:
@@ -385,7 +385,7 @@ class ParquetDataLake:
 
                     if append and partition_path.exists():
                         # Mevcut dosyaya ekle (async fonksiyon - doğrudan await)
-                        existing_df = await self._read_parquet_thread(partition_path)
+                        existing_df = await asyncio.to_thread(self._read_parquet_thread, partition_path)
                         if existing_df is not None and not existing_df.empty:
                             # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
                             if existing_df.index.tzinfo is None:
