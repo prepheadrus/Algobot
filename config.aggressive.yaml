@@ -1,0 +1,114 @@
+# ============================================================================
+# HIZLI ÇÖZÜM - BOT İŞLEM ALMAMA SORUNU
+# ============================================================================
+# Bu config, botun daha agresif işlem almasını sağlar.
+# Varsayılan config.yaml'ı backup edin ve bunu kullanın.
+# ============================================================================
+
+bot:
+  environment: development
+  exchange: binance
+  log_level: INFO              # DEBUG yaparsanız daha detaylı log görürsünüz
+  name: CryptoAlgoBot
+
+trading:
+  exchange: binance
+  symbols: []                  # Boş bırakın, Parquet'ten otomatik yüklenecek
+  timeframes:
+  - 1m
+
+# ============================================================================
+# RİSK YÖNETİMİ - AGRESİF İŞLEM
+# ============================================================================
+risk_management:
+  default_leverage: 1
+  max_leverage: 10
+  max_open_positions: 20       # 10 → 20 (daha fazla pozisyon)
+  max_risk_per_trade_percent: 1.0  # %1 risk
+  
+  # Kill Switch - KAPALI (işlem devam etsin)
+  kill_switch:
+    enabled: false             # true → false (kapalı)
+    max_consecutive_losses: 10 # 5 → 10 (daha toleranslı)
+  
+  max_daily_loss: 0.1          # %10 günlük kayıp limiti
+  max_drawdown: 0.3            # %30 maksimum düşüş
+
+# ============================================================================
+# ML AYARLARI - DÜŞÜK THRESHOLD
+# ============================================================================
+ml:
+  enabled: true                # true (ML aktif)
+  confidence_threshold: 0.5    # 0.65 → 0.5 (daha düşük threshold)
+  
+  leverage:
+    normal_threshold: 0.65
+    strong_threshold: 0.8
+    weak_threshold: 0.5
+
+# ============================================================================
+# HTF AYARLARI - KAPALI (VETO YOK)
+# ============================================================================
+htf:
+  enabled: false               # true → false (HTF veto kapalı)
+  dynamic_map:
+    1m:
+    - 5m
+    - 15m
+    5m:
+    - 15m
+    - 1h
+    15m:
+    - 1h
+    - 4h
+  ema_fast: 20
+  ema_slow: 50
+  trend_method: ema_stack
+  filter_rules:
+    require_all_htf_agree: false
+
+# ============================================================================
+# WFO (WALK-FORWARD OPTIMIZATION)
+# ============================================================================
+wfo:
+  enabled: true
+  train_days: 90
+  test_days: 30
+  reoptimize_interval: 168     # 1 hafta
+  optimization_metric: sharpe
+  min_improvement: 0.05
+
+# ============================================================================
+# STRATEJİ AYARLARI
+# ============================================================================
+strategy:
+  active_modules:
+  - trend_following
+  - mean_reversion
+  atr_sl_multiplier: 3.0       # Stop loss: 3x ATR
+  atr_tp_multiplier: 6.0       # Take profit: 6x ATR (1:2 risk/reward)
+  ml_confidence_threshold: 0.6
+
+# ============================================================================
+# KALMAN FILTER
+# ============================================================================
+kalman:
+  enabled: true
+  q: 0.001
+  r: 0.1
+
+kalman_smoothing:
+  enabled: false
+  measurement_noise: 0.1
+  process_noise: 0.001
+
+# ============================================================================
+# CANDLE LOCK
+# ============================================================================
+candle_lock:
+  enabled: false
+  interval: 1
+
+candle_close_lock:
+  enabled: true
+  check_interval: 5

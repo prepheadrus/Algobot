@@ -1,0 +1,237 @@
+# 🤖 AUTO-DOC BOT - Yapılandırma
+
+**Versiyon:** v1.0
+**Son Güncelleme:** 17 Mart 2026
+
+---
+
+## 📋 GENEL BAKIŞ
+
+Auto-Doc Bot, her git commit'tan sonra `docs/architecture/` klasöründeki 3 ana dokümanı otomatik günceller.
+
+---
+
+## 🔧 KURULUM
+
+### **1. Yerel Geliştirme (Post-Commit Hook)**
+
+```bash
+# Windows (PowerShell - Admin olarak çalıştır)
+cd "f:\Crypto Bot"
+
+# Hook'u aktif et
+git config core.hooksPath .git/hooks
+
+# Manuel test
+python scripts/auto_doc_bot.py
+```
+
+**Hook otomatik çalışacak:**
+```bash
+git commit -m "Feature: Yeni endpoint eklendi"
+# → Post-commit hook otomatik çalışır
+# → auto_doc_bot.py çalışır
+# → Dokümanlar güncellenir
+```
+
+---
+
+### **2. GitHub Actions (CI/CD)**
+
+**Otomatik Aktif:**
+- ✅ `.github/workflows/auto-doc-bot.yml` oluşturuldu
+- ✅ Her `push` ve `pull_request`'ta çalışır
+- ✅ Güncellenen dokümanlar otomatik commit edilir
+
+**İlk Push Sonrası Kontrol:**
+```
+1. GitHub → Actions sekmesine git
+2. "Auto-Doc Bot" workflow'u göründüğünden emin ol
+3. İlk commit'ten sonra workflow çalışacak
+4. "Docs: Otomatik dokümantasyon güncelleme" commit'i görünecek
+```
+
+---
+
+## ⚙️ YAPILANDIRMA DOSYASI
+
+**Dosya:** `scripts/auto_doc_config.yaml`
+
+```yaml
+# Auto-Doc Bot Konfigürasyonu
+
+# Güncellenecek dokümanlar
+docs:
+  - path: docs/architecture/MASTER_PROJE_DESTANI.md
+    categories:
+      - core/
+      - shared/
+      - strategy/
+      - bot_manager
+      - position_manager
+  
+  - path: docs/architecture/TASKS_AND_TRACEABILITY.md
+    categories:
+      - api/
+      - ml/
+      - frontend/
+      - router
+      - service
+  
+  - path: docs/architecture/TRADING_RULES_AND_RISK.md
+    categories:
+      - risk_engine
+      - config.yaml
+      - komisyon
+      - slippage
+
+# Versiyon formatı
+versioning:
+  format: "v{major}.{minor}"
+  auto_increment: true
+
+# Tarih formatı
+date_format: "%d %B %Y"
+
+# Log seviyesi
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR
+```
+
+---
+
+## 📊 ÇALIŞMA PRENSİBİ
+
+### **Commit Öncesi:**
+```bash
+git add api/routers/bot.py
+git commit -m "Feature: Resume-all endpoint"
+```
+
+### **Commit Sonrası (Otomatik):**
+```
+🤖 AUTO-DOC BOT çalışıyor...
+📝 Commit mesajı: Feature: Resume-all endpoint
+📁 Değişen dosyalar: 1
+📄 TASKS_AND_TRACEABILITY.md güncelleniyor...
+✅ TASKS_AND_TRACEABILITY.md güncellendi
+
+💡 Güncellenen dosyaları eklemek için:
+   git add docs/architecture/
+```
+
+### **Güncellenen Doküman:**
+```markdown
+# 📊 TASKS AND TRACEABILITY MATRIX
+
+**Versiyon:** v4.1  ← Otomatik artırıldı
+**Son Güncelleme:** 17 Mart 2026  ← Otomatik güncellendi
+
+---
+
+## 🔄 Otomatik Güncelleme (2026-03-17)
+
+**Commit:** Feature: Resume-all endpoint
+
+**Değişiklikler:**
+- API Endpoint: `api/routers/bot.py`
+```
+
+---
+
+## 🚨 SORUN GİDERME
+
+### **Hook Çalışmıyor**
+
+**Windows:**
+```powershell
+# Hook path'i kontrol et
+git config core.hooksPath
+
+# Eğer boşsa veya yanlışsa:
+git config core.hooksPath .git/hooks
+
+# Hook dosyasının çalıştırılabilir olduğundan emin ol
+icacls .git/hooks/post-commit /grant Everyone:RX
+```
+
+### **Python Script Hatası**
+
+```bash
+# Python yolunu kontrol et
+where python  # Windows
+which python3  # Linux/Mac
+
+# Script'i manuel test et
+python scripts/auto_doc_bot.py
+
+# Hata mesajını kontrol et
+```
+
+### **GitHub Actions Çalışmıyor**
+
+```
+1. GitHub → Settings → Actions → General
+2. "Allow all actions" aktif olmalı
+3. Workflow dosyasının syntax'ını kontrol et:
+   yamllint .github/workflows/auto-doc-bot.yml
+```
+
+---
+
+## 🔄 MANUEL GÜNCELLEME
+
+Eğer otomatik sistem çalışmazsa:
+
+```bash
+# Manuel çalıştır
+python scripts/auto_doc_bot.py
+
+# Güncellenen dokümanları kontrol et
+git status
+
+# Commit et
+git add docs/architecture/
+git commit -m "Docs: Manuel dokümantasyon güncelleme"
+```
+
+---
+
+## 📈 İSTATİSTİKLER
+
+**Her Otomatik Güncelleme:**
+- ✅ Versiyon numarası +1 artırılır
+- ✅ Tarih güncellenir
+- ✅ Değişen dosyalar listelenir
+- ✅ İlgili bölüme eklenir
+
+**Tahmini Süre:**
+- Hook çalışması: < 2 saniye
+- Doküman güncelleme: < 5 saniye
+- Toplam: < 10 saniye
+
+---
+
+## 💡 EN İYİ UYGULAMALAR
+
+1. **Her Commit'ten Sonra Kontrol Et:**
+   ```bash
+   git commit -m "Feature: XYZ"
+   git status  # docs/architecture/ güncellenmiş mi?
+   ```
+
+2. **Pull Request Öncesi:**
+   ```bash
+   # Son commit'i kontrol et
+   git log -1
+   git diff HEAD~1 docs/architecture/
+   ```
+
+3. **Haftalık Özet:**
+   ```bash
+   # Haftalık değişiklikleri gör
+   git log --since="1 week ago" -- docs/architecture/
+   ```
+
+---
+
+**Auto-Doc Bot v1.0 - Otomatik Dokümantasyon Güncelleme Aktif**

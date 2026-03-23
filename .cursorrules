@@ -1,0 +1,25 @@
+# Crypto Bot Project Rules
+
+## 1. Yazılım Mimarisi (Software Architecture)
+- Proje, bağımsız modüllerden oluşan bir Veri Boru Hattı (Data Pipeline) üzerine kuruludur.
+- Veri indirme (`exchange.py`), indikatör hesaplama (`indicators.py`), strateji karar alma (`strategy/`) ve makine öğrenmesi tahmini (`server.py`) aşamaları kesin çizgilerle birbirinden ayrılmıştır.
+- Her yeni strateji `strategy/base.py`'den miras almalı (inherit) ve `strategy/manager.py` içine kaydedilmelidir.
+
+## 2. İndikatör ve Özellik Mühendisliği (Feature Engineering)
+- İndikatörler *asla* strateji dosyaları içerisinde `for` döngüleriyle hesaplanmaz. 
+- Hesaplama yükü, C kütüphanesi kullanan `pandas_ta` kütüphanesine devredilmiş olup, `data/indicators.py` içindeki `add_all_indicators` metodunda tek merkezden yapılır.
+- Kütüphanede olmayan özel formüller (Koncorde, Kalman Filter vb.) Python ile `indicators.py` içerisine fonksiyon olarak işlenir. 
+
+## 3. Makine Öğrenmesi Entegrasyonu (ML)
+- Yapay Zeka (XGBoost) eğitim ve tahmin aşamalarında teknik analiz sütunlarını birleştirerek kullanır.
+- Stratejilerin tek başına "AL/SAT" vermesi yetmez, nihai onayı ML tahmini (Confidence Score) ile konfluans (örtüşme) sağlayarak gerçekleştirmelidir.
+- Görsel simülasyon grafiğinde ML sinyalleri izole edilerek arka plan verisi olarak işlenir, gerçek "İşlem (Trade)" sadece strateji + ML aynı yöne baktığında (Konfluans) çalışır.
+
+## 4. Paper Trade & Risk Yönetimi
+- Test işlemleri `core/paper.py` üzerinden asenkron yönetilir (Slipaj %0.01 ve Fee/Komisyon ücretleri hesaba dahil edilir).
+- ATR tabanlı dinamik stop (Trailing Stop hazırlığı), Kripto büyüklüğü hesaplama ve Kaldıraç konfigürasyonu aktiftir.
+
+## 5. UI & Frontend (Görünüm)
+- Arayüz, modern cam (Glassmorphism) stilindedir.
+- Grafikler için TradingView Lightweight Charts kütüphanesi kullanılır.
+- Grafik okunaklılığı ön plandadır: Mükerrer "Ok" veya "Sinyal" basımı yasaktır; yalnızca net bir işleme girildiğinde ana simgeler kullanılır. Arka plandaki düşünce sinyalleri küçük şeffaf noktalar halinde gösterilir. Tooltip (Popup) entegrasyonu zorunludur.

@@ -1,0 +1,53 @@
+# Environments
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database
+*.db
+*.sqlite3
+*.db-shm
+*.db-wal
+cryptobot.db
+
+# OHLCV Flat Files (Superalgos Mimarisi)
+data/ohlcv/
+data/ohlcv_flat/
+
+# Logs and Debug
+*.log
+debug_output.txt
+cols_out.txt
+error_trace.txt
+
+# Migration/Temp Folders
+linux_migration/
+.vscode/
+home/
+
+# Artifacts (trained models, history)
+artifacts/
+
+# Jupyter Notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# IDEs
+.idea/
+.DS_Store
+
+# =============================================
+# Makineye Özel Yapılandırma (Her Makine Farklı)
+# Ubuntu ve Windows config'leri birbirini ezmez.
+# Şablon: config.example.yaml dosyasını kopyala
+#          -> config.yaml olarak kullan
+# =============================================
+config.yaml

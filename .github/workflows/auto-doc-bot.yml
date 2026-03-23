@@ -1,0 +1,49 @@
+name: Auto-Doc Bot - CI/CD Dokümantasyon Güncelleme
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  auto-doc-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 2  # Son 2 commit'i al (diff için gerekli)
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyYAML
+    
+    - name: Run Auto-Doc Bot
+      run: |
+        echo "========================================================================"
+        echo "🤖 AUTO-DOC BOT - CI/CD Dokümantasyon Güncelleme"
+        echo "========================================================================"
+        python scripts/auto_doc_bot.py
+      
+    - name: Commit updated documentation
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Docs: Otomatik dokümantasyon güncelleme [skip ci]"
+        file_pattern: docs/architecture/*.md
+        commit_options: '--no-verify'
+        skip_fetch: true
+    
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: updated-docs
+        path: docs/architecture/
+        retention-days: 30

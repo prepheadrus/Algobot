@@ -1,0 +1,512 @@
+<!-- 
+  CryptoAlgoBot - No-Code Strateji Oluşturucu
+  Kullanıcıların kod yazmadan strateji oluşturmasını sağlar.
+-->
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strateji Laboratuvarı | CryptoAlgoBot</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Strateji Builder Özel Stilleri */
+        .builder-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 20px;
+            height: calc(100vh - 150px);
+            padding: 20px;
+        }
+
+        .panel {
+            background: rgba(30, 35, 45, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--neon-blue);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* İndikatör Listesi */
+        .indicator-category {
+            margin-bottom: 20px;
+        }
+
+        .category-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .indicator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .indicator-item:hover {
+            background: rgba(88, 166, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .indicator-name {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .btn-add {
+            background: var(--neon-blue);
+            color: #fff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .btn-add:hover {
+            background: var(--neon-green);
+        }
+
+        /* Koşul Oluşturucu */
+        .condition-builder {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .condition-side {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .condition-side.long {
+            color: var(--neon-green);
+        }
+
+        .condition-side.short {
+            color: var(--neon-red);
+        }
+
+        .condition-rule {
+            display: grid;
+            grid-template-columns: 2fr 1fr 2fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .condition-select, .condition-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .btn-remove {
+            background: var(--neon-red);
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-add-rule {
+            background: transparent;
+            border: 1px dashed var(--text-muted);
+            color: var(--text-muted);
+            padding: 8px;
+            width: 100%;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-add-rule:hover {
+            border-color: var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        /* Logic Selector */
+        .logic-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .logic-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .logic-btn.active {
+            background: var(--neon-blue);
+            color: #fff;
+            border-color: var(--neon-blue);
+        }
+
+        /* Parametre Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--neon-blue);
+        }
+
+        .param-group {
+            margin-bottom: 15px;
+        }
+
+        .param-label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .param-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: var(--neon-blue);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+        }
+
+        /* Preview Panel */
+        .preview-code {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .strategy-info {
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .info-label {
+            color: var(--text-muted);
+        }
+
+        .info-value {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sol Menü -->
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <span class="pulse-dot"></span>
+                <h2>Algo<span>Bot</span></h2>
+            </div>
+            <nav class="menu">
+                <button class="menu-item" data-target="tab-portfolio">📊 Portföy</button>
+                <button class="menu-item" data-target="tab-ml">🧠 ML Motoru</button>
+                <button class="menu-item" data-target="tab-orders">⚡ Emirler</button>
+                <button class="menu-item active" data-target="tab-strategy-lab">🎨 Strateji Lab</button>
+                <button class="menu-item" data-target="tab-settings">⚙️ Ayarlar</button>
+            </nav>
+        </aside>
+
+        <!-- Ana İçerik -->
+        <main class="main-content">
+            <header class="top-nav glass-panel">
+                <h1>🎨 Strateji Laboratuvarı</h1>
+                <div class="user-profile">
+                    <img src="https://api.dicebear.com/7.x/identicon/svg?seed=StrategyBuilder" alt="User">
+                </div>
+            </header>
+
+            <!-- Strateji Builder -->
+            <div class="builder-container">
+                <!-- SOL PANEL: İndikatör Kütüphanesi -->
+                <div class="panel">
+                    <div class="panel-header">📚 Gösterge Kütüphanesi</div>
+                    
+                    <input type="text" id="indicator-search" class="condition-input" 
+                           placeholder="🔍 Ara..." style="width: 100%; margin-bottom: 15px;">
+
+                    <div id="indicator-list">
+                        <!-- Trend -->
+                        <div class="indicator-category">
+                            <div class="category-title">📈 TREND</div>
+                            <div class="indicator-item" data-type="EMA">
+                                <span class="indicator-name">EMA</span>
+                                <button class="btn-add" onclick="addIndicator('EMA')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="SMA">
+                                <span class="indicator-name">SMA</span>
+                                <button class="btn-add" onclick="addIndicator('SMA')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="Supertrend">
+                                <span class="indicator-name">Supertrend</span>
+                                <button class="btn-add" onclick="addIndicator('Supertrend')">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Momentum -->
+                        <div class="indicator-category">
+                            <div class="category-title">🚀 MOMENTUM</div>
+                            <div class="indicator-item" data-type="RSI">
+                                <span class="indicator-name">RSI</span>
+                                <button class="btn-add" onclick="addIndicator('RSI')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="MACD">
+                                <span class="indicator-name">MACD</span>
+                                <button class="btn-add" onclick="addIndicator('MACD')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="Stochastic">
+                                <span class="indicator-name">Stochastic</span>
+                                <button class="btn-add" onclick="addIndicator('Stochastic')">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Volatilite -->
+                        <div class="indicator-category">
+                            <div class="category-title">📊 VOLATİLİTE</div>
+                            <div class="indicator-item" data-type="ATR">
+                                <span class="indicator-name">ATR</span>
+                                <button class="btn-add" onclick="addIndicator('ATR')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="Bollinger">
+                                <span class="indicator-name">Bollinger</span>
+                                <button class="btn-add" onclick="addIndicator('Bollinger')">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Hacim -->
+                        <div class="indicator-category">
+                            <div class="category-title">💰 HACİM</div>
+                            <div class="indicator-item" data-type="OBV">
+                                <span class="indicator-name">OBV</span>
+                                <button class="btn-add" onclick="addIndicator('OBV')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="VWAP">
+                                <span class="indicator-name">VWAP</span>
+                                <button class="btn-add" onclick="addIndicator('VWAP')">+</button>
+                            </div>
+                            <div class="indicator-item" data-type="MFI">
+                                <span class="indicator-name">MFI</span>
+                                <button class="btn-add" onclick="addIndicator('MFI')">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ORTA PANEL: Koşul Oluşturucu -->
+                <div class="panel">
+                    <div class="panel-header">⚙️ Koşul Oluşturucu</div>
+
+                    <!-- Strateji Bilgileri -->
+                    <div class="strategy-info">
+                        <div class="info-row">
+                            <span class="info-label">Strateji Adı:</span>
+                            <input type="text" id="strategy-name" class="condition-input" 
+                                   value="Yeni Strateji" style="flex: 1; text-align: right;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Zaman Dilimi:</span>
+                            <select id="timeframe" class="condition-select" style="flex: 1; text-align: right;">
+                                <option value="1m">1m</option>
+                                <option value="5m">5m</option>
+                                <option value="15m" selected>15m</option>
+                                <option value="1h">1h</option>
+                                <option value="4h">4h</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- LONG Koşulları -->
+                    <div class="condition-builder">
+                        <div class="condition-side long">🟢 LONG Koşulları</div>
+                        
+                        <div class="logic-selector">
+                            <div class="logic-btn active" onclick="setLogic('long', 'AND')">VE (AND)</div>
+                            <div class="logic-btn" onclick="setLogic('long', 'OR')">VEYA (OR)</div>
+                        </div>
+
+                        <div id="long-conditions">
+                            <!-- Dinamik koşullar buraya eklenecek -->
+                        </div>
+
+                        <button class="btn-add-rule" onclick="addConditionRule('long')">
+                            ➕ Koşul Ekle
+                        </button>
+                    </div>
+
+                    <!-- SHORT Koşulları -->
+                    <div class="condition-builder">
+                        <div class="condition-side short">🔴 SHORT Koşulları</div>
+                        
+                        <div class="logic-selector">
+                            <div class="logic-btn active" onclick="setLogic('short', 'AND')">VE (AND)</div>
+                            <div class="logic-btn" onclick="setLogic('short', 'OR')">VEYA (OR)</div>
+                        </div>
+
+                        <div id="short-conditions">
+                            <!-- Dinamik koşullar buraya eklenecek -->
+                        </div>
+
+                        <button class="btn-add-rule" onclick="addConditionRule('short')">
+                            ➕ Koşul Ekle
+                        </button>
+                    </div>
+
+                    <!-- Risk Ayarları -->
+                    <div class="condition-builder">
+                        <div class="condition-side">🎯 Risk Ayarları</div>
+                        <div class="condition-rule">
+                            <span class="info-label">Stop Loss (ATR çarpanı):</span>
+                            <input type="number" id="stop-loss" class="condition-input" value="2.0" step="0.1">
+                            <span class="info-label">Take Profit:</span>
+                            <input type="number" id="take-profit" class="condition-input" value="3.0" step="0.1">
+                        </div>
+                        <div class="condition-rule">
+                            <span class="info-label">Max Risk (%):</span>
+                            <input type="number" id="max-risk" class="condition-input" value="2.0" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SAĞ PANEL: Preview ve Aksiyonlar -->
+                <div class="panel">
+                    <div class="panel-header">👁️ Önizleme</div>
+
+                    <div class="strategy-info">
+                        <div class="info-row">
+                            <span class="info-label">İndikatörler:</span>
+                            <span class="info-value" id="preview-indicators">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">LONG Koşulları:</span>
+                            <span class="info-value" id="preview-long">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">SHORT Koşulları:</span>
+                            <span class="info-value" id="preview-short">0</span>
+                        </div>
+                    </div>
+
+                    <div class="panel-header">📄 JSON Önizleme</div>
+                    <div class="preview-code" id="json-preview">
+// Strateji JSON'u burada görünecek...
+                    </div>
+
+                    <div class="modal-actions" style="margin-top: 20px;">
+                        <button class="btn btn-secondary" onclick="testStrategy()">🧪 Test Et</button>
+                        <button class="btn btn-primary" onclick="saveStrategy()">💾 Kaydet</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Parametre Modal -->
+    <div id="param-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modal-title">İndikatör Parametreleri</div>
+            <div id="modal-params">
+                <!-- Dinamik parametreler -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+                <button class="btn btn-primary" onclick="confirmIndicator()">Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="strategy-builder.js"></script>
+</body>
+</html>

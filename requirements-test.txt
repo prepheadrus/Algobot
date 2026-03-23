@@ -1,0 +1,32 @@
+# Test Dependencies
+# CryptoAlgoBot E2E Test Suite için gerekli kütüphaneler
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+pytest-cov>=4.1.0  # Code coverage
+
+# HTTP testing (API endpoints için)
+httpx>=0.25.0  # Async HTTP client
+fastapi>=0.104.0  # API testing için gerekli
+
+# Mocking
+unittest2>=1.1.0  # Enhanced unittest
+mock>=5.1.0  # Mocking library
+
+# Test runners
+pytest-xdist>=3.3.0  # Parallel test execution
+pytest-timeout>=2.2.0  # Test timeout protection
+
+# Reporting
+pytest-html>=4.0.0  # HTML test reports
+allure-pytest>=2.13.0  # Allure test reports (optional)
+
+# Database testing
+pytest-postgresql>=5.0.0  # PostgreSQL testing (optional)
+aiosqlite>=0.19.0  # SQLite async testing
+
+# Utilities
+freezegun>=1.4.0  # Time freezing for tests
+faker>=20.0.0  # Fake data generation

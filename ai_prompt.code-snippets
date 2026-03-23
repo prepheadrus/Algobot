@@ -1,0 +1,463 @@
+{
+	"🚀 SİSTEMİ BAŞLAT (Güne Başla)": {
+		"prefix": "ai-basla",
+		"body": [
+			"Sen Crypto Bot projesinin baş mimarısın. Lütfen hafızanı tazele ve şu bağlamları yükle:",
+			"1. **KİMLİK:** @.cursorrules (Kurallarımız ve Teknik Standartlar)",
+			"2. **HARİTA:** @knowledge/INDEX.md (Proje yapısı ve dokümantasyon)",
+			"3. **HAFIZA:** @knowledge/BIRLESTIRME-OZETI.md (Son oturum özeti)",
+			"4. **PROJE:** @knowledge/PROJE-HARITASI.md (Genel bakış)",
+			"5. **ÇEKİRDEK KODLAR:** @core/exchange.py, @core/paper.py, @data/indicators.py ve @api/server.py",
+			"",
+			"✅ Yüklendikten sonra:",
+			"- Botun güncel durumunu yorumla.",
+			"- Kullanıcıya özet sun: 'Hoş geldin! Knowledge base yüklendi. Tüm modüller kontrol edildi.'",
+			"",
+			"Hazırsan 'Sistem Yüklendi ve Hazır 🚀' mesajını ver."
+		],
+		"description": "Projeyi açtığınızda AI'a tüm bağlamı yükler."
+	},
+	"💾 OTURUMU KAYDET (Günü Bitir)": {
+		"prefix": "ai-kaydet",
+		"body": [
+			"Bu oturumda yaptığımız tüm değişiklikleri özetle.",
+			"",
+			"📄 **status.md dosyasını güncelle:**",
+			"- **Tarih:** $CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE",
+			"- **Tamamlanan Görevler:** (Bugün biten işler - numaralandırılmış)",
+			"- **Sıradaki Adım:** (Bir sonraki oturumda neye başlamalıyız? - DETAYLI)",
+			"- **Değişen Dosyalar:** (Hangi dosyalara dokunduk? - tam yol)",
+			"- **Hata Durumu:** (Varsa mevcut bug/hata listesi)",
+			"",
+			"📝 **Oturum kaydı oluştur:**",
+			"- `.agent/knowledge/gunluk-raporlar/2026-$CURRENT_MONTH-$CURRENT_DATE-oturum-kaydi.md` dosyasını oluştur",
+			"- Kronolojik sırayla yapılan işleri detaylı yaz",
+			"- Kod blokları ve örnekler ekle",
+			"- Metrikleri kaydet (Bot hızı, kâr zararları, eklenen stratejiler, vs.)",
+			"",
+			"🗺️ **Haritayı güncelle:**",
+			"- `ai-harita` komutunu çalıştır",
+			"- Yeni dosyaları map.md'ye ekle",
+			"",
+			"✅ Tüm işlemler tamamlandıktan sonra:",
+			"'Save Point Oluşturuldu! İyi akşamlar! 👋' mesajını ver."
+		],
+		"description": "Günü bitirirken durumu status.md dosyasına kaydeder, oturum kaydı oluşturur."
+	},
+	"📒 HIZLI KAYIT (Session Snapshot)": {
+		"prefix": "ai-kayıt",
+		"body": [
+			"Şu anki durumu hızlıca kaydet.",
+			"",
+			"📋 **Kısa Özet:**",
+			"- **Ne yapıldı:** (Son 3 saatte tamamlanan iş)",
+			"- **Şu an ne yapılıyor:** (Mevcut görev)",
+			"- **Sorunlar:** (Varsa hatalar/bloklamalar)",
+			"- **Sıradaki:** (Önümüzdeki 30 dakikada yapılacak)",
+			"",
+			"📄 **aktif-gorevler.md güncelle:**",
+			"- Tamamlanan görevleri işaretle",
+			"- Yeni görev varsa ekle",
+			"- İlerleme yüzdesini güncelle",
+			"",
+			"💾 **Save Point:**",
+			"- Git commit oluştur (ai-commit)",
+			"- Kullanıcıya 'Save Point oluşturuldu! Devam edelim mi yoksa durdurayım mı?' sor"
+		],
+		"description": "Hızlı durum güncellemesi ve save point oluşturur."
+	},
+	"🚑 HATA ÇÖZÜCÜ (Panodaki Hatayı Okur)": {
+		"prefix": "ai-fix",
+		"body": [
+			"Şu an panomda (clipboard) kopyalı olan hatayı analiz etmeni istiyorum.",
+			"",
+			"🔴 **HATA İÇERİĞİ / TRACEBACK:**",
+			"$CLIPBOARD",
+			"",
+			"📂 **İLGİLİ DOSYA:**",
+			"$TM_FILENAME",
+			"",
+			"🧠 **ANALİZ TALİMATI:**",
+			"1. Bu hatanın neden kaynaklandığını `Python Traceback` veya `Browser Console` üzerinden analiz et.",
+			"2. Eğer sorun asenkron (asyncio) işlem veya Pandas kütüphanesi ile ilgiliyse veri tiplerini kontrol et.",
+			"3. Benzer hata daha önce çözülmüş mü? `.agent/knowledge/` veya logları kontrol et.",
+			"4. Çözümü adım adım anlat ve düzeltilmiş kod bloğunu ver.",
+			"5. Bu hatanın tekrarlanmaması için gerekirse `.cursorrules` dosyasına kural ekle.",
+			"",
+			"✅ Çözüm sonrası:",
+			"- Gerekli modüllerin (FastAPI, uvicorn vb.) hatasız çalıştığını test et.",
+			"- Hata çözüldüyse '✅ Hata çözüldü! Bot stabil!' mesajı ver."
+		],
+		"description": "Kopyalanmış hatayı otomatik analiz eder ve çözer."
+	},
+	"🧹 REFACTOR (Kodu İyileştir)": {
+		"prefix": "ai-refactor",
+		"body": [
+			"Şu an açık olan '$TM_FILENAME' dosyasını incele.",
+			"Bu kodu Crypto Bot projesinin standartlarına (performanslı Python, Pandas optimizasyonu, Asenkron FastAPI) göre optimize et.",
+			"",
+			"**Dikkat etmen gerekenler:**",
+			"- Performans (Gereksiz döngü var mı? Pandas/Numpy yerine yavaş list comprehensions kullanılmış mı?)",
+			"- Tipleme (Pydantic / Type Hints kullanılmış mı?)",
+			"- Okunabilirlik (Değişken ve fonksiyon isimleri açıklayıcı mı?)",
+			"- Asenkron Uyum (Blocking kodlar, `await` eksiklikleri)",
+			"- Error handling (Try-except blokları uygun yerlerde mi? Hatalar yutuluyor mu?)",
+			"",
+			"📝 **Refactor raporu oluştur:**",
+			"- Önce: (Kötü kod örneği)",
+			"- Sonra: (İyi kod örneği)",
+			"- Neden: (Değişiklik gerekçesi)",
+			"- Etki: (Performans/güvenlik iyileştirmesi)"
+		],
+		"description": "Açık olan dosyayı optimize eder ve raporlar."
+	},
+	"🛡️ GÜVENLİK VE RİSK ANALİZİ": {
+		"prefix": "ai-sec",
+		"body": [
+			"Şu an açık olan '$TM_FILENAME' dosyasını güvenlik ve finansal riskler yönünden denetle.",
+			"",
+			"**Özellikle şunlara odaklan:**",
+			"1. **Borsa API Riskleri:** API key, secret gibi veriler güvende mi? Loglara veya dışarıya sızıyor mu?",
+			"2. **Finansal Mantık:** Hatalı bir hesaplama sonucu bot bütün kasayı boşaltabilir mi? (Risk limitleri uygulanmış mı?)",
+			"3. **Girdi Doğrulama:** Pydantic ile endpoint verileri doğrulanmış mı?",
+			"4. **WebSocket ve Asenkron Hatalar:** Bir soket çöktüğünde bot tamamen duruyor mu?",
+			"5. **SQL Injection:** SQLite veri tabanı işlemlerinde paramerizasyon var mı?",
+			"",
+			"📊 **Risk skoru ver:**",
+			"- 🟢 Güvenli (0 kritik açık)",
+			"- 🟡 Orta (1-2 düşük riskli açık)",
+			"- 🔴 Riskli (Finansal kayıp yaratacak veya çökmeye neden olacak açık)",
+			"",
+			"Eğer açık varsa, saldırı/hata senaryosunu ve çözüm kodunu göster."
+		],
+		"description": "Kodu güvenlik ve borsa risklerine karşı tarar."
+	},
+	"🏗️ YENİ ÖZELLİK VEYA İNDİKATÖR (Feature Plan)": {
+		"prefix": "ai-feature",
+		"body": [
+			"Projeye yeni bir özellik (veya strateji/indikatör) eklemek istiyorum: '${1:Özellik Adı}'",
+			"",
+			"Lütfen bu özelliği geliştirmek için bana bir yol haritası çıkar.",
+			"",
+			"**Plan yaparken şunlara sadık kal:**",
+			"1. **DB/Model:** Yeni bir veritabanı tablosu veya Pydantic modeli gerekiyor mu?",
+			"2. **Core/Strategy:** `data/indicators.py`, `core/exchange.py` veya `core/paper.py` modülleri nasıl etkilenir?",
+			"3. **Backend API:** `api/server.py` içine hangi yeni endpointler (GET/POST) eklenecek?",
+			"4. **Frontend / Dashboard:** `frontend/app.js` ve `index.html` üzerinde görsel olarak neresi değişecek?",
+			"5. **Testing & Backtest:** Bu indikatör/strateji eklendiğinde backtest mekanizması veya loglamalar nasıl test edilecek?",
+			"",
+			"📋 **Çıktı formatı:**",
+			"- [ ] Görev 1 (Tahmini: X saat)",
+			"- [ ] Görev 2 (Tahmini: X saat)",
+			"- [ ] Görev 3 (Tahmini: X saat)",
+			"",
+			"Kod yazmaya başlamadan önce adım adım planı onayıma sun."
+		],
+		"description": "Yeni özellik/strateji için teknik plan hazırlar."
+	},
+	"🧪 TEST YAZ (Algoritma / Unit Test)": {
+		"prefix": "ai-test",
+		"body": [
+			"Şu an açık olan '$TM_FILENAME' dosyasındaki fonksiyonlar için kapsamlı `pytest` test senaryoları yaz.",
+			"",
+			"**Test Stratejisi:**",
+			"- **Happy Path:** Göstergeler veya veri sorunsuz gelirse ne olmalı?",
+			"- **Edge Cases:** Borsa API yetersiz veri (!00 mum yerine 5 mum) verirse veya fiyatlar NaN olursa bot çöküyor mu?",
+			"- **Mocking:** `ccxt` veya Binance gerçek API'ye doğrudan dokunmadan borsa bağlantılarını `unittest.mock` veya `pytest-asyncio` ile mockla.",
+			"",
+			"📁 **Dosya yapısı:**",
+			"- Test dosyası: `tests/test_${TM_FILENAME_BASE}.py`",
+			"",
+			"📊 **Test raporu:**",
+			"- Kritik test senaryoları listesi ve amacını özetle."
+		],
+		"description": "Python algoritma veya veri analiz fonksiyonlarına test yazar."
+	},
+	"🧪 BACKTEST / SİMÜLASYON TESTİ": {
+		"prefix": "ai-backtest",
+		"body": [
+			"'${1:Strateji veya Karar Algoritması}' için geçmiş veriler üzerinde (backtest) bir mantık testi yaz.",
+			"",
+			"**Senaryo:**",
+			"1. DataFrame'e sahte (mock) OHLCV fiyat/mum verisi `${2:yükselen/düşen trend}` enjekte et",
+			"2. Botun hesaplama modülünü (`process_signal` vb.) tetikle.",
+			"3. Sistemin `${3:Al/Sat/Hold}` tepkisi vermesini assert (doğrula) et.",
+			"",
+			"**Test Araçları:**",
+			"- Mock Pandas DataFrame kullan",
+			"- ML tahmin değerlerini override (patch) et.",
+			"",
+			"📊 **Test Özeti:**",
+			"- Testin başarılı olup olmadığını ve hangi sınır değerleri denediğini listele."
+		],
+		"description": "Strateji / Backtest süreçleri simülasyonu."
+	},
+	"🎨 DASHBOARD / UI BİLEŞENİ": {
+		"prefix": "ai-ui",
+		"body": [
+			"Sen uzman bir Frontend geliştiricisisin.",
+			"Bana Dashboard'da kullanılmak üzere '${1:Bileşen Adı}' adında yeni bir HTML/JS modülü/tasarımı ayarla.",
+			"",
+			"**Kurallar:**",
+			"- Projedeki mevcut Vanilla HTML, CSS (`style.css`), ve `frontend/app.js` yapısına sadık kal.",
+			"- Veri akışını `app.js` içindeki fetch mekanizmalarıyla eşzamanlı olarak düşün.",
+			"- Görsel dil olarak koyu mod (Cyberpunk / Modern Kripto Trader) estetiğini uygula.",
+			"- Responsive tasarım yapısı gözet (Mobil / Tablet uyumu).",
+			"- Gereksiz dış kütüphaneler ekleme (zaten Tailwind gibi frameworkler yoksa saf CSS kullan).",
+			"",
+			"📁 **Değişecek Dosyalar:**",
+			"- `frontend/index.html`",
+			"- `frontend/app.js`"
+		],
+		"description": "Dashboard arayüzü için grafik / modül yazar."
+	},
+	"🗄️ VERİTABANI / ASYNC SORGUSU": {
+		"prefix": "ai-db",
+		"body": [
+			"Bana şu işlemi yapacak bir asenkron veritabanı (SQLite / aiosqlite) fonksiyonu yaz: '${1:Sorgu Amacı}'",
+			"",
+			"**Dikkat:**",
+			"- `data/database.py` standartlarına sadık kal.",
+			"- Performans için gereksiz yere büyük verileri toplu halde RAM'e alma, limitasyon / chunking kullan.",
+			"- İşlem kritikse (Trade History Insert vb.) hataları try-except bloğunda yakala.",
+			"- Parametrik SQL kullan (SQL injection önlemek için ?, ? syntax'ı).",
+			"",
+			"📝 **Kod yapısı:**",
+			"```python",
+			"async def ${1/\\s+/_/g}(self, data: dict):",
+			"    query = \"\"\"INSERT INTO tablo_name (kolon1) VALUES (?)\"\"\"",
+			"    try:",
+			"        async with getattr(self.local, 'db_conn', await aiosqlite.connect(self.db_name)) as db:",
+			"            await db.execute(query, (data['deger'],))",
+			"            await db.commit()",
+			"            return True",
+			"    except Exception as e:",
+			"        logger.error(f\"DB Hatası: {e}\")",
+			"        return False",
+			"```"
+		],
+		"description": "Güvenli veritabanı sorgusu oluşturur."
+	},
+	"🎲 TEST VERİSİ / HİSTORİCAL DATA ÜRET": {
+		"prefix": "ai-seed",
+		"body": [
+			"Sistemi (Örn: Model eğitimi veya İndikatör testi) test etmek için sahte OHLCV veya trade verisine ihtiyacım var.",
+			"",
+			"**Senaryo:** '${1:Örn: 1000 satırlık volatil yükseliş piyasası mum verisi}'",
+			"",
+			"📝 **Veriler gerçekçi olsun:**",
+			"- Timestamp'ler ardışık ve mantıklı olsun (örn. 1 dakikalık farklar)",
+			"- Open / High / Low / Close ilişkisi matematiksel olarak tutarlı olsun (High >= Open, vs.)",
+			"- Hacim (Volume) varyasyonlu olsun.",
+			"",
+			"📁 **Çıktı:**",
+			"- Pandas DataFrame oluşturan bir Python snippet'ı.",
+			"- Veya mock DB seeding için ufak bir betik."
+		],
+		"description": "Model veya backtest için mockup mum verisi üretir."
+	},
+	"📝 VERİTABANI YAPISI DEĞİŞİKLİĞİ": {
+		"prefix": "ai-db-migration",
+		"body": [
+			"Veritabanı yapısında değişiklik yapılacak: '${1:Değişiklik Açıklaması}'",
+			"",
+			"**Yapılacaklar:**",
+			"1. `data/database.py` dosyasındaki `create_tables` veya ilgili yeri güncelle.",
+			"2. Mevcut SQLite veritabanındaki veriler kaybolmadan kolon eklemek için bir `ALTER TABLE` SQL sorgusu hazırla.",
+			"3. Gerekiyorsa eski veritabanını yedekleyen bir mekanizma öner.",
+			"",
+			"⚠️ **Dikkat:**",
+			"- Canlıda bot çalışırken DB kilitlenmelerine (database is locked) dikkat et.",
+			"",
+			"📊 **Migration raporu:**",
+			"- Eklenen kolon/tablolar",
+			"- Veri tipi değişimleri"
+		],
+		"description": "Database Schema değişikliği için yardımcı olur."
+	},
+	"📝 DOKÜMANTASYON VEYA STRATEJİ BELGESİ": {
+		"prefix": "ai-belge",
+		"body": [
+			"Şu an üzerinde çalıştığımız stratejiyi, indikatörü veya modülü analiz et.",
+			"Bunu proje `knowledge/` veya `docs/` klasörü altına yeni bir teknik doküman olarak kaydetmemiz gerekiyor.",
+			"",
+			"**Doküman Kuralları:**",
+			"- Dosya adı konuyla ilgili olsun (örn: `trend-master-algoritmasi.md`).",
+			"- İçerikte: 'Mantık', 'Kullanılan İndikatörler', 'Risk/Stop Mekanizması' gibi başlıklar bulunsun.",
+			"",
+			"📁 **Kategori seç:**",
+			"- `stratejiler/` - Tüm al/sat stratejileri",
+			"- `ml-modelleri/` - XGBoost, yapay zeka yapılandırması",
+			"- `mimari/` - Sistem çalışma mimarisi",
+			"- `frontend/` - Dashboard ile alakalı dokümanlar",
+			"",
+			"Dosya içeriğini hazırla."
+		],
+		"description": "Yapılan işi teknik dokümana dönüştürür."
+	},
+	"🤖 STRATEJİ & İNDİKATÖR BİLGİSİ": {
+		"prefix": "ai-strategy-doc",
+		"body": [
+			"'${1:Strateji/İndikatör Adı}' için dokümantasyon oluştur.",
+			"",
+			"**Format:**",
+			"1. **Tanım:** Bu algoritma / indikatör piyasadaki hangi fırsatı yakalar?",
+			"2. **Hesaplama:** Matematiksel kurgusu (ADX > 25, RSI < 30 vb.)",
+			"3. **Piyasa Rejimi Uyumu:** (Trend, Yatay, Volatil vb. hangi durumlarda başarılı?)",
+			"4. **Kör Noktalar:** Bu algoritmanın yanılacağı/zarar edeceği (Drawdown) senaryolar.",
+			"5. **Örnek PnL Performansı:** Tahmini kar oranı.",
+			"",
+			"📁 **Dosya:**",
+			"- `docs/strategies/${1/\\s+/-/g}.md`"
+		],
+		"description": "Al-Sat Strateji / Algoritma dokümantasyonu."
+	},
+	"🗺️ HARİTA GÜNCELLE (Proje Haritası)": {
+		"prefix": "ai-harita",
+		"body": [
+			"Lütfen proje dizinini ve son oluşturduğumuz dosyaları kontrol et.",
+			"",
+			"🔍 **Kontrol et:**",
+			"- Yeni modüller veya dosyalar var mı?",
+			"- Klasör yapısı parçalandı mı? (Örn: indikatörler ayrıldı mı?)",
+			"",
+			"📝 **Güncelle:**",
+			"- Proje mimari şemasını (genelde README.md veya INDEX.md) markdown formatında listele.",
+			"- Yeni dosyaların karşısına kısaca ne işe yaradıklarını yaz.",
+			"",
+			"Haritanın güncel halini bana sun."
+		],
+		"description": "Proje dizin haritasını otomatik günceller."
+	},
+	"🐛 HATA AYIKLAMA (Asenkron & Uvicorn Debug)": {
+		"prefix": "ai-debug",
+		"body": [
+			"Döngüde (Loop) veya API tarafında bir hata ile karşılaştık. Lütfen şu adımları izle:",
+			"",
+			"🔍 **Adım 1: Hata Analizi**",
+			"- Terminal veya loglardan dönen Python veya TypeError hatasını oku.",
+			"- Hangi modülde çöktü? (`core/exchange.py`, `data/indicators.py` vb.)",
+			"",
+			"🔍 **Adım 2: Veri Akışı (Codebase Taraması)**",
+			"- Hata Pandas DataFrame hesaplamalarından geliyorsa 'NoneType', 'NaN' veya tip uyuşmazlığını kontrol et.",
+			"- API çağrıları rate-limit (IP Ban) sebepli mi cevap vermiyor?",
+			"- asyncio Queue veya WebSocket stream kapanmış mı?",
+			"",
+			"🔍 **Adım 3: Çözüm**",
+			"- Sorunu tespit et, `try-except` izolasyonu veya `logging.exception()` bloğu ekle.",
+			"- Çözüm kodu sun.",
+			"",
+			"📊 **Debug raporu:**",
+			"- Kök neden",
+			"- Önleme stratejisi"
+		],
+		"description": "Bot hata ayıklama sürecini başlatır."
+	},
+	"📦 TOPLU VERİ ÇEKİMİ (Bulk Download)": {
+		"prefix": "ai-bulk",
+		"body": [
+			"Geçmiş verilerin toplu olarak çekilmesi/işlenmesi (Data Mining) senaryosu var.",
+			"",
+			"**Plan:**",
+			"1. **Borsa Sınırları:** Binance/CCXT maksimum kaç mum limitine izin veriyor? (Genelde 1000 veya 1500)",
+			"2. **Zaman Dilimi Döngüsü:** Start Date'den bitiş tarihine kadar paginate işlemi.",
+			"3. **Rate Limiting:** IP Ban yememek için döngü içi asyncio.sleep() süresi ne olmalı?",
+			"4. **Database Yazımı:** Çekilen 1m'lik veya 5m'lik bloklar veritabanına tek tek mi yoksa bulk insert ile mi yazılacak?",
+			"",
+			"📝 **Önerilen taslak planı sun ve asenkron kod örneğini göster.**"
+		],
+		"description": "Geçmiş borsa verileri indirme optimizasyonu."
+	},
+	"⚡ OPTİMİZASYON (Performans & Gecikme)": {
+		"prefix": "ai-optimize",
+		"body": [
+			"Şu an açık olan '$TM_FILENAME' dosyasını HFT (Yüksek Frekanslı İşlem) performans standartlarına göre optimize et.",
+			"",
+			"**Kontrol Listesi:**",
+			"- [ ] **Pandas Optimizasyonu:** `iterrows()`, for loop yerine vektörel (numpy) veya `.apply()` işlemleri kullanılmış mı?",
+			"- [ ] **Ağ Gecikmesi (Latency):** WebSocket kullanılıyor mu, yoksa gereksiz yere her işlemde REST API mi sorgulanıyor?",
+			"- [ ] **Memory Leak:** Asenkron döngülerde veya listelerde biriken, garbage collector'ın silemediği veri var mı?",
+			"- [ ] **DB Yükü:** Veritabanına saniyede çok fazla yazma (write) isteği gidiyor mu? (Batch mekanizması var mı?)",
+			"",
+			"📊 **İyileştirme:**",
+			"Her tespit için ölçülebilir iyileştirme öner (ms/saniye cinsinden)."
+		],
+		"description": "Bot işlem hızını ve veri hesaplamalarını hızlandırır."
+	},
+	"📊 PERFORMANS METRİKLERİ VE KÂR/ZARAR": {
+		"prefix": "ai-metrics",
+		"body": [
+			"Sistem (Bot) performansı için kârlılık metriklerini analiz et.",
+			"",
+			"**Takip Edilecek Metrikler:**",
+			"- **Win Rate (Kazanma Oranı):** (Hedef: >%60)",
+			"- **Profit Factor (Kâr Çarpanı):** Toplam Kâr / Toplam Zarar",
+			"- **Max Drawdown:** Sermayenin yüzde olarak maksimum erimesi",
+			"- **Avg Trade Duration:** İşlemlerde kalma süresi.",
+			"- **Sharpe Oranı:** Risk bazlı getiri (opsiyonel hesaplama).",
+			"",
+			"Lütfen bu metriklerin `core/paper.py` (Veya canlı trader) içinde nasıl daha stabil hesaplanıp Dashboard'a aktarılabileceğini inceleyip bana raporla."
+		],
+		"description": "Bot başarım metriklerinin analizi ve entegrasyonu."
+	},
+	"🔐 GÜVENLİK & API YÖNETİMİ": {
+		"prefix": "ai-auth",
+		"body": [
+			"Crypto Bot API'si / Web Dashboard'u için temel güvenlik yapılandırmasını kur.",
+			"",
+			"**Gereksinimler:**",
+			"1. **Borsa API Key Güvenliği:** Anahtarlar sadece RAM'de tutulmalı ve loglanmamalı.",
+			"2. **Web Arayüzü Auth:** Dışa açılması durumunda Dashboard'a şifreli/Basic Auth ile giriş.",
+			"3. **CORS Rules:** FastAPI CORS ayarlarının sıkılaştırılması.",
+			"4. **Rate Limiting:** Kötü niyetli/DDOS benzeri ardışık API çağrılarını kısıtlama.",
+			"",
+			"Lütfen güvenlik tavsiyeleri ve FastAPI kod örneği ile gel."
+		],
+		"description": "Bot Dashboard güvenlik/şifreleme yönergeleri."
+	},
+	"📜 KURALLARI GÜNCELLE": {
+		"prefix": "ai-kural",
+		"body": [
+			"Son yaptığımız '${1:Örn: İndikatör hesaplamalarında Try-Except kullanma}' değişikliğini analiz et.",
+			"Bu değişikliğin projenin genelinde bir standart haline gelmesi gerekiyor.",
+			"",
+			"Lütfen kök dizindeki `.cursorrules` (veya kurallar belleğindeki) dosyayı oku ve şu güncellemeleri yap:",
+			"1. Yeni teknik standardı 'HATA YÖNETİMİ' veya ilgili bölüme ekle.",
+			"2. Asistanın (senin) bundan sonra bu hatayı yapmaman için net bir talimat yaz.",
+			"3. Finansal hataların tolere edilmeyeceğini vurgula.",
+			"",
+			"Güncellenmiş kurallar setini göster."
+		],
+		"description": "Gelecek AI komutları için proje standardı ekler."
+	},
+	"📝 COMMIT MESAJI OLUŞTUR": {
+		"prefix": "ai-commit",
+		"body": [
+			"Aşağıdaki kod değişikliklerini analiz et ve 'Conventional Commits' standardına uygun bir commit mesajı yaz.",
+			"",
+			"**Değişiklikler:**",
+			"$CLIPBOARD",
+			"",
+			"**Format:**",
+			"```",
+			"type(scope): description",
+			"",
+			"body (optional)",
+			"",
+			"footer (optional)",
+			"```",
+			"",
+			"**Types:**",
+			"- `feat:` (Yeni algoritma, indikatör, özellik)",
+			"- `fix:` (Bug / Hata giderme - Örn: TypeError düzeltmesi)",
+			"- `refactor:` (Kod yapılandırması - Örn: İndikatör ayrıştırması)",
+			"- `docs:` (Strateji/bot dokümanı)",
+			"- `test:` (Backtest, pytest)",
+			"- `perf:` (Hız/Pandas/WebSocket optimizasyonları)",
+			"- `style:` (PEP8 vb. formatlama)",
+			"",
+			"Lütfen başlık ve maddeler halinde açıklama ekle."
+		],
+		"description": "Profesyonel Git commit mesajı hazırlar."
+	}
+}
