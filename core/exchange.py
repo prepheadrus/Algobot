@@ -176,6 +176,11 @@ class ExchangeManager:
 
         # Asenkron borsayı başlat
         self.exchange = self.exchange_class(exchange_args)
+
+        # Binance public streamleri api key gerektirmiyor. Ancak watch_ticker api key var ise public kanalları kullanırken de
+        # hatalı api-key id hatası veriyor. Bunun için eğer watch_ticker vb. public kanallar kullanılacaksa
+        # anahtarların gerçekten auth_err durumuna düşüp düşmeyeceğini try-except ile kontrol edeceğiz (load_markets içinde
+        # veya watch_ticker esnasında anonim moda geçiliyor).
         logger.info(f"{self.exchange_id.upper()} borsa motoru WebSocket desteğiyle başlatıldı.")
 
         # ========================================================================
@@ -538,8 +543,17 @@ class ExchangeManager:
                 logger.info(f"Ticker dinleme işlemi sonlandırıldı ({symbol}).")
                 break
             except Exception as e:
-                logger.error(f"WS Ticker İzleme Hatası ({symbol}): {e}")
-                await asyncio.sleep(5)  # Hata durumunda bağlantıyı 5sn soğut
+                # EĞER API ANAHTARI HATALIYSA (Code -2008 veya Invalid API-key), Anahtarları temizleyip anonim moda geç
+                error_str = str(e)
+                if "-2008" in error_str or "Invalid Api-Key ID" in error_str or "AuthenticationError" in str(type(e)):
+                    logger.warning(f"⚠️ {symbol} API key hatası! Anonim moda geçiliyor...")
+                    self.exchange.apiKey = None
+                    self.exchange.secret = None
+                    # Hemen ardından tekrar denemek üzere beklemeye gerek yok veya kısa bekle
+                    await asyncio.sleep(1)
+                else:
+                    logger.error(f"WS Ticker İzleme Hatası ({symbol}): {e}")
+                    await asyncio.sleep(5)  # Hata durumunda bağlantıyı 5sn soğut
 
     async def download_historical_data(self, symbol, timeframe='1m', start_date_str="2024-01-01", market_type='future', is_resume=False):
         """
