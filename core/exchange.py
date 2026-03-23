@@ -766,22 +766,29 @@ class ExchangeManager:
                     klines_to_save.append((symbol, candle, timeframe))
                     new_mum_count += 1
 
+                if not klines_to_save:
+                    continue
+
+                symbol_to_save = klines_to_save[0][0]
+                timeframe_to_save = klines_to_save[0][2]
+                candles_to_save = [k[1] for k in klines_to_save]
+
                 # Toplu kayıt (tek transaction içinde)
                 try:
-                    for kline_data in klines_to_save:
-                        await db_manager.save_kline(*kline_data)
+                    await db_manager.save_klines_bulk(symbol_to_save, candles_to_save, timeframe_to_save)
                 except Exception as db_err:
                     logger.error(f"⚠️ {symbol} DB yazma hatası: {db_err}")
-                    # Locked hatası varsa 5 saniye bekle ve tekrar dene
+                    # Locked hatası varsa 0.5 saniye bekle ve tekrar dene
                     if "database is locked" in str(db_err):
-                        logger.warning(f"⏳ Database locked, 5 saniye bekleniyor...")
-                        await asyncio.sleep(5)
+                        logger.warning(f"⏳ Database locked, 0.5 saniye bekleniyor...")
+                        await asyncio.sleep(0.5)
                         # Tekrar dene
-                        for kline_data in klines_to_save:
-                            try:
-                                await db_manager.save_kline(*kline_data)
-                            except Exception:
-                                existing_mum_count += 1  # İkinci hata = zaten var
+                        try:
+                            await db_manager.save_klines_bulk(symbol_to_save, candles_to_save, timeframe_to_save)
+                        except Exception:
+                            existing_mum_count += len(klines_to_save)  # İkinci hata = tüm parti başarısız / zaten var
+                    else:
+                        existing_mum_count += len(klines_to_save)
 
                 last_ts = ohlcv[-1][0]
                 all_downloaded += new_mum_count
