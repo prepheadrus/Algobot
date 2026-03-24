@@ -114,6 +114,14 @@ class MLService:
             # DataFrame'i ML formatına hazırla
             import pandas as pd
 
+            # Güvenlik: Eğer index DatetimeIndex değilse ve 'timestamp' kolonu varsa index yap
+            if not isinstance(df.index, pd.DatetimeIndex):
+                if 'timestamp' in df.columns:
+                    logger.info(f"🔄 [ML] Index DatetimeIndex değil ({type(df.index)}), 'timestamp' kolonu index yapılıyor...")
+                    df.set_index('timestamp', inplace=True)
+                else:
+                    logger.warning(f"⚠️ [ML] Index DatetimeIndex değil ve 'timestamp' kolonu bulunamadı!")
+
             # UTC timezone kontrolü (leakage koruması)
             if df.index.tz is None:
                 df.index = df.index.tz_localize('UTC')
