@@ -895,7 +895,12 @@ class ExchangeManager:
                 if klines_data and len(klines_data) > 0:
                     import pandas as pd
                     df_1m = pd.DataFrame(klines_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                    df_1m['timestamp'] = pd.to_datetime(df_1m['timestamp'], unit='ms', utc=True)
+
+                    if df_1m['timestamp'].dtype == 'object':
+                        df_1m['timestamp'] = pd.to_datetime(df_1m['timestamp'], utc=True)
+                    else:
+                        df_1m['timestamp'] = pd.to_datetime(df_1m['timestamp'], unit='ms', utc=True)
+
                     df_1m.set_index('timestamp', inplace=True)
 
                     # 1m'i Parquet'e kaydet (overwrite modunda, append=False)
@@ -1259,7 +1264,12 @@ class ExchangeManager:
 
                         # DataFrame'e dönüştür
                         gap_df = pd.DataFrame(all_gap_ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                        gap_df['timestamp'] = pd.to_datetime(gap_df['timestamp'], unit='ms', utc=True)
+
+                        if gap_df['timestamp'].dtype == 'object':
+                            gap_df['timestamp'] = pd.to_datetime(gap_df['timestamp'], utc=True)
+                        else:
+                            gap_df['timestamp'] = pd.to_datetime(gap_df['timestamp'], unit='ms', utc=True)
+
                         gap_df.set_index('timestamp', inplace=True)
 
                         # 🔥 TIMEZONE DÜZELTMESİ: gap_df'i UTC yap
@@ -1330,7 +1340,12 @@ class ExchangeManager:
                             db_klines = await db_manager.get_klines(symbol, '1m', limit=1000)
                             if db_klines and len(db_klines) > 0:
                                 db_df = pd.DataFrame(db_klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                                db_df['timestamp'] = pd.to_datetime(db_df['timestamp'], unit='ms')
+
+                                if db_df['timestamp'].dtype == 'object':
+                                    db_df['timestamp'] = pd.to_datetime(db_df['timestamp'], utc=True)
+                                else:
+                                    db_df['timestamp'] = pd.to_datetime(db_df['timestamp'], unit='ms', utc=True)
+
                                 db_df.set_index('timestamp', inplace=True)
 
                                 save_df = db_df.copy()
@@ -1349,7 +1364,12 @@ class ExchangeManager:
 
                 if historical_ohlcv and len(historical_ohlcv) > 0:
                     ohlcv_df = pd.DataFrame(historical_ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                    ohlcv_df['timestamp'] = pd.to_datetime(ohlcv_df['timestamp'], unit='ms')
+
+                    if ohlcv_df['timestamp'].dtype == 'object':
+                        ohlcv_df['timestamp'] = pd.to_datetime(ohlcv_df['timestamp'])
+                    else:
+                        ohlcv_df['timestamp'] = pd.to_datetime(ohlcv_df['timestamp'], unit='ms')
+
                     ohlcv_df.set_index('timestamp', inplace=True)
                     logger.info(f"OK [REST] {len(ohlcv_df)} mum REST API'den çekildi.")
 

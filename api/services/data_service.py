@@ -653,11 +653,17 @@ class DataService:
         
         if data_range:
             import pandas as pd
+
+            def safe_parse(ts_val):
+                if isinstance(ts_val, str):
+                    return pd.to_datetime(ts_val)
+                return pd.to_datetime(ts_val, unit='ms')
+
             return {
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "start_date": pd.to_datetime(data_range['start'], unit='ms').strftime('%Y-%m-%d %H:%M'),
-                "end_date": pd.to_datetime(data_range['end'], unit='ms').strftime('%Y-%m-%d %H:%M'),
+                "start_date": safe_parse(data_range['start']).strftime('%Y-%m-%d %H:%M'),
+                "end_date": safe_parse(data_range['end']).strftime('%Y-%m-%d %H:%M'),
                 "count_hint": "Dinamik hesaplanabilir"
             }
         
