@@ -39,6 +39,10 @@ body {
     flex-direction: column;
 }
 
+::-webkit-scrollbar {
+    display: none;
+}
+
 /* Live Ticker Band */
 .live-ticker-band {
     background: var(--panel-bg);
@@ -3073,7 +3077,7 @@ select option {
     left: 0;
     width: 100%;
     height: 180px;
-    background: var(--panel-bg);
+    background: var(--bg-obsidian);
     backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-glass);
     z-index: 9998;
@@ -3164,38 +3168,50 @@ select option {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
 }/* ============================================================================
-   BENTO BOX LAYOUT (Terminal Workspace)
+   HORIZONTAL WORKSPACE LAYOUT (Terminal Workspace)
    ============================================================================ */
-.bento-workspace {
-    display: grid;
-    grid-template-columns: minmax(300px, 1fr) minmax(500px, 2fr) minmax(300px, 1fr);
+.horizontal-workspace {
+    display: flex;
+    flex-direction: column;
     gap: 15px;
     height: 100%;
-    align-items: stretch;
 }
 
-@media (max-width: 1400px) {
-    .bento-workspace {
-        grid-template-columns: minmax(300px, 1fr) minmax(400px, 2fr);
+.top-row-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    min-height: 250px;
+}
+
+.bottom-row-chart {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 400px;
+}
+
+.flex-card {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 1200px) {
+    .top-row-cards {
+        grid-template-columns: repeat(2, 1fr);
     }
-    .panel-right {
+    .top-row-cards > div:last-child {
         grid-column: span 2;
     }
 }
 
-@media (max-width: 1024px) {
-    .bento-workspace {
+@media (max-width: 768px) {
+    .top-row-cards {
         grid-template-columns: 1fr;
     }
-    .panel-right {
+    .top-row-cards > div:last-child {
         grid-column: span 1;
     }
-}
-
-.bento-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
 }
 
 .panel-title {
