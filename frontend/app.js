@@ -2486,16 +2486,12 @@ window.editStrategy = function(strategyId) {
  * Setup global event listeners
  */
 function setupEventListeners() {
-    // Adjust charts when sidebar expands/collapses natively via CSS hover
-    const sidebar = document.getElementById('main-sidebar');
-    if (sidebar) {
-        sidebar.addEventListener('transitionend', (e) => {
-            if (e.propertyName === 'width') {
+
                 if (window.chartRenderer && typeof window.chartRenderer.resize === 'function') {
                     window.chartRenderer.resize();
                 }
                 window.dispatchEvent(new Event('resize'));
-            }
+
         });
     }
 
