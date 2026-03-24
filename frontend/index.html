@@ -23,19 +23,6 @@
         </div>
     </div>
 
-    <!-- AI Terminal Widget (Pinned to bottom) -->
-    <div class="ai-terminal" id="ai-terminal">
-        <div class="terminal-header">
-            <span>🧠 AI Kernel Logs</span>
-            <span class="pulse-dot"></span>
-        </div>
-        <div class="terminal-body" id="terminal-body">
-            <div class="terminal-line">Neural network initialized...</div>
-            <div class="terminal-line">Data Lake connected via Parquet...</div>
-            <div class="terminal-line">Waiting for market signals...</div>
-        </div>
-    </div>
-
     <div class="dashboard-container">
         <!-- Collapsible Sidebar -->
         <aside class="sidebar glass-panel" id="sidebar">
@@ -90,149 +77,49 @@
 
             <!-- SEKME 1: PORTFÖY ANALİZİ / TERMINAL -->
             <div id="tab-portfolio" class="tab-content active-tab">
-                <div class="bento-workspace">
+                <div class="horizontal-workspace">
 
-                    <!-- Sol Panel: Signal Akışı -->
-                    <div class="bento-panel panel-left">
-                        <h3 class="panel-title">Sinyal Akışı</h3>
-                        <div class="signal-flow-container">
-                            <!-- Dummy Data for Visual -->
-                            <div class="signal-card signal-long">
-                                <div class="signal-header">
-                                    <span class="signal-symbol">BTC/USDT</span>
-                                    <span class="signal-time">14:02:15</span>
-                                </div>
-                                <div class="signal-body">
-                                    <span class="signal-type">LONG</span>
-                                    <span class="signal-price">@ $69,250</span>
-                                </div>
-                                <div class="signal-footer">
-                                    <span class="signal-strat">XGB_Trend_v4</span>
-                                    <span class="signal-conf">Conf: 87%</span>
-                                </div>
+                    <!-- Row 1: 3 Eşit Yatay Kart -->
+                    <div class="top-row-cards">
+
+                        <!-- Kart 1: Total Portfolio Value -->
+                        <div class="card glass-panel flex-card bento-card">
+                            <h3 class="panel-title">TOTAL PORTFOLIO VALUE</h3>
+                            <div class="bento-content-container">
+                                <div id="balance-val" class="bento-value text-green">$0.00</div>
+                                <div class="bento-subtext">Daily Performance: <span id="total-pnl-val">+$0.00 (0.00%)</span></div>
                             </div>
-                            <div class="signal-card signal-short">
-                                <div class="signal-header">
-                                    <span class="signal-symbol">ETH/USDT</span>
-                                    <span class="signal-time">13:45:10</span>
-                                </div>
-                                <div class="signal-body">
-                                    <span class="signal-type">SHORT</span>
-                                    <span class="signal-price">@ $3,810</span>
-                                </div>
-                                <div class="signal-footer">
-                                    <span class="signal-strat">RF_MeanRev_v2</span>
-                                    <span class="signal-conf">Conf: 82%</span>
-                                </div>
-                            </div>
-                            <div class="signal-card signal-long">
-                                <div class="signal-header">
-                                    <span class="signal-symbol">SOL/USDT</span>
-                                    <span class="signal-time">13:10:05</span>
-                                </div>
-                                <div class="signal-body">
-                                    <span class="signal-type">LONG</span>
-                                    <span class="signal-price">@ $145.20</span>
-                                </div>
-                                <div class="signal-footer">
-                                    <span class="signal-strat">XGB_Trend_v4</span>
-                                    <span class="signal-conf">Conf: 91%</span>
-                                </div>
-                            </div>
-                            <div class="signal-card signal-short">
-                                <div class="signal-header">
-                                    <span class="signal-symbol">AVAX/USDT</span>
-                                    <span class="signal-time">12:30:00</span>
-                                </div>
-                                <div class="signal-body">
-                                    <span class="signal-type">SHORT</span>
-                                    <span class="signal-price">@ $35.50</span>
-                                </div>
-                                <div class="signal-footer">
-                                    <span class="signal-strat">RF_MeanRev_v2</span>
-                                    <span class="signal-conf">Conf: 78%</span>
+                        </div>
+
+                        <!-- Kart 2: ML Prediction Confidence -->
+                        <div class="card glass-panel flex-card bento-card">
+                            <h3 class="panel-title">ML PREDICTION CONFIDENCE</h3>
+                            <div class="bento-content-container">
+                                <div id="ml-confidence-val" class="bento-value text-cyan">0.0%</div>
+                                <div class="progress-bar-wrapper bento-progress">
+                                    <div id="ml-confidence-bar" class="progress-bar-fill bento-progress-fill"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card glass-panel" style="margin-top: 15px;">
-                            <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">🔥 Piyasa İzleme Listesi</h4>
-                            <div id="market-heatmap" class="heatmap-container"></div>
+
+                        <!-- Kart 3: Hybrid Data Engine Status -->
+                        <div class="card glass-panel flex-card bento-card">
+                            <h3 class="panel-title">HYBRID DATA ENGINE</h3>
+                            <div class="bento-content-container">
+                                <div id="engine-status-text" class="bento-value text-white">SYNCED</div>
+                                <div id="engine-latency-val" class="bento-subtext text-green">Latency: 0ms</div>
+                            </div>
                         </div>
+
                     </div>
 
-                    <!-- Orta Panel: Hybrid Engine Status -->
-                    <div class="bento-panel panel-center">
-                        <div class="card glass-panel chart-span" style="height: 100%; display: flex; flex-direction: column;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <h3 class="panel-title" style="margin-bottom: 0;">Hybrid Engine Status</h3>
-                            </div>
-                            <div id="plotly-chart" class="chart-container" style="flex-grow: 1; min-height: 400px;"></div>
+                    <!-- Row 2: Dev Grafik Alanı -->
+                    <div class="bottom-row-chart card glass-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 class="panel-title" style="margin-bottom: 0; border-bottom: none; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">REAL-TIME PARQUET STREAM VISUALIZATION</h3>
+                            <span style="font-size: 1.2rem; color: var(--text-muted);">📊</span>
                         </div>
-                    </div>
-
-                    <!-- Sağ Panel: Risk Metrikleri & ML Gauge -->
-                    <div class="bento-panel panel-right">
-                        <h3 class="panel-title">Risk Metrikleri</h3>
-
-                        <div class="risk-metrics-grid">
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Bakiye</span>
-                                <span class="metric-value" id="balance-val">$0.00</span>
-                            </div>
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Serbest Marjin</span>
-                                <span class="metric-value" id="free-margin-val">$0.00</span>
-                            </div>
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Kullanılan</span>
-                                <span class="metric-value" id="used-margin-val">$0.00</span>
-                            </div>
-                            <div class="risk-metric-box highlight">
-                                <span class="metric-label">Live P&L</span>
-                                <span class="metric-value success-text" id="total-pnl-val">+$0.00</span>
-                            </div>
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Kâr Faktörü</span>
-                                <span class="metric-value" id="stat-profit-factor">1.0</span>
-                            </div>
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Max Drawdown</span>
-                                <span class="metric-value danger-text" id="stat-drawdown">0.0%</span>
-                            </div>
-                            <div class="risk-metric-box">
-                                <span class="metric-label">Sharpe Ratio</span>
-                                <span class="metric-value" id="stat-sharpe">0.0</span>
-                            </div>
-                        </div>
-
-                        <h3 class="panel-title" style="margin-top: 20px;">Model Confidence</h3>
-                        <div class="ml-gauge-container glass-panel">
-                            <!-- Dummy Data for Visual Gauge -->
-                            <div class="gauge-circle">
-                                <div class="gauge-value">85%</div>
-                                <div class="gauge-label">Aggressive</div>
-                            </div>
-                            <div class="gauge-details">
-                                <div class="gauge-detail-row">
-                                    <span>Trend Strength:</span>
-                                    <span style="color: var(--accent-emerald);">Strong</span>
-                                </div>
-                                <div class="gauge-detail-row">
-                                    <span>Volatility:</span>
-                                    <span style="color: var(--accent-gold);">Medium</span>
-                                </div>
-                                <div class="gauge-detail-row">
-                                    <span>ML Prediction:</span>
-                                    <span style="color: var(--accent-cyan);">Bullish</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card glass-panel" style="margin-top: 20px; padding: 15px;">
-                            <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">🍕 Varlık Dağılımı</h4>
-                            <div id="allocation-chart" style="height: 150px;"></div>
-                        </div>
-
+                        <div id="plotly-chart" class="chart-container" style="flex-grow: 1; min-height: 400px; width: 100%;"></div>
                     </div>
 
                 </div>
@@ -1634,6 +1521,19 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- AI Terminal Widget (Pinned to bottom) -->
+    <div class="ai-terminal" id="ai-terminal">
+        <div class="terminal-header">
+            <span>🧠 AI Kernel Logs</span>
+            <span class="pulse-dot"></span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+            <div class="terminal-line">Neural network initialized...</div>
+            <div class="terminal-line">Data Lake connected via Parquet...</div>
+            <div class="terminal-line">Waiting for market signals...</div>
+        </div>
     </div>
 
     <!-- Strateji Görselleştirme Çekmecesi (Drawer) -->

@@ -39,6 +39,10 @@ body {
     flex-direction: column;
 }
 
+::-webkit-scrollbar {
+    display: none;
+}
+
 /* Live Ticker Band */
 .live-ticker-band {
     background: var(--panel-bg);
@@ -66,7 +70,7 @@ body {
     padding: 15px;
     gap: 15px;
     margin-top: 30px; /* Offset for the fixed ticker */
-    margin-bottom: 200px; /* Offset for AI terminal */
+    height: calc(100vh - 30px - 180px); /* Fill space between ticker and terminal */
 }
 
 .ticker-wrapper {
@@ -3073,7 +3077,7 @@ select option {
     left: 0;
     width: 100%;
     height: 180px;
-    background: var(--panel-bg);
+    background: var(--bg-obsidian);
     backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-glass);
     z-index: 9998;
@@ -3164,38 +3168,51 @@ select option {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
 }/* ============================================================================
-   BENTO BOX LAYOUT (Terminal Workspace)
+   HORIZONTAL WORKSPACE LAYOUT (Terminal Workspace)
    ============================================================================ */
-.bento-workspace {
-    display: grid;
-    grid-template-columns: minmax(300px, 1fr) minmax(500px, 2fr) minmax(300px, 1fr);
+.horizontal-workspace {
+    display: flex;
+    flex-direction: column;
     gap: 15px;
     height: 100%;
-    align-items: stretch;
+    width: 100%;
 }
 
-@media (max-width: 1400px) {
-    .bento-workspace {
-        grid-template-columns: minmax(300px, 1fr) minmax(400px, 2fr);
+.top-row-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    min-height: 200px; /* Reduced min-height slightly to match proportion */
+}
+
+.bottom-row-chart {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 400px;
+}
+
+.flex-card {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 1200px) {
+    .top-row-cards {
+        grid-template-columns: repeat(2, 1fr);
     }
-    .panel-right {
+    .top-row-cards > div:last-child {
         grid-column: span 2;
     }
 }
 
-@media (max-width: 1024px) {
-    .bento-workspace {
+@media (max-width: 768px) {
+    .top-row-cards {
         grid-template-columns: 1fr;
     }
-    .panel-right {
+    .top-row-cards > div:last-child {
         grid-column: span 1;
     }
-}
-
-.bento-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
 }
 
 .panel-title {
@@ -3404,4 +3421,73 @@ select option {
 
 .gauge-detail-row span:first-child {
     color: var(--text-muted);
+}
+
+/* ============================================================================
+   BENTO CARDS CUSTOM STYLES
+   ============================================================================ */
+.bento-card {
+    padding: 25px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.bento-card .panel-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: none;
+    margin-bottom: 20px;
+    padding-bottom: 0;
+}
+
+.bento-content-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bento-value {
+    font-size: 2.8rem;
+    font-weight: 700;
+    line-height: 1;
+    font-family: var(--font-mono);
+}
+
+.bento-subtext {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.text-green {
+    color: var(--neon-green);
+    text-shadow: 0 0 10px rgba(0, 255, 148, 0.3);
+}
+
+.text-cyan {
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px rgba(0, 209, 255, 0.3);
+}
+
+.text-white {
+    color: var(--text-main);
+    letter-spacing: 2px;
+}
+
+.bento-progress {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    margin-top: 15px;
+    width: 80%;
+}
+
+.bento-progress-fill {
+    background: var(--neon-blue);
+    height: 100%;
+    border-radius: 3px;
+    box-shadow: 0 0 8px var(--neon-blue);
 }
