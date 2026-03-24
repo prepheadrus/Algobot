@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptoAlgoBot | Pro Dashboard</title>
+    <title>CryptoAlgoBot | Quantum Terminal v5.0</title>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
     <script src="lightweight-charts.js"></script>
@@ -14,29 +14,70 @@
 </head>
 
 <body>
+    <!-- Live Ticker -->
+    <div class="live-ticker-band">
+        <div class="ticker-content" id="live-ticker-content">
+            <span class="ticker-item"><span class="ticker-dot pulse-dot"></span> <span class="ticker-sym">Sistem Yükleniyor...</span> <span class="ticker-price">--</span></span>
+        </div>
+    </div>
+
     <div class="dashboard-container">
         <!-- Sol Menü -->
-        <aside class="sidebar glass-panel">
+        <aside class="sidebar glass-panel" id="main-sidebar">
+            <button id="sidebar-toggle" class="sidebar-toggle-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
             <div class="logo">
                 <span class="pulse-dot"></span>
-                <h2>Algo<span>Bot</span></h2>
+                <h2 class="sidebar-text">Algo<span>Bot</span></h2>
             </div>
-            <div class="status-box">
+            <div class="status-box sidebar-text">
                 <p>Sistem Çevresi</p>
                 <h3 id="env-status" class="neon-text">Yükleniyor...</h3>
             </div>
             <nav class="menu" id="side-menu">
-                <button class="menu-item active" data-target="tab-portfolio">📊 Portföy Analizi</button>
-                <button class="menu-item" data-target="tab-ml">🧠 ML Karar Motoru</button>
-                <button class="menu-item" data-target="tab-orders">⚡ Aktif Emirler</button>
-                <button class="menu-item" data-target="tab-history">📜 İşlem Geçmişi</button>
-                <button class="menu-item" data-target="tab-reports">📈 Performans Raporları</button>
-                <button class="menu-item" data-target="tab-strategy-builder">🎨 Strateji Oluşturucu</button>
-                <button class="menu-item" data-target="tab-strategies">📚 Strateji Kütüphanesi</button>
-                <button class="menu-item" data-target="tab-settings">⚙️ Sistem Ayarları</button>
-                <button class="menu-item" data-target="tab-data">💾 Veri Laboratuvarı</button>
+                <button class="menu-item active" data-target="tab-portfolio">
+                    <span class="menu-icon">📊</span>
+                    <span class="sidebar-text">Portföy Analizi</span>
+                </button>
+                <button class="menu-item" data-target="tab-ml">
+                    <span class="menu-icon">🧠</span>
+                    <span class="sidebar-text">ML Karar Motoru</span>
+                </button>
+                <button class="menu-item" data-target="tab-orders">
+                    <span class="menu-icon">⚡</span>
+                    <span class="sidebar-text">Aktif Emirler</span>
+                </button>
+                <button class="menu-item" data-target="tab-history">
+                    <span class="menu-icon">📜</span>
+                    <span class="sidebar-text">İşlem Geçmişi</span>
+                </button>
+                <button class="menu-item" data-target="tab-reports">
+                    <span class="menu-icon">📈</span>
+                    <span class="sidebar-text">Performans Raporları</span>
+                </button>
+                <button class="menu-item" data-target="tab-strategy-builder">
+                    <span class="menu-icon">🎨</span>
+                    <span class="sidebar-text">Strateji Oluşturucu</span>
+                </button>
+                <button class="menu-item" data-target="tab-strategies">
+                    <span class="menu-icon">📚</span>
+                    <span class="sidebar-text">Strateji Kütüphanesi</span>
+                </button>
+                <button class="menu-item" data-target="tab-settings">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="sidebar-text">Sistem Ayarları</span>
+                </button>
+                <button class="menu-item" data-target="tab-data">
+                    <span class="menu-icon">💾</span>
+                    <span class="sidebar-text">Veri Laboratuvarı</span>
+                </button>
             </nav>
-            <div class="bot-control">
+            <div class="bot-control sidebar-text">
                 <button class="btn btn-danger" id="kill-switch">ACİL DURDURMA</button>
             </div>
         </aside>
@@ -51,7 +92,7 @@
 
             <!-- SEKME 1: PORTFÖY ANALİZİ -->
             <div id="tab-portfolio" class="tab-content active-tab">
-                <div class="grid-content" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="grid-content">
                     <div class="card glass-panel">
                         <div class="card-info">
                             <h3>💰 Bakiye (Balance)</h3>
@@ -493,7 +534,7 @@
                 </div>
 
                 <!-- İşlem Özet Kartları -->
-                <div class="grid-content" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 20px;">
+                <div class="grid-content" style="margin-bottom: 20px;">
                     <div class="card glass-panel">
                         <div class="card-info">
                             <h3>📊 Toplam İşlem</h3>
@@ -588,8 +629,7 @@
 
             <!-- SEKME: STRATEJİ OLUŞTURUCU -->
             <div id="tab-strategy-builder" class="tab-content" style="display: none;">
-                <div class="builder-container"
-                    style="display: grid; grid-template-columns: 310px 1fr 310px; gap: 20px; height: calc(100vh - 160px); padding: 15px;">
+                <div class="builder-container">
 
                     <!-- SOL PANEL: İndikatör Kütüphanesi -->
                     <div class="panel glass-panel" style="overflow-y: auto;">
@@ -695,7 +735,7 @@
                         <div class="panel-header">🎯 Backtest & Risk</div>
                         <div
                             style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 10px;">
                                 <div><label style="font-size:0.65rem; color:var(--text-muted);">Sembol</label><input
                                         type="text" id="backtest-symbol" class="condition-input" value="BTC/USDT"
                                         style="width: 100%;"></div>
@@ -728,14 +768,14 @@
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px;">
                             <div><label style="font-size:0.7rem; color:var(--text-muted);">SL (ATR)</label><input
                                     type="number" id="stop-loss-atr" class="condition-input" value="2.0" step="0.1"
                                     style="width: 100%;"></div>
                             <div><label style="font-size:0.7rem; color:var(--text-muted);">TP (ATR)</label><input
                                     type="number" id="take-profit-atr" class="condition-input" value="4.0" step="0.1"
                                     style="width: 100%;"></div>
-                            <div style="grid-column: span 2;"><label
+                            <div><label
                                     style="font-size:0.7rem; color:var(--text-muted);">Max Risk (%)</label><input
                                     type="number" id="max-risk-percent" class="condition-input" value="2.0" step="0.1"
                                     style="width: 100%;"></div>
@@ -753,7 +793,7 @@
 
                         <div id="test-results" style="margin-top: 25px; display: none;">
                             <div class="category-title">📊 SONUÇLAR</div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 15px;">
                                 <div class="metric-box"
                                     style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; text-align: center;">
                                     <div style="font-size: 0.65rem; color: var(--text-muted);">Win Rate</div>
@@ -1295,7 +1335,7 @@
                             </div>
 
                             <!-- Action Buttons -->
-                            <div class="settings-button-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                            <div class="settings-button-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
                                 <button class="settings-btn settings-btn-primary" onclick="saveApiKeys()"
                                     style="padding: 12px; font-size: 0.9rem; font-weight: 600;">
                                     🔑 Şifrele ve Kaydet
@@ -1307,7 +1347,7 @@
                             </div>
 
                             <!-- Security Info Boxes -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                                 <div class="settings-info-box" style="background: rgba(0, 255, 136, 0.05); border: 1px solid rgba(0, 255, 136, 0.2);">
                                     <p class="settings-info-text" style="color: var(--neon-green);">
                                         <strong>🔒 Fernet Şifreleme:</strong> API anahtarlarınız AES-128-CBC ile
