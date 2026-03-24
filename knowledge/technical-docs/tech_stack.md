@@ -14,7 +14,7 @@ Aşağıdaki teknoloji yığını rapordaki profesyonel ve kurumsal hedefleri do
 ## 3. Matematik, Veri Analizi ve İndikatörler
 - **Matris ve İstatistik İşlemleri:** `NumPy`, `Pandas`, `SciPy`.
 - **Finansal Modelleme:** `statsmodels` (Fractional Differentiation, statik analiz metodları).
-- **İndikatörler (Hızlı):** Piyasada kendini ispatlamış `TA-Lib` kütüphanesi (veya Python sarmalayıcısı `pandas-ta`).
+- **İndikatörler (Hızlı):** Tamamen bağımsız (`pandas-ta` veya `TA-Lib` gerektirmeyen) %100 saf Pandas ve Numpy vektörel hesaplamaları.
 
 ## 4. Yapay Zeka ve Tahmin Modelleri (AI & ML)
 - **Derin Öğrenme / Sinir Ağları:** `PyTorch` (LSTM, Transformer zaman serisi modelleri ve Özel Risk Ödül Kayıp (Loss) Fonksiyonları yazmak için donanımı iyi kullanır).

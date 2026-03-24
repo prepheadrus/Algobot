@@ -11,7 +11,7 @@
 Smart Hybrid Architecture, botun veri toplama stratejisini optimize eden, Rate Limit koruması sağlayan ve CPU kullanımını minimize eden hibrit bir mimaridir.
 
 **3 Anaşama:**
-1. **Local DB First** - SQLite'dan veri çek (0 API çağrısı)
+1. **Local DB/Parquet First** - Parquet Lake/SQLite'dan veri çek (0 API çağrısı)
 2. **REST Pagination** - Sadece eksik mumları çek (sınırsız gap fill)
 3. **WebSocket Push** - Canlı mumları dinle (0 polling)
 
@@ -21,7 +21,7 @@ Smart Hybrid Architecture, botun veri toplama stratejisini optimize eden, Rate L
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ 1. LOCAL DB FIRST (SQLite)                              │
+│ 1. LOCAL DATA FIRST (Parquet/SQLite)                    │
 │    - db_manager.get_klines(symbol, '1m', limit=1500)   │
 │    - Son 1500 mum yerel veritabanından çekilir         │
 │    - ✅ 0 REST API çağrısı (Rate Limit koruması)       │
@@ -40,7 +40,7 @@ Smart Hybrid Architecture, botun veri toplama stratejisini optimize eden, Rate L
 │    - while True: döngüsü                                │
 │    - Her sayfada 1000 mum                               │
 │    - Tüm gap dolana kadar devam                         │
-│    - SQLite'a KAYDET (save_kline)                       │
+│    - Parquet Lake veya SQLite'a KAYDET (save_kline)     │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -126,7 +126,7 @@ if time_diff.total_seconds() > 120:  # 2 dakika
         gap_start_ms = page_ohlcv[-1][0]
         await asyncio.sleep(0.1)  # Rate limit
     
-    # TÜM gap mumlarını SQLite'a kaydet
+    # TÜM gap mumlarını Parquet Lake / SQLite'a kaydet
     for candle in all_gap_ohlcv:
         await db_manager.save_kline(symbol, candle, '1m')
 ```
@@ -138,8 +138,8 @@ if time_diff.total_seconds() > 120:  # 2 dakika
 📄 [PAGINATION] Sayfa 1: 1000 mum çekildi (Toplam: 1000)
 📄 [PAGINATION] Sayfa 2: 357 mum çekildi (Toplam: 1357)
 OK [PAGINATION] Tüm gap mumları çekildi (Toplam: 1357 mum)
-💾 [SAVE] 1357 gap mumu SQLite'a kaydediliyor...
-OK [SAVE] Tüm gap mumları SQLite'a kaydedildi.
+💾 [SAVE] 1357 gap mumu Parquet Lake / SQLite'a kaydediliyor...
+OK [SAVE] Tüm gap mumları Parquet Lake / SQLite'a kaydedildi.
 ```
 
 ---
@@ -313,8 +313,8 @@ OK [PAGINATION] Sayfa 1: 1000 mum çekildi (Toplam: 1000)
 📄 [PAGINATION] Sayfa 2 çekiliyor (since=1709914200000)...
 OK [PAGINATION] Sayfa 2: 357 mum çekildi (Toplam: 1357)
 OK [PAGINATION] Tüm gap mumları çekildi (Toplam: 1357 mum)
-💾 [SAVE] 1357 gap mumu SQLite'a kaydediliyor...
-OK [SAVE] Tüm gap mumları SQLite'a kaydedildi.
+💾 [SAVE] 1357 gap mumu Parquet Lake / SQLite'a kaydediliyor...
+OK [SAVE] Tüm gap mumları Parquet Lake / SQLite'a kaydedildi.
 OK [STITCH] DB + REST birleştirildi: Toplam 1500 mum
 OK [RAM] RAM koruması: Son 1500 mum yüklendi.
 📡 [WSS] BTC/USDT:USDT için WebSocket döngüsü başlatılıyor...
