@@ -335,7 +335,7 @@ class PaperTrader:
             
             # Pozisyon aç
             strategy_id = self.active_strategies.get(symbol, "unknown")
-            position = self.position_manager.open_position(
+            position = await self.position_manager.open_position(
                 bot_id=bot_id,
                 symbol=symbol,
                 direction=direction,
@@ -906,88 +906,91 @@ class PaperTrader:
         candle_high = current_high if current_high is not None else current_price
         candle_low  = current_low  if current_low  is not None else current_price
 
-        # Legacy positions güncelle
-        positions_to_close = []  # Kapatılacaklar (döngü içinde silme)
-        positions_updated = False  # Güncelleme yapıldı mı?
+        # Per-Symbol Locking for update_live_prices (Trailing Stop updates & Take Profit)
+        async with self.position_manager.get_lock(symbol):
+            # Legacy positions güncelle
+            positions_to_close = []  # Kapatılacaklar (döngü içinde silme)
+            positions_updated = False  # Güncelleme yapıldı mı?
 
-        for pos in list(self.position_manager.legacy_positions):  # list() kopyasını al
-            if pos['symbol'] != symbol:
-                continue
+            for pos in list(self.position_manager.legacy_positions):  # list() kopyasını al
+                if pos['symbol'] != symbol:
+                    continue
 
-            bot_id = pos.get('bot_id')
+                bot_id = pos.get('bot_id')
 
-            # Position objesine bak (asıl lock orada)
-            position = self.position_manager.get_position(bot_id)
-            if position and position.metadata.get('is_closing', False):
-                # Zaten kapanıyor, işlem yapma
-                continue
+                # Position objesine bak (asıl lock orada)
+                position = self.position_manager.get_position(bot_id)
+                if position and position.metadata.get('is_closing', False):
+                    # Zaten kapanıyor, işlem yapma
+                    continue
 
-            pos['current_price'] = current_price
-            positions_updated = True
+                pos['current_price'] = current_price
+                positions_updated = True
 
-            # 1. Trailing stop güncelle (doğru HIGH/LOW ile)
-            self.position_manager.update_trailing_stop_legacy(
-                pos, candle_high, candle_low, current_price
-            )
+                # 1. Trailing stop güncelle (doğru HIGH/LOW ile)
+                self.position_manager.update_trailing_stop_legacy(
+                    pos, candle_high, candle_low, current_price
+                )
 
-            # 2. PnL hesapla
-            roe, pnl_usd = self.position_manager.get_unrealized_pnl_legacy(pos, current_price)
-            pos['unrealized_usd'] = pnl_usd
-            pos['pnl_percent'] = roe
+                # 2. PnL hesapla
+                roe, pnl_usd = self.position_manager.get_unrealized_pnl_legacy(pos, current_price)
+                pos['unrealized_usd'] = pnl_usd
+                pos['pnl_percent'] = roe
 
-            # ========================================================================
-            # YENİ: position.updated EVENT FIRLAT (UI gerçek zamanlı güncelleme)
-            # ========================================================================
-            try:
-                from shared.events import event_bus
-                from shared.events.event_bus import Event
-                await event_bus.publish(Event(
-                    type="position.updated",
-                    payload={
-                        "bot_id": bot_id,
-                        "symbol": symbol,
-                        "updates": {
-                            "current_price": current_price,
-                            "unrealized_usd": pnl_usd,
-                            "pnl_percent": roe,
-                            "stop_loss": pos.get('stop_loss'),
-                            "take_profit": pos.get('take_profit'),
-                            "highest_seen": pos.get('highest_seen'),
-                            "lowest_seen": pos.get('lowest_seen')
-                        }
-                    },
-                    source="paper_engine"
-                ))
-                logger.debug(f"📊 [EDA] {symbol} position.updated event fırlatıldı (bot_id={bot_id})")
-            except Exception as e:
-                logger.error(f"❌ [EDA] position.updated event fırlatma hatası: {e}")
-            # ========================================================================
+                # ========================================================================
+                # YENİ: position.updated EVENT FIRLAT (UI gerçek zamanlı güncelleme)
+                # ========================================================================
+                try:
+                    from shared.events import event_bus
+                    from shared.events.event_bus import Event
+                    await event_bus.publish(Event(
+                        type="position.updated",
+                        payload={
+                            "bot_id": bot_id,
+                            "symbol": symbol,
+                            "updates": {
+                                "current_price": current_price,
+                                "unrealized_usd": pnl_usd,
+                                "pnl_percent": roe,
+                                "stop_loss": pos.get('stop_loss'),
+                                "take_profit": pos.get('take_profit'),
+                                "highest_seen": pos.get('highest_seen'),
+                                "lowest_seen": pos.get('lowest_seen')
+                            }
+                        },
+                        source="paper_engine"
+                    ))
+                    logger.debug(f"📊 [EDA] {symbol} position.updated event fırlatıldı (bot_id={bot_id})")
+                except Exception as e:
+                    logger.error(f"❌ [EDA] position.updated event fırlatma hatası: {e}")
+                # ========================================================================
 
-            # 3. Likidasyon kontrolü
-            if self.position_manager.check_liquidation_legacy(pos, current_price):
-                positions_to_close.append((bot_id, current_price, 'LİKİDASYON'))
-                continue
+                # 3. Likidasyon kontrolü
+                if self.position_manager.check_liquidation_legacy(pos, current_price):
+                    positions_to_close.append((bot_id, current_price, 'LİKİDASYON'))
+                    continue
 
-            # 4. Stop Loss / Take Profit kontrolü
-            sl = pos.get('stop_loss')
-            tp = pos.get('take_profit')
-            direction = pos.get('direction', 'LONG')
+                # 4. Stop Loss / Take Profit kontrolü
+                sl = pos.get('stop_loss')
+                tp = pos.get('take_profit')
+                direction = pos.get('direction', 'LONG')
 
-            if direction == 'LONG':
-                if sl and current_price <= sl:
-                    positions_to_close.append((bot_id, sl, 'STOP LOSS'))
-                elif tp and current_price >= tp:
-                    positions_to_close.append((bot_id, tp, 'TAKE PROFIT'))
-            else:  # SHORT
-                if sl and current_price >= sl:
-                    positions_to_close.append((bot_id, sl, 'STOP LOSS'))
-                elif tp and current_price <= tp:
-                    positions_to_close.append((bot_id, tp, 'TAKE PROFIT'))
+                if direction == 'LONG':
+                    if sl and current_price <= sl:
+                        positions_to_close.append((bot_id, sl, 'STOP LOSS'))
+                    elif tp and current_price >= tp:
+                        positions_to_close.append((bot_id, tp, 'TAKE PROFIT'))
+                else:  # SHORT
+                    if sl and current_price >= sl:
+                        positions_to_close.append((bot_id, sl, 'STOP LOSS'))
+                    elif tp and current_price <= tp:
+                        positions_to_close.append((bot_id, tp, 'TAKE PROFIT'))
 
-        # paper_engine.open_positions'u senkronize et (UI güncellemesi için kritik!)
-        if positions_updated:
-            self.open_positions = list(self.position_manager.legacy_positions)
-        
+            # paper_engine.open_positions'u senkronize et (UI güncellemesi için kritik!)
+            if positions_updated:
+                self.open_positions = list(self.position_manager.legacy_positions)
+
+        # Lock dışına çıkıldı, artık kapatma işlemlerini güvenle yapabiliriz (Deadlock önleme)
         # Kapatılacak pozisyonları işle
         closed_bot_ids = set()  # Bu tick'te kapatılan bot'lar (duplicate önleme)
 
