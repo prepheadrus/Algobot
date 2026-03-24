@@ -883,11 +883,12 @@ class ExchangeManager:
                 lake = get_parquet_lake('binance')
 
                 # 1m veriyi DB'den çek
-                limit_1m = max(all_downloaded, 1000)  # En az 1000 mum
+                # İndirme bitince db'deki TÜM veriyi (limit 2,000,000 yeterince büyük) Parquet'e toptan (overwrite) kaydediyoruz
+                limit_1m = 2000000  # Tüm geçmişi çekmek için çok büyük bir limit
                 # [WSS NORMALİZASYON] symbol.split('_')[0] yerine normalize_symbol kullan
                 symbol_clean = normalize_symbol(symbol)
 
-                logger.info(f"📊 [PARQUET] {symbol_clean} için Parquet oluşturuluyor... (limit={limit_1m})")
+                logger.info(f"📊 [PARQUET] {symbol_clean} için Parquet oluşturuluyor... (Tüm veri)")
 
                 klines_data = await db_manager.get_klines(symbol_clean, '1m', limit=limit_1m)
 
@@ -897,8 +898,8 @@ class ExchangeManager:
                     df_1m['timestamp'] = pd.to_datetime(df_1m['timestamp'], unit='ms', utc=True)
                     df_1m.set_index('timestamp', inplace=True)
 
-                    # 1m'i Parquet'e kaydet
-                    await lake.save(symbol_clean, '1m', df_1m, append=True)
+                    # 1m'i Parquet'e kaydet (overwrite modunda, append=False)
+                    await lake.save(symbol_clean, '1m', df_1m, append=False)
                     logger.info(f"✅ [PARQUET] {symbol_clean} 1m → Parquet kaydedildi ({len(df_1m)} satır)")
 
                     # Diğer TF'leri oluştur ve kaydet (TÜM Superalgos timeframeleri)
@@ -915,7 +916,7 @@ class ExchangeManager:
                         df_tf = df_tf.dropna()
 
                         if not df_tf.empty:
-                            await lake.save(symbol_clean, tf, df_tf, append=True)
+                            await lake.save(symbol_clean, tf, df_tf, append=False)
                             logger.info(f"✅ [PARQUET] {tf} → Parquet kaydedildi: {len(df_tf)} satır")
 
                     logger.info(f"🎉 [PARQUET] {symbol} için TÜM timeframe'ler ({len(all_timeframes)}) Parquet'e kaydedildi!")
