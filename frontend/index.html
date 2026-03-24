@@ -23,19 +23,6 @@
         </div>
     </div>
 
-    <!-- AI Terminal Widget (Pinned to bottom) -->
-    <div class="ai-terminal" id="ai-terminal">
-        <div class="terminal-header">
-            <span>🧠 AI Kernel Logs</span>
-            <span class="pulse-dot"></span>
-        </div>
-        <div class="terminal-body" id="terminal-body">
-            <div class="terminal-line">Neural network initialized...</div>
-            <div class="terminal-line">Data Lake connected via Parquet...</div>
-            <div class="terminal-line">Waiting for market signals...</div>
-        </div>
-    </div>
-
     <div class="dashboard-container">
         <!-- Collapsible Sidebar -->
         <aside class="sidebar glass-panel" id="sidebar">
@@ -96,51 +83,18 @@
                     <div class="top-row-cards">
 
                         <!-- Kart 1: Total Portfolio Value -->
-                        <div class="card glass-panel flex-card">
-                            <h3 class="panel-title">Total Portfolio Value</h3>
-                            <div class="risk-metrics-grid" style="grid-template-columns: 1fr; gap: 10px; margin-top: auto;">
-                                <div class="risk-metric-box">
-                                    <span class="metric-label">Bakiye</span>
-                                    <span class="metric-value" id="balance-val">$0.00</span>
-                                </div>
-                                <div class="risk-metric-box highlight">
-                                    <span class="metric-label">Live P&L</span>
-                                    <span class="metric-value success-text" id="total-pnl-val">+$0.00</span>
-                                </div>
+
                             </div>
                         </div>
 
                         <!-- Kart 2: ML Prediction Confidence -->
-                        <div class="card glass-panel flex-card">
-                            <h3 class="panel-title">ML Prediction Confidence</h3>
-                            <div class="ml-prediction-content" style="display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 15px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-weight: bold; font-size: 1.1rem;">Güven Skoru</span>
-                                    <span style="font-weight: bold; font-size: 1.5rem; color: var(--accent-cyan);">85%</span>
-                                </div>
-                                <div style="background: rgba(255,255,255,0.1); border-radius: 10px; height: 12px; overflow: hidden; width: 100%;">
-                                    <div style="background: var(--accent-cyan); height: 100%; width: 85%; box-shadow: 0 0 10px var(--accent-cyan);"></div>
-                                </div>
-                                <div class="gauge-details" style="margin-top: 10px;">
-                                    <div class="gauge-detail-row">
-                                        <span>ML Prediction:</span>
-                                        <span style="color: var(--accent-cyan); font-weight: bold;">Bullish</span>
-                                    </div>
-                                    <div class="gauge-detail-row">
-                                        <span>Volatility:</span>
-                                        <span style="color: var(--accent-gold);">Medium</span>
-                                    </div>
+
                                 </div>
                             </div>
                         </div>
 
                         <!-- Kart 3: Hybrid Data Engine Status -->
-                        <div class="card glass-panel flex-card">
-                            <h3 class="panel-title">Hybrid Data Engine Status</h3>
-                            <div style="display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column;">
-                                <span style="font-size: 2.5rem; margin-bottom: 10px;">🟢</span>
-                                <span style="font-size: 1.5rem; font-weight: bold; color: var(--accent-emerald); letter-spacing: 2px;">SYNCED</span>
-                                <span style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Parquet Data Lake Active</span>
+
                             </div>
                         </div>
 
@@ -148,7 +102,7 @@
 
                     <!-- Row 2: Dev Grafik Alanı -->
                     <div class="bottom-row-chart card glass-panel">
-                        <h3 class="panel-title">Real-Time Parquet Stream Visualization</h3>
+
                         <div id="plotly-chart" class="chart-container" style="flex-grow: 1; min-height: 400px; width: 100%;"></div>
                     </div>
 
@@ -1551,6 +1505,19 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- AI Terminal Widget (Pinned to bottom) -->
+    <div class="ai-terminal" id="ai-terminal">
+        <div class="terminal-header">
+            <span>🧠 AI Kernel Logs</span>
+            <span class="pulse-dot"></span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+            <div class="terminal-line">Neural network initialized...</div>
+            <div class="terminal-line">Data Lake connected via Parquet...</div>
+            <div class="terminal-line">Waiting for market signals...</div>
+        </div>
     </div>
 
     <!-- Strateji Görselleştirme Çekmecesi (Drawer) -->
