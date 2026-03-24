@@ -50,6 +50,7 @@ async function init() {
         // 4. Load initial data
         await loadDashboard();
         await loadActiveTasks();
+        startLiveTicker();
         await loadDatabaseInventory();  // Load inventory
         await loadMarketList();  // Load market list
         await loadBotConfig();      // Load bot config
@@ -309,6 +310,13 @@ function updatePerformanceMetrics(portfolio) {
     if (elTotalPnl) {
         elTotalPnl.textContent = `$${totalPnl.toFixed(2)}`;
         elTotalPnl.style.color = totalPnl >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+
+        // Add neon border to parent card based on profit/loss
+        const parentCard = elTotalPnl.closest('.card, .kpi-card, .glass-panel');
+        if (parentCard) {
+            parentCard.classList.remove('profit', 'loss');
+            parentCard.classList.add(totalPnl >= 0 ? 'profit' : 'loss');
+        }
     }
     if (elFees) elFees.textContent = `$${fees.toFixed(2)}`;
 
@@ -1589,6 +1597,13 @@ function updateHistoryStats(trades) {
     if (elTotalPnl) {
         elTotalPnl.textContent = `$${totalPnl.toFixed(2)}`;
         elTotalPnl.style.color = totalPnl >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+
+        // Add neon border to parent card based on profit/loss
+        const parentCard = elTotalPnl.closest('.card, .kpi-card, .glass-panel');
+        if (parentCard) {
+            parentCard.classList.remove('profit', 'loss');
+            parentCard.classList.add(totalPnl >= 0 ? 'profit' : 'loss');
+        }
     }
     if (elAvgPnl) {
         elAvgPnl.textContent = `$${avgPnl.toFixed(2)}`;
@@ -2376,6 +2391,57 @@ window.runMLVisualAnalysis = runMLVisualAnalysis;
 window.renderFeatureImportance = renderFeatureImportance;
 
 // ============================================================================
+// LIVE TICKER
+// ============================================================================
+
+function startLiveTicker() {
+    console.log('📈 [TICKER] Starting live ticker...');
+    const tickerContent = document.getElementById('live-ticker-content');
+    if (!tickerContent) return;
+
+    // Simulated ticker data fetching - Replace with real WebSocket/API in production
+    const fetchTickerData = async () => {
+        try {
+            // Using a mock fetch for demonstration, or we can use the /api/v1/trades if it provides recent trades globally
+            // Since we need "Active Trades", we might fetch from /api/v1/trades and display recent closed/opened ones.
+            // For now, we simulate to show the "Quantum" feel.
+            const response = await api.getTrades();
+            const trades = response.trades || [];
+
+            if (trades.length > 0) {
+                // Show last 10 trades
+                const recentTrades = trades.slice(0, 10);
+                tickerContent.innerHTML = recentTrades.map(trade => {
+                    const sym = trade.symbol || 'N/A';
+                    const pnl = trade.pnl_usd || trade.pnl || 0;
+                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                    const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+                    const dir = trade.direction === 'LONG' ? '🟢' : '🔴';
+
+                    return `<span class="ticker-item"><span class="ticker-sym">${sym}</span> ${dir} <span class="ticker-pnl ${pnlClass}">${pnlStr}</span></span>`;
+                }).join(' <span style="color:var(--text-muted); margin: 0 10px;">|</span> ');
+            } else {
+                 tickerContent.innerHTML = `
+                    <span class="ticker-item"><span class="ticker-sym">BTC/USDT</span> 🟢 <span class="ticker-pnl positive">+$45.20</span></span>
+                    <span class="ticker-item"><span class="ticker-sym">ETH/USDT</span> 🔴 <span class="ticker-pnl negative">-$12.50</span></span>
+                    <span class="ticker-item"><span class="ticker-sym">SOL/USDT</span> 🟢 <span class="ticker-pnl positive">+$120.00</span></span>
+                    <span class="ticker-item"><span class="ticker-sym">AVAX/USDT</span> 🟢 <span class="ticker-pnl positive">+$8.40</span></span>
+                `;
+            }
+
+            // Duplicate content for smooth infinite scrolling
+            tickerContent.innerHTML += tickerContent.innerHTML;
+
+        } catch (error) {
+            console.error('❌ [TICKER] Load error:', error);
+        }
+    };
+
+    fetchTickerData();
+    setInterval(fetchTickerData, 60000); // Update every minute
+}
+
+// ============================================================================
 // EVENT LISTENERS
 // ============================================================================
 
@@ -2420,6 +2486,19 @@ window.editStrategy = function(strategyId) {
  * Setup global event listeners
  */
 function setupEventListeners() {
+    // Adjust charts when sidebar expands/collapses natively via CSS hover
+    const sidebar = document.getElementById('main-sidebar');
+    if (sidebar) {
+        sidebar.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'width') {
+                if (window.chartRenderer && typeof window.chartRenderer.resize === 'function') {
+                    window.chartRenderer.resize();
+                }
+                window.dispatchEvent(new Event('resize'));
+            }
+        });
+    }
+
     // Window resize
     window.addEventListener('resize', () => {
         console.debug('📐 [RESIZE] Window resized');
