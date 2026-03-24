@@ -180,6 +180,11 @@ class DataService:
         # Diskteki Master Data (1m) veya API'den çekilen birleşmiş veri hedef timeframe değilse RAM'de resample et.
         if timeframe == MASTER_TIMEFRAME:
             logger.info(f"✅ [HYBRID DATA] {symbol} {timeframe} başarıyla yüklendi. (Satır: {len(df_1m)})")
+
+            # WFO & ML standartları için tz-naive garantisi
+            if df_1m.index.tzinfo is not None:
+                df_1m.index = df_1m.index.tz_localize(None)
+
             return df_1m
 
         logger.info(f"⚙️ [HYBRID DATA] (B) Resampling işlemi yapılıyor: 1m -> {timeframe}")
@@ -187,6 +192,10 @@ class DataService:
 
         # Olası NaN değerleri doldur
         df_resampled = df_resampled.ffill().dropna(how='all')
+
+        # WFO & ML standartları için tz-naive garantisi (Eğer resample_data bunu yapmadıysa önlem)
+        if df_resampled.index.tzinfo is not None:
+            df_resampled.index = df_resampled.index.tz_localize(None)
 
         logger.info(f"✅ [HYBRID DATA] {symbol} {timeframe} RAM'de başarıyla üretildi. (Satır: {len(df_resampled)})")
         return df_resampled

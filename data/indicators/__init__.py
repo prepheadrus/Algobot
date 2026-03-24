@@ -252,8 +252,15 @@ class StrategyIndicators:
             logger.debug(f"⚠️ [RESAMPLE] Son mum 1 dakika önce kapandı, güvenlik için düşürülüyor")
             resampled_df = resampled_df.iloc[:-1]
 
-        # Index'i tekrar sütuna al
-        resampled_df.reset_index(inplace=True)
+        # ========================================================================
+        # ÇIKIŞ STANDARDI (Tz-Naive DatetimeIndex)
+        # ========================================================================
+        # Index'i timezone-naive yap (WFO ve ML ile uyumluluk için)
+        if resampled_df.index.tzinfo is not None:
+            resampled_df.index = resampled_df.index.tz_localize(None)
+
+        # ÖNEMLİ: reset_index KALDIRILDI!
+        # ML servisi ve Data servisi index'in DatetimeIndex olmasını bekliyor
         return resampled_df
     
     # ========================================================================
