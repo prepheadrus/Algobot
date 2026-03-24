@@ -9,63 +9,104 @@ echo ==========================================
 echo.
 
 REM Script dizinine git
-cd /d %~dp0
+cd /d "%~dp0"
 
-REM Virtual Environment kontrolu
+REM 1. Python Kontrolu
+python --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    color 0C
+    echo [HATA] Python sisteminizde kurulu degil veya PATH'e eklenmemis!
+    echo.
+    echo Lutfen asagidaki adimlari izleyin:
+    echo 1. https://www.python.org/downloads/ adresinden Python'i indirin.
+    echo 2. Kurulum ekraninda "Add Python to PATH" (Python'i PATH'e ekle) secenegini MUTLAKA isaretleyin.
+    echo 3. Kurulum bittikten sonra bu dosyayi tekrar calistirin.
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Python kurulumu dogrulandi.
+
+REM 2. Sanal Ortam (VENV) Kontrolu ve Olusturma
 if not exist "venv\Scripts\python.exe" (
-    echo [HATA] Virtual environment bulunamadi!
-    echo [HATA] Lutfen once setup.bat dosyasini calistirin.
     echo.
-    pause
-    exit /b 1
+    echo [BILGI] Sanal ortam (venv) bulunamadi. Sizin icin otomatik olusturuluyor...
+    python -m venv venv
+    if errorlevel 1 (
+        color 0C
+        echo [HATA] Sanal ortam olusturulamadi. Lutfen Python kurulumunuzu kontrol edin.
+        pause
+        exit /b 1
+    )
+    echo [OK] Sanal ortam basariyla olusturuldu.
+) else (
+    echo [OK] Sanal ortam bulundu.
 )
 
-echo [OK] Virtual environment bulundu.
+REM 3. Aktivasyon ve Bagimliliklarin Yuklenmesi
 echo.
+echo [BILGI] Kutuphaneler ve bagimliliklar kontrol ediliyor...
+echo [BILGI] Ilk kurulum yapiliyorsa bagimliliklar indirilecektir.
+echo [BILGI] Bu islem bilgisayar hiziniza ve internetinize gore birkac dakika surebilir, lutfen bekleyin...
+call venv\Scripts\activate.bat
+python -m pip install --upgrade pip >nul 2>&1
+if exist "requirements.txt" (
+    pip install -r requirements.txt >nul 2>&1
+    if errorlevel 1 (
+        color 0C
+        echo [HATA] Bagimliliklar yuklenirken bir sorun olustu. Lutfen internet baglantinizi kontrol edin.
+        pause
+        exit /b 1
+    )
+    echo [OK] Tum bagimliliklar yuklendi ve guncel.
+) else (
+    echo [UYARI] requirements.txt dosyasi bulunamadi!
+)
 
-REM .env kontrolu
+REM 4. Cevre Degiskenleri (.env) ve Config (config.yaml) Kontrolu
+echo.
 if not exist ".env" (
-    echo [UYARI] .env dosyasi yok! Otomatik olusturuluyor...
-    copy .env.example .env >nul
-    echo [OK] .env olusturuldu. API anahtarlarini duzenleyin!
-    echo.
+    echo [BILGI] .env dosyasi yok. Otomatik olusturuluyor...
+    if exist ".env.example" (
+        copy .env.example .env >nul
+        echo [OK] .env dosyasi olusturuldu. API anahtarlarini daha sonra duzenleyebilirsiniz.
+    ) else (
+        echo [UYARI] .env.example bulunamadi, .env olusturulamadi.
+    )
+) else (
+    echo [OK] .env dosyasi mevcut.
 )
 
-REM config.yaml kontrolu
 if not exist "config.yaml" (
-    echo [HATA] config.yaml bulunamadi!
-    echo [HATA] config.example.yaml'i config.yaml olarak kopyalayin.
-    pause
-    exit /b 1
+    echo [BILGI] config.yaml dosyasi yok. Otomatik olusturuluyor...
+    if exist "config.example.yaml" (
+        copy config.example.yaml config.yaml >nul
+        echo [OK] config.yaml dosyasi olusturuldu.
+    ) else (
+        echo [UYARI] config.example.yaml bulunamadi, config.yaml olusturulamadi.
+    )
+) else (
+    echo [OK] config.yaml dosyasi mevcut.
 )
 
-echo [OK] Yapilandirma hazir.
+REM 5. Botu Baslatma
 echo.
 echo ==========================================
 echo   Bot baslatiliyor...
 echo ==========================================
 echo.
-echo [BİLGİ] Dashboard: http://localhost:3000
-echo [BİLGİ] Tarayici otomatik acilacak...
-echo [BİLGİ] Durdurmak icin: Bu pencereyi kapat veya CTRL+C
+echo [BILGI] Dashboard: http://localhost:3000
+echo [BILGI] Tarayici otomatik acilacak...
+echo [BILGI] Durdurmak icin: Bu pencereyi kapat veya CTRL+C
 echo.
 
-REM Botu arka planda baslat
-start /B call venv\Scripts\activate.bat ^&^& python main.py
+REM Tarayiciyi birazdan acmasi icin arka planda bir timeout komutu calistiralim
+start /B cmd /c "timeout /t 5 /nobreak >nul & start http://localhost:3000"
 
-REM 5 saniye bekle (bot baslasin)
-timeout /t 5 /nobreak >nul
-
-REM Tarayiciyi ac
-echo [OK] Dashboard aciliyor...
-start http://localhost:3000
+REM Botu on planda baslat ki loglari ekranda gorebilsin ve hata alirsa pencere kapanmasin
+python main.py
 
 echo.
-echo ==========================================
-echo   Bot calisiyor...
-echo ==========================================
-echo.
-echo NOT: Bot penceresini acik tutun!
-echo     Kapatmak icin pencereyi kapatin veya CTRL+C yapin.
+echo [HATA] Bot beklenmedik sekilde durdu!
 echo.
 pause
