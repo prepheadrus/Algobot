@@ -1,12 +1,5 @@
 import pandas as pd
 import numpy as np
-try:
-    import pandas_ta as ta
-except ImportError:
-    try:
-        import pandas_ta_classic as ta
-    except ImportError:
-        ta = None
 
 class MarketRegimeDetector:
     """
@@ -34,8 +27,25 @@ class MarketRegimeDetector:
         # VHF, fiyat hareketinin ne kadarının trende dayalı olduğunu ölçer.
         # Yüksek değer = Güçlü Trend.
         try:
-            vhf = ta.vhf(df['close'], length=28).iloc[-1]
-        except:
+            # Saf Pandas VHF (Vertical Horizontal Filter) Hesaplaması
+            length = 28
+            close_s = df['close']
+            hcp = close_s.rolling(window=length).max()
+            lcp = close_s.rolling(window=length).min()
+
+            # Pay (Numerator)
+            numerator = abs(hcp - lcp)
+
+            # Payda (Denominator)
+            diff = abs(close_s.diff())
+            denominator = diff.rolling(window=length).sum()
+
+            # VHF
+            vhf_series = numerator / denominator
+            vhf = vhf_series.iloc[-1]
+            if pd.isna(vhf):
+                vhf = 0.5
+        except Exception:
             vhf = 0.5 # Default orta değer
             
         # 3. Bollinger Band Width (Squeeze kontrolü)
