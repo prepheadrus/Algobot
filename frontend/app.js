@@ -2486,21 +2486,12 @@ window.editStrategy = function(strategyId) {
  * Setup global event listeners
  */
 function setupEventListeners() {
-    // Sidebar Toggle
-    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
-    const dashboardContainer = document.querySelector('.dashboard-container');
 
-    if (sidebarToggleBtn && dashboardContainer) {
-        sidebarToggleBtn.addEventListener('click', () => {
-            dashboardContainer.classList.toggle('sidebar-collapsed');
-
-            // Adjust charts when sidebar resizes
-            setTimeout(() => {
                 if (window.chartRenderer && typeof window.chartRenderer.resize === 'function') {
                     window.chartRenderer.resize();
                 }
                 window.dispatchEvent(new Event('resize'));
-            }, 450); // wait for CSS transition
+
         });
     }
 

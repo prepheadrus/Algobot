@@ -21,73 +21,41 @@
         </div>
     </div>
 
-    <div class="dashboard-container">
-        <!-- Sol Menü -->
-        <aside class="sidebar glass-panel" id="main-sidebar">
-            <button id="sidebar-toggle" class="sidebar-toggle-btn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
-            <div class="logo">
-                <span class="pulse-dot"></span>
-                <h2 class="sidebar-text">Algo<span>Bot</span></h2>
-            </div>
-            <div class="status-box sidebar-text">
-                <p>Sistem Çevresi</p>
-                <h3 id="env-status" class="neon-text">Yükleniyor...</h3>
-            </div>
-            <nav class="menu" id="side-menu">
-                <button class="menu-item active" data-target="tab-portfolio">
-                    <span class="menu-icon">📊</span>
-                    <span class="sidebar-text">Portföy Analizi</span>
-                </button>
-                <button class="menu-item" data-target="tab-ml">
-                    <span class="menu-icon">🧠</span>
-                    <span class="sidebar-text">ML Karar Motoru</span>
-                </button>
-                <button class="menu-item" data-target="tab-orders">
-                    <span class="menu-icon">⚡</span>
-                    <span class="sidebar-text">Aktif Emirler</span>
-                </button>
-                <button class="menu-item" data-target="tab-history">
-                    <span class="menu-icon">📜</span>
-                    <span class="sidebar-text">İşlem Geçmişi</span>
-                </button>
-                <button class="menu-item" data-target="tab-reports">
-                    <span class="menu-icon">📈</span>
-                    <span class="sidebar-text">Performans Raporları</span>
-                </button>
-                <button class="menu-item" data-target="tab-strategy-builder">
-                    <span class="menu-icon">🎨</span>
-                    <span class="sidebar-text">Strateji Oluşturucu</span>
-                </button>
-                <button class="menu-item" data-target="tab-strategies">
-                    <span class="menu-icon">📚</span>
-                    <span class="sidebar-text">Strateji Kütüphanesi</span>
-                </button>
-                <button class="menu-item" data-target="tab-settings">
-                    <span class="menu-icon">⚙️</span>
-                    <span class="sidebar-text">Sistem Ayarları</span>
-                </button>
-                <button class="menu-item" data-target="tab-data">
-                    <span class="menu-icon">💾</span>
-                    <span class="sidebar-text">Veri Laboratuvarı</span>
-                </button>
-            </nav>
-            <div class="bot-control sidebar-text">
-                <button class="btn btn-danger" id="kill-switch">ACİL DURDURMA</button>
+
             </div>
         </aside>
 
         <!-- Ana İçerik -->
         <main class="main-content">
-            <header class="top-nav glass-panel">
-                <div class="metric"><span class="label">Borsa:</span> <strong id="exchange-val">--</strong></div>
-                <div class="user-profile"><img src="https://api.dicebear.com/7.x/identicon/svg?seed=CryptoAlgoBot"
-                        alt="Avatar"></div>
+            <!-- Multi-Tab Top Bar -->
+            <header class="top-tabs-bar glass-panel" id="side-menu">
+                <button class="menu-item active" data-target="tab-portfolio">
+                    <span class="menu-icon">📊</span> Terminal
+                </button>
+                <button class="menu-item" data-target="tab-ml">
+                    <span class="menu-icon">🧠</span> ML Motoru
+                </button>
+                <button class="menu-item" data-target="tab-orders">
+                    <span class="menu-icon">⚡</span> Emirler
+                </button>
+                <button class="menu-item" data-target="tab-history">
+                    <span class="menu-icon">📜</span> Geçmiş
+                </button>
+                <button class="menu-item" data-target="tab-reports">
+                    <span class="menu-icon">📈</span> Raporlar
+                </button>
+                <button class="menu-item" data-target="tab-strategy-builder">
+                    <span class="menu-icon">🎨</span> Strateji
+                </button>
+                <button class="menu-item" data-target="tab-strategies">
+                    <span class="menu-icon">📚</span> Kütüphane
+                </button>
+                <button class="menu-item" data-target="tab-settings">
+                    <span class="menu-icon">⚙️</span> Ayarlar
+                </button>
+                <button class="menu-item" data-target="tab-data">
+                    <span class="menu-icon">💾</span> Laboratuvar
+                </button>
             </header>
 
             <!-- SEKME 1: PORTFÖY ANALİZİ -->
