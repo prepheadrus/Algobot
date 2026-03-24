@@ -37,7 +37,7 @@ from api.routers.trades import router as trades_router
 # LIFESPAN EVENTS
 # ============================================================================
 
-from core.config import CONFIG, API_HOST, ALLOWED_ORIGINS
+from core.config import CONFIG, API_HOST, API_PORT, ALLOWED_ORIGINS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "api.server:app",
         host=API_HOST,
-        port=8000,
+        port=API_PORT,
         reload=True,
         log_level="info"
     )
