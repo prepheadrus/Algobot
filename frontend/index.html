@@ -23,6 +23,19 @@
         </div>
     </div>
 
+    <!-- AI Terminal Widget (Pinned to bottom) -->
+    <div class="ai-terminal" id="ai-terminal">
+        <div class="terminal-header">
+            <span>🧠 AI Kernel Logs</span>
+            <span class="pulse-dot"></span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+            <div class="terminal-line">Neural network initialized...</div>
+            <div class="terminal-line">Data Lake connected via Parquet...</div>
+            <div class="terminal-line">Waiting for market signals...</div>
+        </div>
+    </div>
+
     <div class="dashboard-container">
         <!-- Collapsible Sidebar -->
         <aside class="sidebar glass-panel" id="sidebar">
@@ -74,81 +87,154 @@
 
         <!-- Ana İçerik -->
         <main class="main-content">
-            <!-- Multi-Tab Top Bar -->
-            <header class="top-tabs-bar glass-panel" id="dynamic-tabs-bar">
-                <!-- Tabs will be dynamically added here by app.js -->
-            </header>
 
-            <!-- Welcome/Empty State for when no tabs are open -->
-            <div id="tab-empty-state" class="tab-content active-tab" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-                <span style="font-size: 4rem; margin-bottom: 20px;">🌌</span>
-                <h2>Quantum Terminal v5.0</h2>
-                <p style="color: var(--text-muted); margin-top: 10px;">Çalışma alanınızı açmak için soldaki menüden bir modül seçin.</p>
-            </div>
-
-            <!-- SEKME 1: PORTFÖY ANALİZİ -->
+            <!-- SEKME 1: PORTFÖY ANALİZİ / TERMINAL -->
             <div id="tab-portfolio" class="tab-content active-tab">
-                <div class="grid-content">
-                    <div class="card glass-panel">
-                        <div class="card-info">
-                            <h3>💰 Bakiye (Balance)</h3>
-                            <h1 id="balance-val">$0.00</h1>
-                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:5px;">Cüzdan Bakiyesi</p>
-                        </div>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="card-info">
-                            <h3>🛡️ Serbest Marjin</h3>
-                            <h1 id="free-margin-val">$0.00</h1>
-                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:5px;">Mevcut Nakit</p>
-                        </div>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="card-info">
-                            <h3>📊 Kullanılan Marjin</h3>
-                            <h1 id="used-margin-val">$0.00</h1>
-                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:5px;">Açık Pozisyonlar</p>
-                        </div>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="card-info">
-                            <h3>🚀 Toplam P&L (Live)</h3>
-                            <h1 id="total-pnl-val" class="success-text">+$0.00</h1>
-                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:5px;">Anlık Kâr/Zarar</p>
-                        </div>
-                    </div>
-                </div>
+                <div class="bento-workspace">
 
-                <div class="grid-content" style="margin-top:20px;">
-                    <div class="card glass-panel" style="padding: 15px;">
-                        <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">Envanter Özeti</h4>
-                        <div class="mini-stats-grid">
-                            <div class="mini-stat"><span>Kâr Faktörü:</span> <strong
-                                    id="stat-profit-factor">1.0</strong></div>
-                            <div class="mini-stat"><span>Max Drawdown:</span> <strong id="stat-drawdown"
-                                    class="danger-text">0.0%</strong></div>
-                            <div class="mini-stat"><span>Sharpe Ratio:</span> <strong id="stat-sharpe">0.0</strong>
+                    <!-- Sol Panel: Signal Akışı -->
+                    <div class="bento-panel panel-left">
+                        <h3 class="panel-title">Sinyal Akışı</h3>
+                        <div class="signal-flow-container">
+                            <!-- Dummy Data for Visual -->
+                            <div class="signal-card signal-long">
+                                <div class="signal-header">
+                                    <span class="signal-symbol">BTC/USDT</span>
+                                    <span class="signal-time">14:02:15</span>
+                                </div>
+                                <div class="signal-body">
+                                    <span class="signal-type">LONG</span>
+                                    <span class="signal-price">@ $69,250</span>
+                                </div>
+                                <div class="signal-footer">
+                                    <span class="signal-strat">XGB_Trend_v4</span>
+                                    <span class="signal-conf">Conf: 87%</span>
+                                </div>
+                            </div>
+                            <div class="signal-card signal-short">
+                                <div class="signal-header">
+                                    <span class="signal-symbol">ETH/USDT</span>
+                                    <span class="signal-time">13:45:10</span>
+                                </div>
+                                <div class="signal-body">
+                                    <span class="signal-type">SHORT</span>
+                                    <span class="signal-price">@ $3,810</span>
+                                </div>
+                                <div class="signal-footer">
+                                    <span class="signal-strat">RF_MeanRev_v2</span>
+                                    <span class="signal-conf">Conf: 82%</span>
+                                </div>
+                            </div>
+                            <div class="signal-card signal-long">
+                                <div class="signal-header">
+                                    <span class="signal-symbol">SOL/USDT</span>
+                                    <span class="signal-time">13:10:05</span>
+                                </div>
+                                <div class="signal-body">
+                                    <span class="signal-type">LONG</span>
+                                    <span class="signal-price">@ $145.20</span>
+                                </div>
+                                <div class="signal-footer">
+                                    <span class="signal-strat">XGB_Trend_v4</span>
+                                    <span class="signal-conf">Conf: 91%</span>
+                                </div>
+                            </div>
+                            <div class="signal-card signal-short">
+                                <div class="signal-header">
+                                    <span class="signal-symbol">AVAX/USDT</span>
+                                    <span class="signal-time">12:30:00</span>
+                                </div>
+                                <div class="signal-body">
+                                    <span class="signal-type">SHORT</span>
+                                    <span class="signal-price">@ $35.50</span>
+                                </div>
+                                <div class="signal-footer">
+                                    <span class="signal-strat">RF_MeanRev_v2</span>
+                                    <span class="signal-conf">Conf: 78%</span>
+                                </div>
                             </div>
                         </div>
+                        <div class="card glass-panel" style="margin-top: 15px;">
+                            <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">🔥 Piyasa İzleme Listesi</h4>
+                            <div id="market-heatmap" class="heatmap-container"></div>
+                        </div>
                     </div>
-                    <div class="card glass-panel chart-span">
-                        <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">📈 Bakiye Gelişim
-                            Grafiği (Equity Curve)</h4>
-                        <div id="plotly-chart" class="chart-container" style="height: 250px;"></div>
-                    </div>
-                </div>
 
-                <div class="grid-content" style="margin-top:20px;">
-                    <div class="card glass-panel">
-                        <h3>🍕 Varlık Dağılımı</h3>
-                        <div id="allocation-chart" style="height: 180px;"></div>
-                        <p style="font-size:0.7rem; color:var(--text-muted); text-align:center;">Marjin ve Nakit Dengesi
-                        </p>
+                    <!-- Orta Panel: Hybrid Engine Status -->
+                    <div class="bento-panel panel-center">
+                        <div class="card glass-panel chart-span" style="height: 100%; display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h3 class="panel-title" style="margin-bottom: 0;">Hybrid Engine Status</h3>
+                            </div>
+                            <div id="plotly-chart" class="chart-container" style="flex-grow: 1; min-height: 400px;"></div>
+                        </div>
                     </div>
-                    <div class="card glass-panel" style="grid-column: span 2;">
-                        <h3>🔥 Piyasa İzleme Listesi</h3>
-                        <div id="market-heatmap" class="heatmap-container"></div>
+
+                    <!-- Sağ Panel: Risk Metrikleri & ML Gauge -->
+                    <div class="bento-panel panel-right">
+                        <h3 class="panel-title">Risk Metrikleri</h3>
+
+                        <div class="risk-metrics-grid">
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Bakiye</span>
+                                <span class="metric-value" id="balance-val">$0.00</span>
+                            </div>
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Serbest Marjin</span>
+                                <span class="metric-value" id="free-margin-val">$0.00</span>
+                            </div>
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Kullanılan</span>
+                                <span class="metric-value" id="used-margin-val">$0.00</span>
+                            </div>
+                            <div class="risk-metric-box highlight">
+                                <span class="metric-label">Live P&L</span>
+                                <span class="metric-value success-text" id="total-pnl-val">+$0.00</span>
+                            </div>
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Kâr Faktörü</span>
+                                <span class="metric-value" id="stat-profit-factor">1.0</span>
+                            </div>
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Max Drawdown</span>
+                                <span class="metric-value danger-text" id="stat-drawdown">0.0%</span>
+                            </div>
+                            <div class="risk-metric-box">
+                                <span class="metric-label">Sharpe Ratio</span>
+                                <span class="metric-value" id="stat-sharpe">0.0</span>
+                            </div>
+                        </div>
+
+                        <h3 class="panel-title" style="margin-top: 20px;">Model Confidence</h3>
+                        <div class="ml-gauge-container glass-panel">
+                            <!-- Dummy Data for Visual Gauge -->
+                            <div class="gauge-circle">
+                                <div class="gauge-value">85%</div>
+                                <div class="gauge-label">Aggressive</div>
+                            </div>
+                            <div class="gauge-details">
+                                <div class="gauge-detail-row">
+                                    <span>Trend Strength:</span>
+                                    <span style="color: var(--accent-emerald);">Strong</span>
+                                </div>
+                                <div class="gauge-detail-row">
+                                    <span>Volatility:</span>
+                                    <span style="color: var(--accent-gold);">Medium</span>
+                                </div>
+                                <div class="gauge-detail-row">
+                                    <span>ML Prediction:</span>
+                                    <span style="color: var(--accent-cyan);">Bullish</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card glass-panel" style="margin-top: 20px; padding: 15px;">
+                            <h4 style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">🍕 Varlık Dağılımı</h4>
+                            <div id="allocation-chart" style="height: 150px;"></div>
+                        </div>
+
                     </div>
+
                 </div>
             </div>
 
@@ -1607,19 +1693,6 @@
         </div>
     </div>
     <div id="drawer-overlay" class="drawer-overlay" onclick="closeStrategyDrawer()"></div>
-
-    <!-- AI Terminal Widget -->
-    <div class="ai-terminal" id="ai-terminal">
-        <div class="terminal-header">
-            <span>🧠 AI Kernel Logs</span>
-            <span class="pulse-dot"></span>
-        </div>
-        <div class="terminal-body" id="terminal-body">
-            <div class="terminal-line">Neural network initialized...</div>
-            <div class="terminal-line">Data Lake connected via Parquet...</div>
-            <div class="terminal-line">Waiting for market signals...</div>
-        </div>
-    </div>
 
     <!-- ES6 Modules -->
     <script type="module" src="app.js?v=2026031521"></script>

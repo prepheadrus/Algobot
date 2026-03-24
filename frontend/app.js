@@ -46,7 +46,6 @@ async function init() {
         setupEventListeners();
 
         // 3. Show default tab (portfolio)
-        openWorkspaceTab('tab-portfolio', 'Terminal', '📊');
         switchTab('tab-portfolio');
 
         // 4. Load initial data
@@ -89,101 +88,16 @@ async function init() {
  * Setup tab navigation
  */
 function setupTabs() {
-    // Sadece sidebar linklerine tıklandığında sekme açma (VS Code stili)
+    // Sadece sidebar linklerine tıklandığında sekme açma (SPA Mantığı)
     const sidebarLinks = document.querySelectorAll('.sidebar-link');
 
     sidebarLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-
             const targetTab = link.dataset.target;
-            const title = link.querySelector('.sidebar-text').textContent;
-            const icon = link.querySelector('.menu-icon').textContent;
-
-            openWorkspaceTab(targetTab, title, icon);
             switchTab(targetTab);
         });
     });
-}
-
-/**
- * Open a dynamic workspace tab in the top bar
- */
-function openWorkspaceTab(tabId, title, icon) {
-    // Sekme zaten açık mı kontrol et
-    const existingTab = app.openTabs.find(t => t.id === tabId);
-
-    if (!existingTab) {
-        // Yeni sekmeyi diziye ekle
-        app.openTabs.push({ id: tabId, title: title, icon: icon });
-        renderTopTabs();
-    }
-}
-
-/**
- * Render the dynamic top tabs bar
- */
-function renderTopTabs() {
-    const tabsBar = document.getElementById('dynamic-tabs-bar');
-    if (!tabsBar) return;
-
-    tabsBar.innerHTML = '';
-
-    app.openTabs.forEach(tab => {
-        const isActive = tab.id === app.activeTab ? 'active' : '';
-        const btn = document.createElement('button');
-        btn.className = `menu-item ${isActive}`;
-        btn.dataset.target = tab.id;
-
-        btn.innerHTML = `
-            <span class="menu-icon">${tab.icon}</span> ${tab.title}
-            <span class="close-tab-icon" data-close="${tab.id}" style="margin-left: 8px; cursor: pointer; opacity: 0.6; font-size: 0.8rem;">✕</span>
-        `;
-
-        // Sekmeye tıklandığında focuslan
-        btn.addEventListener('click', (e) => {
-            // Eğer kapatma tuşuna basıldıysa sekmeyi değiştirme
-            if (e.target.classList.contains('close-tab-icon')) return;
-            e.preventDefault();
-            switchTab(tab.id);
-        });
-
-        // X ikonuna tıklandığında kapat
-        const closeBtn = btn.querySelector('.close-tab-icon');
-        closeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeWorkspaceTab(tab.id);
-        });
-
-        // Hover effects for close icon
-        closeBtn.addEventListener('mouseenter', () => closeBtn.style.opacity = '1');
-        closeBtn.addEventListener('mouseleave', () => closeBtn.style.opacity = '0.6');
-
-        tabsBar.appendChild(btn);
-    });
-}
-
-/**
- * Close a dynamic workspace tab
- */
-function closeWorkspaceTab(tabId) {
-    const index = app.openTabs.findIndex(t => t.id === tabId);
-    if (index > -1) {
-        app.openTabs.splice(index, 1);
-        renderTopTabs();
-
-        // Kapattığımız sekme aktif miydi?
-        if (app.activeTab === tabId) {
-            if (app.openTabs.length > 0) {
-                // Dizideki son sekmeye veya önceki sekmeye geç
-                const nextTabToFocus = app.openTabs[Math.max(0, index - 1)];
-                switchTab(nextTabToFocus.id);
-            } else {
-                // Açık sekme kalmadıysa boş state'e dön
-                switchTab('tab-empty-state');
-            }
-        }
-    }
 }
 
 /**
@@ -209,9 +123,6 @@ function switchTab(tabId) {
             item.classList.remove('active');
         }
     });
-
-    // Top tab'leri tekrar render ederek aktif sınıfını güncelle
-    renderTopTabs();
 
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
