@@ -23,6 +23,12 @@ class BaseStrategy(ABC):
         """
         pass
 
+    def calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Stratejinin ihtiyaç duyduğu indikatörleri hesaplar.
+        """
+        return df
+
     @abstractmethod
     def get_stop_params(self):
         """

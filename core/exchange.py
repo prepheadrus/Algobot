@@ -1006,6 +1006,13 @@ class ExchangeManager:
                 logger.warning(f"⏭️ [SINYAL] {symbol} strateji yok veya veri yetersiz (strategy={strategy is not None}, df_len={len(df)})")
                 return
 
+            # ============================================
+            # YENİ MİMARİ: Toplu İndikatör Hesaplama
+            # Sinyal kararı verilmeden önce strateji spesifik indikatörleri hesapla
+            # ============================================
+            if hasattr(strategy, 'calculate_indicators'):
+                df = strategy.calculate_indicators(df)
+
             latest_candle = df.iloc[-1]
 
             # ============================================
