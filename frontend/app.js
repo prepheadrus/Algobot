@@ -22,7 +22,8 @@ import botManager from './components/bots/bot-manager.js';
 
 const app = {
     initialized: false,
-    activeTab: 'dashboard',
+    activeTab: 'tab-empty-state',
+    openTabs: [], // Array to keep track of dynamically opened tabs {id, title, icon}
     refreshInterval: null
 };
 
@@ -45,6 +46,7 @@ async function init() {
         setupEventListeners();
 
         // 3. Show default tab (portfolio)
+        openWorkspaceTab('tab-portfolio', 'Terminal', '📊');
         switchTab('tab-portfolio');
 
         // 4. Load initial data
@@ -87,17 +89,101 @@ async function init() {
  * Setup tab navigation
  */
 function setupTabs() {
-    const tabs = document.querySelectorAll('.menu-item');
+    // Sadece sidebar linklerine tıklandığında sekme açma (VS Code stili)
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', (e) => {
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
             e.preventDefault();
 
-            // data-target attribute'ını kullan (HTML ile uyumlu)
-            const targetTab = tab.dataset.target || tab.dataset.tab;
+            const targetTab = link.dataset.target;
+            const title = link.querySelector('.sidebar-text').textContent;
+            const icon = link.querySelector('.menu-icon').textContent;
+
+            openWorkspaceTab(targetTab, title, icon);
             switchTab(targetTab);
         });
     });
+}
+
+/**
+ * Open a dynamic workspace tab in the top bar
+ */
+function openWorkspaceTab(tabId, title, icon) {
+    // Sekme zaten açık mı kontrol et
+    const existingTab = app.openTabs.find(t => t.id === tabId);
+
+    if (!existingTab) {
+        // Yeni sekmeyi diziye ekle
+        app.openTabs.push({ id: tabId, title: title, icon: icon });
+        renderTopTabs();
+    }
+}
+
+/**
+ * Render the dynamic top tabs bar
+ */
+function renderTopTabs() {
+    const tabsBar = document.getElementById('dynamic-tabs-bar');
+    if (!tabsBar) return;
+
+    tabsBar.innerHTML = '';
+
+    app.openTabs.forEach(tab => {
+        const isActive = tab.id === app.activeTab ? 'active' : '';
+        const btn = document.createElement('button');
+        btn.className = `menu-item ${isActive}`;
+        btn.dataset.target = tab.id;
+
+        btn.innerHTML = `
+            <span class="menu-icon">${tab.icon}</span> ${tab.title}
+            <span class="close-tab-icon" data-close="${tab.id}" style="margin-left: 8px; cursor: pointer; opacity: 0.6; font-size: 0.8rem;">✕</span>
+        `;
+
+        // Sekmeye tıklandığında focuslan
+        btn.addEventListener('click', (e) => {
+            // Eğer kapatma tuşuna basıldıysa sekmeyi değiştirme
+            if (e.target.classList.contains('close-tab-icon')) return;
+            e.preventDefault();
+            switchTab(tab.id);
+        });
+
+        // X ikonuna tıklandığında kapat
+        const closeBtn = btn.querySelector('.close-tab-icon');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeWorkspaceTab(tab.id);
+        });
+
+        // Hover effects for close icon
+        closeBtn.addEventListener('mouseenter', () => closeBtn.style.opacity = '1');
+        closeBtn.addEventListener('mouseleave', () => closeBtn.style.opacity = '0.6');
+
+        tabsBar.appendChild(btn);
+    });
+}
+
+/**
+ * Close a dynamic workspace tab
+ */
+function closeWorkspaceTab(tabId) {
+    const index = app.openTabs.findIndex(t => t.id === tabId);
+    if (index > -1) {
+        app.openTabs.splice(index, 1);
+        renderTopTabs();
+
+        // Kapattığımız sekme aktif miydi?
+        if (app.activeTab === tabId) {
+            if (app.openTabs.length > 0) {
+                // Dizideki son sekmeye veya önceki sekmeye geç
+                const nextTabToFocus = app.openTabs[Math.max(0, index - 1)];
+                switchTab(nextTabToFocus.id);
+            } else {
+                // Açık sekme kalmadıysa boş state'e dön
+                switchTab('tab-empty-state');
+            }
+        }
+    }
 }
 
 /**
@@ -114,9 +200,9 @@ function switchTab(tabId) {
 
     console.log(`📑 [TAB] Switching to: ${tabId}`);
 
-    // Update menu items
-    document.querySelectorAll('.menu-item').forEach(item => {
-        const target = item.dataset.target || item.dataset.tab;
+    // Update sidebar links visual state
+    document.querySelectorAll('.sidebar-link').forEach(item => {
+        const target = item.dataset.target;
         if (target === tabId) {
             item.classList.add('active');
         } else {
@@ -124,10 +210,12 @@ function switchTab(tabId) {
         }
     });
 
+    // Top tab'leri tekrar render ederek aktif sınıfını güncelle
+    renderTopTabs();
+
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
-        const contentId = content.id.replace('tab-', '');
-        if (tabId === content.id || tabId === contentId) {
+        if (content.id === tabId) {
             content.classList.add('active-tab');
             content.style.display = 'block';
             console.log(`✅ [TAB] Showing: ${content.id}`);
@@ -135,21 +223,33 @@ function switchTab(tabId) {
             // ============================================
             // TAB-SPECIFIC DATA LOADING
             // ============================================
-            if (tabId === 'tab-history' || content.id === 'tab-history') {
+            if (tabId === 'tab-history') {
                 console.log('📜 [TAB] History tab activated, loading trade history...');
                 loadTradeHistory();
-            } else if (tabId === 'tab-portfolio' || content.id === 'tab-portfolio') {
+            } else if (tabId === 'tab-portfolio') {
                 console.log('📊 [TAB] Portfolio tab activated, refreshing data...');
                 loadDashboard();
-            } else if (tabId === 'tab-orders' || content.id === 'tab-orders') {
+            } else if (tabId === 'tab-orders') {
                 console.log('📋 [TAB] Orders tab activated, refreshing data...');
                 loadDashboard();
             }
         } else {
             content.classList.remove('active-tab');
             content.style.display = 'none';
+            // Display: none için inline style'ı force olarak override et (bazen tab flex olabiliyor)
+            if(content.id === 'tab-empty-state' && tabId !== 'tab-empty-state') {
+                content.style.display = 'none';
+            }
         }
     });
+
+    // Boş state gösterimi ayarı
+    const emptyState = document.getElementById('tab-empty-state');
+    if(emptyState) {
+        if(tabId === 'tab-empty-state') {
+            emptyState.style.display = 'flex';
+        }
+    }
 
     // Update store
     store.setState('ui', { ...store.get('ui'), activeTab: tabId });
@@ -2399,33 +2499,49 @@ function startLiveTicker() {
     const tickerContent = document.getElementById('live-ticker-content');
     if (!tickerContent) return;
 
-    // Simulated ticker data fetching - Replace with real WebSocket/API in production
     const fetchTickerData = async () => {
         try {
-            // Using a mock fetch for demonstration, or we can use the /api/v1/trades if it provides recent trades globally
-            // Since we need "Active Trades", we might fetch from /api/v1/trades and display recent closed/opened ones.
-            // For now, we simulate to show the "Quantum" feel.
             const response = await api.getTrades();
             const trades = response.trades || [];
 
             if (trades.length > 0) {
-                // Show last 10 trades
-                const recentTrades = trades.slice(0, 10);
+                const recentTrades = trades.slice(0, 15);
                 tickerContent.innerHTML = recentTrades.map(trade => {
                     const sym = trade.symbol || 'N/A';
                     const pnl = trade.pnl_usd || trade.pnl || 0;
+                    const pnlPercent = trade.pnl_percent || 0;
                     const pnlClass = pnl >= 0 ? 'positive' : 'negative';
                     const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
-                    const dir = trade.direction === 'LONG' ? '🟢' : '🔴';
+                    const pnlPctStr = pnlPercent >= 0 ? `(+${pnlPercent.toFixed(1)}%)` : `(${pnlPercent.toFixed(1)}%)`;
+                    const dir = trade.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+                    const entryPrice = trade.entry_price ? `@ $${trade.entry_price.toFixed(2)}` : '';
 
-                    return `<span class="ticker-item"><span class="ticker-sym">${sym}</span> ${dir} <span class="ticker-pnl ${pnlClass}">${pnlStr}</span></span>`;
+                    const dirColor = trade.direction === 'LONG' ? 'color: var(--accent-emerald)' : 'color: var(--accent-crimson)';
+
+                    return `
+                        <span class="ticker-item">
+                            <span class="ticker-sym">${sym}</span> |
+                            <span class="ticker-dir" style="${dirColor}">${dir}</span>
+                            <span class="ticker-price">${entryPrice}</span> |
+                            <span class="ticker-pnl ${pnlClass}">${pnlStr} ${pnlPctStr}</span>
+                        </span>
+                    `;
                 }).join(' <span style="color:var(--text-muted); margin: 0 10px;">|</span> ');
             } else {
                  tickerContent.innerHTML = `
-                    <span class="ticker-item"><span class="ticker-sym">BTC/USDT</span> 🟢 <span class="ticker-pnl positive">+$45.20</span></span>
-                    <span class="ticker-item"><span class="ticker-sym">ETH/USDT</span> 🔴 <span class="ticker-pnl negative">-$12.50</span></span>
-                    <span class="ticker-item"><span class="ticker-sym">SOL/USDT</span> 🟢 <span class="ticker-pnl positive">+$120.00</span></span>
-                    <span class="ticker-item"><span class="ticker-sym">AVAX/USDT</span> 🟢 <span class="ticker-pnl positive">+$8.40</span></span>
+                    <span class="ticker-item">
+                        <span class="ticker-sym">BTC/USDT</span> |
+                        <span class="ticker-dir" style="color: var(--accent-emerald)">🟢 LONG</span>
+                        <span class="ticker-price">@ $69,200</span> |
+                        <span class="ticker-pnl positive">+$45.50 (+1.2%)</span>
+                    </span>
+                    <span style="color:var(--text-muted); margin: 0 10px;">|</span>
+                    <span class="ticker-item">
+                        <span class="ticker-sym">ETH/USDT</span> |
+                        <span class="ticker-dir" style="color: var(--accent-crimson)">🔴 SHORT</span>
+                        <span class="ticker-price">@ $3,800</span> |
+                        <span class="ticker-pnl negative">-$12.50 (-0.5%)</span>
+                    </span>
                 `;
             }
 
@@ -2486,25 +2602,23 @@ window.editStrategy = function(strategyId) {
  * Setup global event listeners
  */
 function setupEventListeners() {
-
-                if (window.chartRenderer && typeof window.chartRenderer.resize === 'function') {
-                    window.chartRenderer.resize();
-                }
-                window.dispatchEvent(new Event('resize'));
-
-        });
-    }
-
     // Window resize
     window.addEventListener('resize', () => {
         console.debug('📐 [RESIZE] Window resized');
+        if (window.chartRenderer && typeof window.chartRenderer.resize === 'function') {
+            window.chartRenderer.resize();
+        }
     });
 
     // Before unload
     window.addEventListener('beforeunload', () => {
         stopAutoRefresh();
-        botManager.destroy();
-        chartRenderer.destroy();
+        if (botManager && typeof botManager.destroy === 'function') {
+            botManager.destroy();
+        }
+        if (window.chartRenderer && typeof window.chartRenderer.destroy === 'function') {
+            window.chartRenderer.destroy();
+        }
     });
 }
 

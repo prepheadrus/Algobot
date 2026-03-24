@@ -16,47 +16,75 @@
 <body>
     <!-- Live Ticker -->
     <div class="live-ticker-band">
-        <div class="ticker-content" id="live-ticker-content">
-            <span class="ticker-item"><span class="ticker-dot pulse-dot"></span> <span class="ticker-sym">Sistem Yükleniyor...</span> <span class="ticker-price">--</span></span>
+        <div class="ticker-wrapper">
+            <div class="ticker-content" id="live-ticker-content">
+                <span class="ticker-item"><span class="ticker-dot pulse-dot"></span> <span class="ticker-sym">Sistem Yükleniyor...</span> <span class="ticker-price">--</span></span>
+            </div>
         </div>
     </div>
 
-
+    <div class="dashboard-container">
+        <!-- Collapsible Sidebar -->
+        <aside class="sidebar glass-panel" id="sidebar">
+            <div class="logo">
+                <span style="font-size: 1.5rem;">🌌</span>
+                <span class="sidebar-text" style="font-weight: 700; font-size: 1.1rem; color: var(--neon-blue);">Quantum v5</span>
             </div>
+
+            <nav class="sidebar-nav" id="sidebar-menu">
+                <!-- Sidebar links map to tabs via data-target -->
+                <a href="#" class="sidebar-link active" data-target="tab-portfolio">
+                    <span class="menu-icon">📊</span>
+                    <span class="sidebar-text">Terminal</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-ml">
+                    <span class="menu-icon">🧠</span>
+                    <span class="sidebar-text">ML Motoru</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-orders">
+                    <span class="menu-icon">⚡</span>
+                    <span class="sidebar-text">Emirler</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-history">
+                    <span class="menu-icon">📜</span>
+                    <span class="sidebar-text">Geçmiş</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-reports">
+                    <span class="menu-icon">📈</span>
+                    <span class="sidebar-text">Raporlar</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-strategy-builder">
+                    <span class="menu-icon">🎨</span>
+                    <span class="sidebar-text">Strateji Kurucu</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-strategies">
+                    <span class="menu-icon">📚</span>
+                    <span class="sidebar-text">Kütüphane</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-settings">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="sidebar-text">Ayarlar</span>
+                </a>
+                <a href="#" class="sidebar-link" data-target="tab-data">
+                    <span class="menu-icon">💾</span>
+                    <span class="sidebar-text">Laboratuvar</span>
+                </a>
+            </nav>
         </aside>
 
         <!-- Ana İçerik -->
         <main class="main-content">
             <!-- Multi-Tab Top Bar -->
-            <header class="top-tabs-bar glass-panel" id="side-menu">
-                <button class="menu-item active" data-target="tab-portfolio">
-                    <span class="menu-icon">📊</span> Terminal
-                </button>
-                <button class="menu-item" data-target="tab-ml">
-                    <span class="menu-icon">🧠</span> ML Motoru
-                </button>
-                <button class="menu-item" data-target="tab-orders">
-                    <span class="menu-icon">⚡</span> Emirler
-                </button>
-                <button class="menu-item" data-target="tab-history">
-                    <span class="menu-icon">📜</span> Geçmiş
-                </button>
-                <button class="menu-item" data-target="tab-reports">
-                    <span class="menu-icon">📈</span> Raporlar
-                </button>
-                <button class="menu-item" data-target="tab-strategy-builder">
-                    <span class="menu-icon">🎨</span> Strateji
-                </button>
-                <button class="menu-item" data-target="tab-strategies">
-                    <span class="menu-icon">📚</span> Kütüphane
-                </button>
-                <button class="menu-item" data-target="tab-settings">
-                    <span class="menu-icon">⚙️</span> Ayarlar
-                </button>
-                <button class="menu-item" data-target="tab-data">
-                    <span class="menu-icon">💾</span> Laboratuvar
-                </button>
+            <header class="top-tabs-bar glass-panel" id="dynamic-tabs-bar">
+                <!-- Tabs will be dynamically added here by app.js -->
             </header>
+
+            <!-- Welcome/Empty State for when no tabs are open -->
+            <div id="tab-empty-state" class="tab-content active-tab" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                <span style="font-size: 4rem; margin-bottom: 20px;">🌌</span>
+                <h2>Quantum Terminal v5.0</h2>
+                <p style="color: var(--text-muted); margin-top: 10px;">Çalışma alanınızı açmak için soldaki menüden bir modül seçin.</p>
+            </div>
 
             <!-- SEKME 1: PORTFÖY ANALİZİ -->
             <div id="tab-portfolio" class="tab-content active-tab">
