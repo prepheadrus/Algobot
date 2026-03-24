@@ -3175,14 +3175,14 @@ select option {
     flex-direction: column;
     gap: 15px;
     height: 100%;
-    width: 100%;
+
 }
 
 .top-row-cards {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 15px;
-    min-height: 200px; /* Reduced min-height slightly to match proportion */
+
 }
 
 .bottom-row-chart {
