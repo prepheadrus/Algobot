@@ -14,10 +14,10 @@ Sistemimiz 5 katmanlı modüler ve asenkron (Event-Driven) bir mimariye sahip ol
 ## 2. KRİTİK TEST SENARYOLARI (TEST CASES)
 
 ### Senaryo 1: Smart Hybrid Data & WSS Akış Testi
-*   **Amaç:** Sistem SQLite, REST API ve WebSocket'i akıllıca harmanlıyor mu?
+*   **Amaç:** Sistem Parquet Data Lake (veya SQLite Hot Buffer), REST API ve WebSocket'i akıllıca harmanlıyor mu?
 *   **Başlangıç:** Bot `BTC/USDT` için 1m zaman diliminde başlatılır.
 *   **Beklenen Çıktı:**
-    1. Sistem önce SQLite'dan son 1500 mumu çeker (0 API çağrısı).
+    1. Sistem önce Parquet/SQLite üzerinden yerel olarak son 1500 mumu çeker (0 API çağrısı).
     2. Eğer veritabanı 2 saat gerideyken bot açıldıysa, REST Pagination devreye girip o 2 saati (gap) doldurur.
     3. Eksikler dolduktan sonra WSS (WebSocket) dinleyicisi açılır ve `watch_ticker_loop` canlı veriyi basmaya başlar.
 
