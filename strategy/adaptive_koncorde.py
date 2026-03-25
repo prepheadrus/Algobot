@@ -72,8 +72,7 @@ class AdaptiveKoncordeX(BaseStrategy):
         if df.empty or len(df) < 50:
             return df
 
-        # Copy to prevent "assignment destination is read-only" SettingWithCopyWarning
-        df = df.copy(deep=True)
+
 
         # Gerekli kütüphaneleri Data katmanından alıyoruz
         from data.indicators.trend import TrendIndicators
@@ -148,7 +147,7 @@ class AdaptiveKoncordeX(BaseStrategy):
         # KALMAN FILTER FUNCTION (Adaptive)
         # ============================================================================
         def adaptive_kalman(src, period_arr, alpha_arr, beta_arr):
-            src_arr = src.values.copy()
+
             res = np.zeros_like(src_arr)
 
             if len(src_arr) == 0: return pd.Series(res, index=src.index)
@@ -187,9 +186,7 @@ class AdaptiveKoncordeX(BaseStrategy):
             superTrend = np.zeros(len(k_series))
             direction = np.ones(len(k_series)) # 1 or -1
 
-            k_val = k_series.values.copy()
-            ub_val = upperBand.values.copy()
-            lb_val = lowerBand.values.copy()
+
 
             for i in range(1, len(k_series)):
                 if np.isnan(atr.iloc[i]):
@@ -301,9 +298,7 @@ class AdaptiveKoncordeX(BaseStrategy):
             # Using lists to simulate max length 50 arrays
             rf_res, k_res, ewo_res, vol_res = [], [], [], []
 
-            range_trend_arr = trend_series['RANGE_TREND'].values.copy()
-            kalman_trend_arr = trend_series['KALMAN_TREND'].values.copy()
-            close_arr = close.values.copy()
+
 
             for i in range(11, n):
                 # Range Filter Performance
