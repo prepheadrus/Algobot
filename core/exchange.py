@@ -1578,8 +1578,9 @@ class ExchangeManager:
 
                             logger.debug(f"OK [WSS] Yeni mum eklendi: {last_live_time}")
                     elif last_live_time == last_hist_time:
-                        # Son mum güncellendi, replace et
-                        ohlcv_df.loc[last_live_time] = live_df.loc[last_live_time]
+                        # Son mum güncellendi, replace et (sadece ortak sütunları güncelle, boole sütun hatalarını önle)
+                        shared_cols = live_df.columns.intersection(ohlcv_df.columns)
+                        ohlcv_df.loc[last_live_time, shared_cols] = live_df.loc[last_live_time, shared_cols]
                         logger.debug(f"OK [WSS] Son mum güncellendi: {last_live_time}")
 
                     # YENİ: RAM limiti YOK - Tüm mumlar tutuluyor
