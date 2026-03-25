@@ -66,3 +66,4 @@ requests>=2.31.0         # HTTP library for testing
 # memory-profiler>=0.61.0 # Memory profiling
 pyarrow
 uvicorn
+cachetools>=5.3.0

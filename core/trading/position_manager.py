@@ -347,7 +347,7 @@ class PositionManager:
         position_symbol = self.positions[bot_id].symbol
 
         async with self.get_lock(position_symbol):
-            # DOUBLE CHECK: Kilit alındıktan sonra pozisyon hala var mı kontrolü
+            # Double-Check Locking: Kilit alındıktan sonra pozisyon hala var mı kontrolü
             if bot_id not in self.positions:
                 logger.warning(f"Pozisyon zaten kapatılmış (Double-Check): {bot_id}")
                 return None
