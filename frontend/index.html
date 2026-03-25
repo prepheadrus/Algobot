@@ -16,30 +16,32 @@
 <body>
     <!-- Hedge Fund Cockpit - Top Ticker Band -->
     <div class="top-ticker-band">
-        <div class="ticker-metrics">
-            <div class="ticker-metric">
-                <span class="ticker-label">PNL / DD</span>
-                <span id="ticker-pnl" class="ticker-value">--</span>
-                <span id="ticker-dd" class="ticker-subvalue">--</span>
-            </div>
-            <div class="ticker-divider"></div>
-            <div class="ticker-metric">
-                <span class="ticker-label">ML CONFIDENCE</span>
-                <span id="ticker-ml-confidence" class="ticker-value text-cyan">--%</span>
-            </div>
-            <div class="ticker-divider"></div>
-            <div class="ticker-metric">
-                <span class="ticker-label">API RATE</span>
-                <div class="api-rate-bar-container">
-                    <div id="ticker-api-rate-bar" class="api-rate-bar"></div>
+        <div class="ticker-marquee-container">
+            <div class="ticker-metrics">
+                <div class="ticker-metric">
+                    <span class="ticker-label">PNL / DD</span>
+                    <span id="ticker-pnl" class="ticker-value">--</span>
+                    <span id="ticker-dd" class="ticker-subvalue">--</span>
                 </div>
-                <span id="ticker-api-rate-text" class="ticker-subvalue">--%</span>
-            </div>
-            <div class="ticker-divider"></div>
-            <div class="ticker-metric">
-                <span class="ticker-label">SYSTEM WS</span>
-                <span class="ticker-dot pulse-dot" id="ticker-ws-dot"></span>
-                <span id="ticker-ws-latency" class="ticker-value">--ms</span>
+                <div class="ticker-divider"></div>
+                <div class="ticker-metric">
+                    <span class="ticker-label">ML CONFIDENCE</span>
+                    <span id="ticker-ml-confidence" class="ticker-value text-cyan">--%</span>
+                </div>
+                <div class="ticker-divider"></div>
+                <div class="ticker-metric">
+                    <span class="ticker-label">API RATE</span>
+                    <div class="api-rate-bar-container">
+                        <div id="ticker-api-rate-bar" class="api-rate-bar"></div>
+                    </div>
+                    <span id="ticker-api-rate-text" class="ticker-subvalue">--%</span>
+                </div>
+                <div class="ticker-divider"></div>
+                <div class="ticker-metric">
+                    <span class="ticker-label">SYSTEM WS</span>
+                    <span class="ticker-dot pulse-dot" id="ticker-ws-dot"></span>
+                    <span id="ticker-ws-latency" class="ticker-value">--ms</span>
+                </div>
             </div>
         </div>
         <div class="ticker-actions">
