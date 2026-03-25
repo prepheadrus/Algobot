@@ -2437,8 +2437,47 @@ window.renderFeatureImportance = renderFeatureImportance;
 // LIVE TICKER
 // ============================================================================
 
+// Optional: throttle mechanism for high-frequency updates
+function throttle(func, limit) {
+    let lastFunc;
+    let lastRan;
+    return function() {
+        const context = this;
+        const args = arguments;
+        if (!lastRan) {
+            window.requestAnimationFrame(() => {
+                func.apply(context, args);
+            });
+            lastRan = Date.now();
+        } else {
+            clearTimeout(lastFunc);
+            lastFunc = setTimeout(function() {
+                if ((Date.now() - lastRan) >= limit) {
+                    window.requestAnimationFrame(() => {
+                        func.apply(context, args);
+                    });
+                    lastRan = Date.now();
+                }
+            }, limit - (Date.now() - lastRan));
+        }
+    }
+}
+
 function startLiveTicker() {
     console.log('📈 [TICKER] Starting live ticker via WebSocket bindings...');
+
+    // Set Initial Loading States
+    document.getElementById('ticker-pnl').textContent = 'Bekleniyor...';
+    document.getElementById('ticker-pnl').style.color = 'var(--text-muted)';
+
+    document.getElementById('ticker-dd').textContent = 'Bekleniyor...';
+
+    document.getElementById('ticker-ml-confidence').textContent = 'Bekleniyor...';
+    document.getElementById('ticker-ml-confidence').className = 'ticker-value';
+    document.getElementById('ticker-ml-confidence').style.color = 'var(--text-muted)';
+
+    document.getElementById('ticker-api-rate-text').textContent = 'Bekleniyor...';
+    document.getElementById('ticker-ws-latency').textContent = 'Bekleniyor...';
 
     // Initial fetch to populate Top Ticker Band
     const fetchTickerData = async () => {
@@ -2657,7 +2696,9 @@ class WebSocketClient {
                 break;
 
             case 'position.updated':
+            case 'portfolio.updated':
                 this.onPositionUpdated(payload);
+                this.onPortfolioUpdated(payload);
                 break;
 
             case 'bot.started':
@@ -2668,10 +2709,93 @@ class WebSocketClient {
                 this.onBotStopped(payload);
                 break;
 
+            case 'ml.evaluation':
+            case 'signal.evaluated':
+                this.onMLEvaluation(payload);
+                break;
+
+            case 'system.status':
+                this.onSystemStatus(payload);
+                break;
+
             default:
                 console.debug(`📬 [WS] Unhandled event: ${type}`);
         }
     }
+
+    onPortfolioUpdated = throttle((payload) => {
+        const pnl = payload?.total_pnl_usd;
+        const drawdown = payload?.current_drawdown_percent;
+
+        if (pnl !== undefined) {
+            const pnlEl = document.getElementById('ticker-pnl');
+            if (pnlEl) {
+                pnlEl.textContent = `$${pnl.toFixed(2)}`;
+                pnlEl.style.color = pnl >= 0 ? 'var(--accent-emerald)' : 'var(--accent-crimson)';
+            }
+        }
+
+        if (drawdown !== undefined) {
+            const ddEl = document.getElementById('ticker-dd');
+            if (ddEl) {
+                ddEl.textContent = `${drawdown.toFixed(1)}% DD`;
+            }
+        }
+    }, 100);
+
+    onMLEvaluation = throttle((payload) => {
+        const conf = payload?.confidence;
+        if (conf === undefined) return;
+
+        const confidencePercent = (conf * 100).toFixed(0);
+        const mlEl = document.getElementById('ticker-ml-confidence');
+        if (mlEl) {
+            mlEl.textContent = `${confidencePercent}%`;
+
+            // Remove previous color classes
+            mlEl.classList.remove('text-cyan', 'text-crimson', 'text-white');
+            mlEl.style.color = '';
+
+            if (confidencePercent > 60) {
+                mlEl.classList.add('text-cyan');
+            } else if (confidencePercent < 40) {
+                mlEl.classList.add('text-crimson');
+            } else {
+                mlEl.style.color = 'var(--text-main)';
+            }
+        }
+    }, 100);
+
+    onSystemStatus = throttle((payload) => {
+        const rateLimit = payload?.api_rate_limit_percent;
+        const latency = payload?.ws_latency_ms;
+
+        if (rateLimit !== undefined) {
+            const rateBar = document.getElementById('ticker-api-rate-bar');
+            const rateText = document.getElementById('ticker-api-rate-text');
+
+            if (rateBar && rateText) {
+                rateBar.style.width = `${rateLimit}%`;
+                rateText.textContent = `${rateLimit}%`;
+
+                if (rateLimit > 80) rateBar.style.backgroundColor = 'var(--accent-crimson)';
+                else if (rateLimit > 50) rateBar.style.backgroundColor = 'var(--accent-gold)';
+                else rateBar.style.backgroundColor = 'var(--accent-emerald)';
+            }
+        }
+
+        if (latency !== undefined) {
+            const latencyEl = document.getElementById('ticker-ws-latency');
+            const dotEl = document.getElementById('ticker-ws-dot');
+
+            if (latencyEl) {
+                latencyEl.textContent = `${Math.max(1, latency)}ms`;
+                if (dotEl) {
+                    dotEl.style.backgroundColor = latency > 500 ? 'var(--accent-crimson)' : 'var(--accent-emerald)';
+                }
+            }
+        }
+    }, 100);
 
     /**
      * Position Opened Event Handler
