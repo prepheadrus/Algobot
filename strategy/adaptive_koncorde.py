@@ -148,6 +148,7 @@ class AdaptiveKoncordeX(BaseStrategy):
         # ============================================================================
         def adaptive_kalman(src, period_arr, alpha_arr, beta_arr):
 
+            src_arr = src.values
             res = np.zeros_like(src_arr)
 
             if len(src_arr) == 0: return pd.Series(res, index=src.index)
@@ -186,7 +187,9 @@ class AdaptiveKoncordeX(BaseStrategy):
             superTrend = np.zeros(len(k_series))
             direction = np.ones(len(k_series)) # 1 or -1
 
-
+            k_val = k_series.values
+            ub_val = upperBand.values.copy()
+            lb_val = lowerBand.values.copy()
 
             for i in range(1, len(k_series)):
                 if np.isnan(atr.iloc[i]):
@@ -288,12 +291,16 @@ class AdaptiveKoncordeX(BaseStrategy):
         # PERFORMANCE TRACKING & DYNAMIC WEIGHTS
         # ============================================================================
 
-        def calculate_performance_arrays(trend_series, ewo_series, ewo_thresh, vol_ok_series):
-            n = len(trend_series)
+        def calculate_performance_arrays(trend_df, ewo_series, ewo_thresh, vol_ok_series):
+            n = len(trend_df)
             range_perf = np.full(n, 0.5)
             kalman_perf = np.full(n, 0.5)
             ewo_perf = np.full(n, 0.5)
             vol_perf = np.full(n, 0.5)
+
+            range_trend_arr = trend_df['RANGE_TREND'].values
+            kalman_trend_arr = trend_df['KALMAN_TREND'].values
+            close_arr = close.values
 
             # Using lists to simulate max length 50 arrays
             rf_res, k_res, ewo_res, vol_res = [], [], [], []
