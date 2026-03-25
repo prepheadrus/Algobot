@@ -478,14 +478,36 @@ class PaperTrader:
             symbol = payload.get('symbol')
             current_price = payload.get('price')
 
-            if not symbol or not current_price:
+            # Sembol veya fiyat geçersizse atla
+            if not symbol or current_price is None:
                 return
 
-            # Açık pozisyonları kontrol et
-            positions_to_update = [
-                pos for pos in self.open_positions
-                if pos.get('symbol') == symbol
-            ]
+            # Katı 0.0 ve NaN/inf kontrolü (Garbage In / Garbage Out Koruması)
+            if pd.isna(current_price) or float(current_price) <= 0.0:
+                logger.warning(f"⚠️ [FİYAT HATASI] Geçersiz fiyat verisi atlandı: {symbol} - Fiyat: {current_price}")
+                return
+
+            # Tip Dönüşümü (Güvenli)
+            current_price = float(current_price)
+
+            # Sembol normalizasyonu ve Açık pozisyonları kontrol et
+            # KATI EŞLEŞTİRME: BTC/USDT:USDT formatları nedeniyle symbol.split(':')[0]
+            # ile de eşleşebilecek şekilde (veya birebir) kontrol et
+            positions_to_update = []
+
+            # normalize the incoming symbol for safe matching
+            incoming_base_symbol = symbol.split(':')[0] if ':' in symbol else symbol
+
+            for pos in self.open_positions:
+                pos_symbol = pos.get('symbol')
+                if not pos_symbol:
+                    continue
+
+                pos_base_symbol = pos_symbol.split(':')[0] if ':' in pos_symbol else pos_symbol
+
+                # Tam eşleşme veya base eşleşmesi
+                if pos_symbol == symbol or pos_base_symbol == incoming_base_symbol:
+                    positions_to_update.append(pos)
 
             if positions_to_update:
                 # Trailing stop ve likidasyon kontrolleri
@@ -902,9 +924,16 @@ class PaperTrader:
             current_high: Mum high (trailing stop için)
             current_low: Mum low (trailing stop için)
         """
+        # KATI KORUMA: NaN ve <= 0 değerleri bu seviyede bile engelle (0 PnL bug'ı için)
+        if current_price is None or pd.isna(current_price) or float(current_price) <= 0.0:
+            logger.warning(f"⚠️ [FİYAT HATASI] Geçersiz veya 0 fiyat (update_live_prices): {symbol} - {current_price}")
+            return
+
+        current_price = float(current_price)
+
         # High/Low fallback: Mumdan gelmiyorsa tahmini değer kullan
-        candle_high = current_high if current_high is not None else current_price
-        candle_low  = current_low  if current_low  is not None else current_price
+        candle_high = float(current_high) if current_high is not None and float(current_high) > 0 else current_price
+        candle_low  = float(current_low)  if current_low  is not None and float(current_low)  > 0 else current_price
 
         # Per-Symbol Locking for update_live_prices (Trailing Stop updates & Take Profit)
         async with self.position_manager.get_lock(symbol):
@@ -912,8 +941,18 @@ class PaperTrader:
             positions_to_close = []  # Kapatılacaklar (döngü içinde silme)
             positions_updated = False  # Güncelleme yapıldı mı?
 
+            # Katı eşleştirme için sembol
+            incoming_base_symbol = symbol.split(':')[0] if ':' in symbol else symbol
+
             for pos in list(self.position_manager.legacy_positions):  # list() kopyasını al
-                if pos['symbol'] != symbol:
+                pos_symbol = pos.get('symbol')
+                if not pos_symbol:
+                    continue
+
+                pos_base_symbol = pos_symbol.split(':')[0] if ':' in pos_symbol else pos_symbol
+
+                # Eğer eşleşmiyorsa atla
+                if pos_symbol != symbol and pos_base_symbol != incoming_base_symbol:
                     continue
 
                 bot_id = pos.get('bot_id')

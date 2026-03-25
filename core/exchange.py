@@ -157,6 +157,9 @@ class ExchangeManager:
         self.local_active_strategies: Dict[str, Any] = {}  # symbol -> strategy
         self.local_active_timeframes: Dict[str, str] = {}  # symbol -> timeframe
 
+        # Sınıf bazlı değişken tuzağından kaçınmak için Ticker fiyatları da instance'a alınmalı
+        self._last_prices: Dict[str, float] = {}
+
         logger.info("📦 [EDA] State Replication aktif (local_active_bots, local_active_strategies)")
 
         # Borsa parametrelerini hazırla
@@ -472,9 +475,13 @@ class ExchangeManager:
 
                 # Fiyat değişimi kontrolü
                 price_changed_significantly = False
-                if hasattr(self, '_last_prices') and symbol in self._last_prices:
-                    price_change_pct = abs(current_price - self._last_prices[symbol]) / self._last_prices[symbol]
-                    price_changed_significantly = price_change_pct >= PRICE_CHANGE_THRESHOLD
+                if symbol in self._last_prices:
+                    # Sıfıra bölme hatası veya sıfır/NaN fiyatı kontrolü
+                    if self._last_prices[symbol] > 0:
+                        price_change_pct = abs(current_price - self._last_prices[symbol]) / self._last_prices[symbol]
+                        price_changed_significantly = price_change_pct >= PRICE_CHANGE_THRESHOLD
+                    else:
+                        price_changed_significantly = True
 
                 # Güncelleme gerekli mi? (1 saniye geçti VEYA fiyat anlamlı değişti)
                 should_update = (time_since_update >= UPDATE_INTERVAL) or price_changed_significantly
@@ -496,8 +503,6 @@ class ExchangeManager:
                         last_update_time[symbol] = current_time
 
                         # Son fiyatı kaydet (değişim kontrolü için)
-                        if not hasattr(self, '_last_prices'):
-                            self._last_prices = {}
                         self._last_prices[symbol] = current_price
 
                         logger.debug(f"📊 [TICKER] {symbol} @ ${current_price:.2f} (Event fırlatıldı)")
