@@ -14,12 +14,38 @@
 </head>
 
 <body>
-    <!-- Live Ticker -->
-    <div class="live-ticker-band">
-        <div class="ticker-wrapper">
-            <div class="ticker-content" id="live-ticker-content">
-                <span class="ticker-item"><span class="ticker-dot pulse-dot"></span> <span class="ticker-sym">Sistem Yükleniyor...</span> <span class="ticker-price">--</span></span>
+    <!-- Hedge Fund Cockpit - Top Ticker Band -->
+    <div class="top-ticker-band">
+        <div class="ticker-metrics">
+            <div class="ticker-metric">
+                <span class="ticker-label">PNL / DD</span>
+                <span id="ticker-pnl" class="ticker-value">--</span>
+                <span id="ticker-dd" class="ticker-subvalue">--</span>
             </div>
+            <div class="ticker-divider"></div>
+            <div class="ticker-metric">
+                <span class="ticker-label">ML CONFIDENCE</span>
+                <span id="ticker-ml-confidence" class="ticker-value text-cyan">--%</span>
+            </div>
+            <div class="ticker-divider"></div>
+            <div class="ticker-metric">
+                <span class="ticker-label">API RATE</span>
+                <div class="api-rate-bar-container">
+                    <div id="ticker-api-rate-bar" class="api-rate-bar"></div>
+                </div>
+                <span id="ticker-api-rate-text" class="ticker-subvalue">--%</span>
+            </div>
+            <div class="ticker-divider"></div>
+            <div class="ticker-metric">
+                <span class="ticker-label">SYSTEM WS</span>
+                <span class="ticker-dot pulse-dot" id="ticker-ws-dot"></span>
+                <span id="ticker-ws-latency" class="ticker-value">--ms</span>
+            </div>
+        </div>
+        <div class="ticker-actions">
+            <button id="kill-switch-btn" class="kill-switch-btn" onclick="handleKillSwitch()">
+                🚨 KILL SWITCH
+            </button>
         </div>
     </div>
 
@@ -79,22 +105,35 @@
             <div id="tab-portfolio" class="tab-content active-tab">
                 <div class="horizontal-workspace">
 
-                    <!-- Row 1: 3 Eşit Yatay Kart -->
+                    <!-- Row 1: 3 Eşit Yatay Kart (Bento Box Layout) -->
                     <div class="top-row-cards">
 
                         <!-- Kart 1: Total Portfolio Value -->
-
+                        <div class="bento-card glass-panel">
+                            <h3 class="panel-title">💰 Portfolio Value</h3>
+                            <div class="bento-content-container">
+                                <span id="bento-portfolio-value" class="bento-value text-white">$0.00</span>
+                                <span id="bento-portfolio-change" class="bento-subtext">--</span>
                             </div>
                         </div>
 
                         <!-- Kart 2: ML Prediction Confidence -->
-
+                        <div class="bento-card glass-panel">
+                            <h3 class="panel-title">🧠 ML Regime Confidence</h3>
+                            <div class="bento-content-container">
+                                <span id="bento-ml-confidence" class="bento-value text-cyan">0%</span>
+                                <div class="bento-progress">
+                                    <div id="bento-ml-progress" class="bento-progress-fill" style="width: 0%;"></div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Kart 3: Hybrid Data Engine Status -->
-
+                        <!-- Kart 3: Active Positions Summary -->
+                        <div class="bento-card glass-panel">
+                            <h3 class="panel-title">⚡ Active Positions</h3>
+                            <div class="bento-content-container">
+                                <span id="bento-active-positions" class="bento-value text-green">0</span>
+                                <span class="bento-subtext">Total Notional: <strong id="bento-total-notional">$0.00</strong></span>
                             </div>
                         </div>
 
@@ -102,7 +141,6 @@
 
                     <!-- Row 2: Dev Grafik Alanı -->
                     <div class="bottom-row-chart card glass-panel">
-
                         <div id="plotly-chart" class="chart-container" style="flex-grow: 1; min-height: 400px; width: 100%;"></div>
                     </div>
 
