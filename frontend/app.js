@@ -2711,6 +2711,7 @@ class WebSocketClient {
 
             case 'ml.evaluation':
             case 'signal.evaluated':
+            case 'signal.confirmed':
                 this.onMLEvaluation(payload);
                 break;
 

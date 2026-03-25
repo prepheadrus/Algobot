@@ -3,7 +3,7 @@
   "description": "RSI + MACD stratejisi",
   "version": "1.0",
   "author": "User",
-  "created_at": "2026-03-23T19:36:52.870514",
+  "created_at": "2026-03-25T17:25:18.199038",
   "timeframe": "15m",
   "indicators": [
     {

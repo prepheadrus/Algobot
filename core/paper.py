@@ -113,6 +113,13 @@ class PaperTrader:
         self.consecutive_losses = 0
         self.market_regime = "UNKNOWN"
         
+        # Thread-safe balance updates
+        self._balance_lock = asyncio.Lock()
+
+        # Using cachetools TTLCache to avoid infinite growth memory leak
+        from cachetools import TTLCache
+        self._processed_trades = TTLCache(maxsize=10000, ttl=86400) # Keep up to 10k trade IDs for 24 hours
+
         # ML Karar Motoru Servisi
         from core.trading.services.signal_validator import SignalValidatorService
         self.ml_models = {}  # {symbol_timeframe: trainer_instance}
@@ -248,6 +255,21 @@ class PaperTrader:
             ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = await self.signal_validator.validate_signal_with_ml(
                 symbol, timeframe, indicators, signal
             )
+
+            # Emit ml.evaluation event to WebSocket
+            from shared.events import event_bus
+            from shared.events.event_bus import Event
+            await event_bus.publish(Event(
+                type="ml.evaluation",
+                payload={
+                    "bot_id": bot_id,
+                    "symbol": symbol,
+                    "confidence": ml_confidence,
+                    "recommendation": ml_rec_norm,
+                    "confirmed": ml_confirmed
+                },
+                source="paper_engine"
+            ))
 
             # Dashboard için en son kararı kaydet
             self.latest_decisions[symbol] = {
@@ -394,11 +416,20 @@ class PaperTrader:
 
         logger.info(f"❌ Pozisyon kapatıldı: {bot_id} PnL=${pnl:.2f}")
 
-        # Bakiyeyi güncelle
-        self.balance += pnl
-        # Free margin'i güncelle (Basit model)
-        self.free_margin = self.balance
-        self.used_margin = 0.0 # Bireysel botlara bakılacak
+        # Thread-safe Bakiye Güncellemesi (Race Condition Önleme)
+        async with self._balance_lock:
+            trade_id = payload.get('trade_id')
+            if trade_id and trade_id in self._processed_trades:
+                logger.warning(f"⚠️ [PNL-FIX] Trade {trade_id} zaten işlenmiş. PnL atlanıyor.")
+                return
+
+            if trade_id:
+                self._processed_trades[trade_id] = True
+
+            self.balance += pnl
+            # Free margin'i güncelle (Basit model)
+            self.free_margin = self.balance
+            self.used_margin = 0.0 # Bireysel botlara bakılacak
 
         # Risk engine'e kaydet
         self.risk_engine.record_trade_result(pnl)
