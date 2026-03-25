@@ -252,7 +252,7 @@ class DataLakeStorage:
                         combined_df = df
 
                     # Tekrar integrity kontrolü
-                    combined_df = self._ensure_integrity(combined_df, timeframe)
+                    combined_df = await asyncio.to_thread(self._ensure_integrity, combined_df, timeframe)
 
                     await asyncio.to_thread(combined_df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
                     logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum EKLENDI (toplam: {len(combined_df)} mum)")
