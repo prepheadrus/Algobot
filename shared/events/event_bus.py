@@ -361,7 +361,6 @@ class EventBus:
                         timeout=1.0
                     )
                 except asyncio.TimeoutError:
-                    consecutive_errors = 0  # Reset counter on success
                     continue
 
                 # Event işle

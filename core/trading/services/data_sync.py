@@ -34,28 +34,38 @@ class DataSynchronizer:
 
     async def update_data_lake(self, symbol: str, df_1m: pd.DataFrame) -> None:
         """Yeni mum geldiğinde tüm timeframeleri Data Lake'e asenkron kaydeder."""
-        async def _save_to_lake(df_1m_copy):
-            try:
-                from data.indicators import StrategyIndicators
 
-                # 1m veriyi kaydet
-                df_1m_copy.reset_index(inplace=True)
-                await self.data_lake.save(symbol, '1m', df_1m_copy, append=True)
+        def _prepare_resampled_data(df_1m_copy):
+            from data.indicators import StrategyIndicators
+            resampled_data = {}
 
-                # Diğer TF'leri resample ve kaydet
-                for tf in ['5m', '15m', '1h', '4h']:
-                    df_tf = StrategyIndicators.resample_data(df_1m_copy.set_index('timestamp'), tf)
-                    df_tf = df_tf.dropna()
-                    if not df_tf.empty:
-                        save_df_tf = df_tf.copy()
-                        save_df_tf.reset_index(inplace=True)
-                        await self.data_lake.save(symbol, tf, save_df_tf, append=True)
-                logger.debug(f"💾 [DATA LAKE] {symbol} güncellendi (TÜM TF'ler)")
-            except Exception as lake_err:
-                logger.debug(f"⚠️ [DATA LAKE] Güncelleme hatası: {lake_err}")
+            # Prepare 1m
+            df_1m_copy.reset_index(inplace=True)
+            resampled_data['1m'] = df_1m_copy
 
-        # Bekleyerek çağır, async def zaten event loop'u bloklamaz
-        await _save_to_lake(df_1m.copy())
+            # Reset index again to be able to use set_index for resampling
+            df_for_resample = df_1m_copy.copy()
+            df_for_resample.set_index('timestamp', inplace=True)
+
+            for tf in ['5m', '15m', '1h', '4h']:
+                df_tf = StrategyIndicators.resample_data(df_for_resample, tf)
+                df_tf = df_tf.dropna()
+                if not df_tf.empty:
+                    save_df_tf = df_tf.copy()
+                    save_df_tf.reset_index(inplace=True)
+                    resampled_data[tf] = save_df_tf
+            return resampled_data
+
+        try:
+            # Perform heavy pandas operations in a separate thread
+            resampled_data = await asyncio.to_thread(_prepare_resampled_data, df_1m.copy())
+
+            for tf, df_tf in resampled_data.items():
+                await self.data_lake.save(symbol, tf, df_tf, append=True)
+
+            logger.debug(f"💾 [DATA LAKE] {symbol} güncellendi (TÜM TF'ler)")
+        except Exception as lake_err:
+            logger.debug(f"⚠️ [DATA LAKE] Güncelleme hatası: {lake_err}")
 
     async def sync_all_from_db_to_lake(self, symbol: str) -> None:
         """Periyodik tam senkronizasyon (DataService -> Data Lake) - Asenkron işleme."""
@@ -71,47 +81,53 @@ class DataSynchronizer:
                 df = await ds.get_cached_or_fetch_data(symbol, '1m')
 
                 if df is not None and not df.empty:
-                    # Formata uygun listeye çevir
-                    if 'timestamp' not in df.columns:
-                        df_reset = df.reset_index()
-                        if 'index' in df_reset.columns and pd.api.types.is_datetime64_any_dtype(df_reset['index']):
-                            df_reset.rename(columns={'index': 'timestamp'}, inplace=True)
-                        elif df.index.name in ['timestamp', 'time', 'date']:
-                            df_reset.rename(columns={df.index.name: 'timestamp'}, inplace=True)
-                        df = df_reset
+                    # Execute synchronous heavy dataframe creation and resampling operations in a background thread
+                    def _prepare_all_resampled_data(df_input):
+                        from data.indicators import StrategyIndicators
 
-                    # Extract as list of values like the old get_klines expected, to minimize disruption in _sync_lake
-                    all_klines = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']].values.tolist()
+                        df_reset = df_input.copy()
+                        if 'timestamp' not in df_reset.columns:
+                            df_reset = df_reset.reset_index()
+                            if 'index' in df_reset.columns and pd.api.types.is_datetime64_any_dtype(df_reset['index']):
+                                df_reset.rename(columns={'index': 'timestamp'}, inplace=True)
+                            elif df_input.index.name in ['timestamp', 'time', 'date']:
+                                df_reset.rename(columns={df_input.index.name: 'timestamp'}, inplace=True)
 
-                    async def _sync_lake(klines_data):
-                        try:
-                            from data.indicators import StrategyIndicators
+                        all_klines = df_reset[['timestamp', 'open', 'high', 'low', 'close', 'volume']].values.tolist()
+                        all_df = pd.DataFrame(all_klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
-                            all_df = pd.DataFrame(klines_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                        if pd.api.types.is_numeric_dtype(all_df['timestamp']):
+                            all_df['timestamp'] = pd.to_datetime(all_df['timestamp'], unit='ms')
+                        else:
+                            all_df['timestamp'] = pd.to_datetime(all_df['timestamp'])
 
-                            if pd.api.types.is_numeric_dtype(all_df['timestamp']):
-                                all_df['timestamp'] = pd.to_datetime(all_df['timestamp'], unit='ms')
-                            else:
-                                all_df['timestamp'] = pd.to_datetime(all_df['timestamp'])
+                        all_df.set_index('timestamp', inplace=True)
 
-                            all_df.set_index('timestamp', inplace=True)
+                        resampled_data = {}
+                        save_all_df = all_df.copy()
+                        save_all_df.reset_index(inplace=True)
+                        resampled_data['1m'] = save_all_df
 
-                            save_all_df = all_df.copy()
-                            save_all_df.reset_index(inplace=True)
-                            await self.data_lake.save(symbol, '1m', save_all_df, append=False)
+                        for tf in ['5m', '15m', '1h', '4h']:
+                            df_tf = StrategyIndicators.resample_data(all_df, tf)
+                            df_tf = df_tf.dropna()
+                            if not df_tf.empty:
+                                save_tf = df_tf.copy()
+                                save_tf.reset_index(inplace=True)
+                                resampled_data[tf] = save_tf
 
-                            for tf in ['5m', '15m', '1h', '4h']:
-                                df_tf = StrategyIndicators.resample_data(all_df, tf)
-                                df_tf = df_tf.dropna()
-                                if not df_tf.empty:
-                                    save_tf = df_tf.copy()
-                                    save_tf.reset_index(inplace=True)
-                                    await self.data_lake.save(symbol, tf, save_tf, append=False)
-                            logger.info(f"✅ [DATA LAKE] {symbol} TAM SENKRONİZASYON tamamlandı ({len(all_df)} mum)")
-                        except Exception as e:
-                            logger.debug(f"⚠️ [DATA LAKE] İçi asenkron hata: {e}")
+                        return resampled_data, len(all_df)
 
-                    await _sync_lake(all_klines)
+                    try:
+                        resampled_data, length = await asyncio.to_thread(_prepare_all_resampled_data, df)
+
+                        for tf, df_tf in resampled_data.items():
+                            await self.data_lake.save(symbol, tf, df_tf, append=False)
+
+                        logger.info(f"✅ [DATA LAKE] {symbol} TAM SENKRONİZASYON tamamlandı ({length} mum)")
+                    except Exception as e:
+                        logger.debug(f"⚠️ [DATA LAKE] İçi asenkron hata: {e}")
+
         except Exception as sync_err:
             logger.debug(f"⚠️ [DATA LAKE] Tam senkronizasyon hatası: {sync_err}")
 
