@@ -432,9 +432,9 @@ class ParquetDataLake:
             Birleştirilmiş DataFrame veya None
         """
         # Ensure start_date and end_date are tz-naive for directory comparison
-        if start_date.tzinfo is not None:
+        if start_date is not None and start_date.tzinfo is not None:
             start_date = start_date.replace(tzinfo=None)
-        if end_date.tzinfo is not None:
+        if end_date is not None and end_date.tzinfo is not None:
             end_date = end_date.replace(tzinfo=None)
 
         try:
@@ -454,7 +454,7 @@ class ParquetDataLake:
                         continue
                     year = int(year_dir.name)
 
-                    if year < start_date.year or year > end_date.year:
+                    if (start_date and year < start_date.year) or (end_date and year > end_date.year):
                         continue
 
                     for month_dir in year_dir.glob("*/"):
@@ -466,7 +466,7 @@ class ParquetDataLake:
                         month_end = month_start + timedelta(days=32)
                         month_end = month_end.replace(day=1) - timedelta(days=1)
 
-                        if month_end < start_date or month_start > end_date:
+                        if (start_date and month_end < start_date) or (end_date and month_start > end_date):
                             continue
 
                         for day_dir in month_dir.glob("*/"):
@@ -479,7 +479,7 @@ class ParquetDataLake:
                             if file_path.exists():
                                 file_date = datetime(year, month, day)
 
-                                if start_date <= file_date <= end_date:
+                                if (start_date is None or start_date <= file_date) and (end_date is None or file_date <= end_date):
                                     parquet_files.append(file_path)
 
                 if not parquet_files:
@@ -507,14 +507,14 @@ class ParquetDataLake:
                 else:
                     combined_df.index = combined_df.index.tz_convert('UTC')
 
-                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
-                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+                start_ts = None if start_date is None else (pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC'))
+                end_ts = None if end_date is None else (pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC'))
 
                 # Tarih aralığını filtrele
-                combined_df = combined_df[
-                    (combined_df.index >= start_ts) &
-                    (combined_df.index <= end_ts)
-                ]
+                if start_ts is not None:
+                    combined_df = combined_df[combined_df.index >= start_ts]
+                if end_ts is not None:
+                    combined_df = combined_df[combined_df.index <= end_ts]
 
                 # NaN temizliği
                 combined_df = combined_df.dropna(how='all')
@@ -547,14 +547,14 @@ class ParquetDataLake:
                 else:
                     df.index = df.index.tz_convert('UTC')
 
-                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
-                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+                start_ts = None if start_date is None else (pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC'))
+                end_ts = None if end_date is None else (pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC'))
 
                 # Tarih aralığını filtrele
-                df = df[
-                    (df.index >= start_ts) &
-                    (df.index <= end_ts)
-                ]
+                if start_ts is not None:
+                    df = df[df.index >= start_ts]
+                if end_ts is not None:
+                    df = df[df.index <= end_ts]
 
                 # NaN temizliği
                 df = df.dropna(how='all')
@@ -591,9 +591,9 @@ class ParquetDataLake:
             pd.DataFrame: Her batch için DataFrame
         """
         # Ensure start_date and end_date are tz-naive for directory comparison
-        if start_date.tzinfo is not None:
+        if start_date is not None and start_date.tzinfo is not None:
             start_date = start_date.replace(tzinfo=None)
-        if end_date.tzinfo is not None:
+        if end_date is not None and end_date.tzinfo is not None:
             end_date = end_date.replace(tzinfo=None)
 
         try:
@@ -613,7 +613,7 @@ class ParquetDataLake:
                         continue
                     year = int(year_dir.name)
 
-                    if year < start_date.year or year > end_date.year:
+                    if (start_date and year < start_date.year) or (end_date and year > end_date.year):
                         continue
 
                     for month_dir in sorted(year_dir.glob("*/")):
@@ -625,7 +625,7 @@ class ParquetDataLake:
                         month_end = month_start + timedelta(days=32)
                         month_end = month_end.replace(day=1) - timedelta(days=1)
 
-                        if month_end < start_date or month_start > end_date:
+                        if (start_date and month_end < start_date) or (end_date and month_start > end_date):
                             continue
 
                         for day_dir in sorted(month_dir.glob("*/")):
@@ -638,7 +638,7 @@ class ParquetDataLake:
                             if file_path.exists():
                                 file_date = datetime(year, month, day)
 
-                                if start_date <= file_date <= end_date:
+                                if (start_date is None or start_date <= file_date) and (end_date is None or file_date <= end_date):
                                     parquet_files.append(file_path)
 
                 if not parquet_files:
@@ -653,8 +653,8 @@ class ParquetDataLake:
                         # PyArrow ile aç (memory-mapped)
                         parquet_file = pq.ParquetFile(file_path)
 
-                        start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
-                        end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+                        start_ts = None if start_date is None else (pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC'))
+                        end_ts = None if end_date is None else (pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC'))
 
                         # Batches halinde oku (50k satır)
                         for batch in parquet_file.iter_batches(batch_size=batch_size):
@@ -667,10 +667,10 @@ class ParquetDataLake:
                                 df_batch.index = df_batch.index.tz_convert('UTC')
 
                             # Tarih aralığını filtrele
-                            df_batch = df_batch[
-                                (df_batch.index >= start_ts) &
-                                (df_batch.index <= end_ts)
-                            ]
+                            if start_ts is not None:
+                                df_batch = df_batch[df_batch.index >= start_ts]
+                            if end_ts is not None:
+                                df_batch = df_batch[df_batch.index <= end_ts]
 
                             if not df_batch.empty:
                                 yield df_batch
@@ -690,8 +690,8 @@ class ParquetDataLake:
                 # PyArrow ile aç
                 parquet_file = pq.ParquetFile(partition_path)
 
-                start_ts = pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC')
-                end_ts = pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC')
+                start_ts = None if start_date is None else (pd.Timestamp(start_date, tz='UTC') if start_date.tzinfo is None else pd.Timestamp(start_date).tz_convert('UTC'))
+                end_ts = None if end_date is None else (pd.Timestamp(end_date, tz='UTC') if end_date.tzinfo is None else pd.Timestamp(end_date).tz_convert('UTC'))
 
                 # Batches halinde oku
                 for batch in parquet_file.iter_batches(batch_size=batch_size):
@@ -704,10 +704,10 @@ class ParquetDataLake:
                         df_batch.index = df_batch.index.tz_convert('UTC')
 
                     # Tarih aralığını filtrele
-                    df_batch = df_batch[
-                        (df_batch.index >= start_ts) &
-                        (df_batch.index <= end_ts)
-                    ]
+                    if start_ts is not None:
+                        df_batch = df_batch[df_batch.index >= start_ts]
+                    if end_ts is not None:
+                        df_batch = df_batch[df_batch.index <= end_ts]
 
                     if not df_batch.empty:
                         yield df_batch
@@ -811,7 +811,7 @@ class ParquetDataLake:
                                     file_path = day_dir / "data.parquet"
                                     if file_path.exists():
                                         file_date = pd.to_datetime(f"{year_dir.name}-{month_dir.name}-{day_dir.name}")
-                                        if start_date <= file_date <= end_date:
+                                        if (start_date is None or start_date <= file_date) and (end_date is None or file_date <= end_date):
                                             file_path.unlink()
                                             deleted_count += 1
                                             logger.debug(f"🗑️ [PARQUET] {file_path.relative_to(self.BASE_DIR)} silindi")
