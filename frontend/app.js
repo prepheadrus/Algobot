@@ -2137,51 +2137,50 @@ function renderStrategyLibrary(strategies) {
         const shortConditions = strategy.conditions?.SHORT || [];
 
         return `
-            <div class="strategy-card glass-panel" style="padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
-                <div class="strategy-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="color: var(--neon-blue); margin: 0;">${name}</h3>
-                    <span style="font-size: 0.75rem; padding: 4px 8px; background: rgba(88, 166, 255, 0.1); color: var(--neon-blue); border-radius: 4px;">
+            <div class="strategy-card glass-panel" style="padding: 15px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column;">
+                <div class="strategy-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <h3 style="color: var(--neon-blue); margin: 0; font-size: 1.1rem; line-height: 1.2;">${name}</h3>
+                    <span style="font-size: 0.65rem; padding: 3px 6px; background: rgba(88, 166, 255, 0.1); color: var(--neon-blue); border-radius: 4px; white-space: nowrap;">
                         ${indicators.length} İndikatör
                     </span>
                 </div>
 
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; line-height: 1.5;">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4; flex-grow: 1; max-height: 3.4rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
                     ${description}
                 </p>
 
-                <div style="margin-bottom: 15px;">
-                    <h4 style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">📊 İndikatörler:</h4>
-                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                         ${indicators.map(ind => `
-                            <span style="font-size: 0.75rem; padding: 4px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: var(--text-main);">
+                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(255,255,255,0.05); border-radius: 3px; color: var(--text-main);">
                                 ${ind.name || ind}
                             </span>
                         `).join('')}
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div style="background: rgba(46, 220, 135, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(46, 220, 135, 0.2);">
-                        <h4 style="font-size: 0.8rem; color: var(--neon-green); margin-bottom: 8px;">🟢 LONG Koşulları</h4>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(46, 220, 135, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(46, 220, 135, 0.2);">
+                        <div style="min-width: 45px; font-size: 0.7rem; color: var(--neon-green); font-weight: bold; padding-top: 1px;">🟢 LONG</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
                             ${longConditions.length > 0 ? longConditions.map(c => `• ${c.description || c}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
                         </div>
                     </div>
 
-                    <div style="background: rgba(248, 83, 73, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(248, 83, 73, 0.2);">
-                        <h4 style="font-size: 0.8rem; color: var(--neon-red); margin-bottom: 8px;">🔴 SHORT Koşulları</h4>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                    <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(248, 83, 73, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(248, 83, 73, 0.2);">
+                        <div style="min-width: 45px; font-size: 0.7rem; color: var(--neon-red); font-weight: bold; padding-top: 1px;">🔴 SHORT</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
                             ${shortConditions.length > 0 ? shortConditions.map(c => `• ${c.description || c}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--glass-border); display: flex; gap: 8px;">
-                    <button onclick="useStrategy('${strategyId}')" style="flex: 1; padding: 8px 12px; background: var(--neon-blue); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
-                        🚀 Bu Stratejiyi Kullan
+                <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--glass-border); display: flex; gap: 8px;">
+                    <button onclick="useStrategy('${strategyId}')" style="flex: 1; padding: 8px 12px; background: var(--neon-blue); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                        <span>🚀</span> Bu Stratejiyi Kullan
                     </button>
-                    <button onclick="editStrategy('${strategyId}')" style="padding: 8px 12px; background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
-                        ✏️ Düzenle
+                    <button onclick="editStrategy('${strategyId}')" style="padding: 8px 12px; background: rgba(255,255,255,0.08); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                        <span>✏️</span> Düzenle
                     </button>
                 </div>
             </div>
