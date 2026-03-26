@@ -674,11 +674,13 @@ class PositionManager:
                     pos['stop_loss'] = new_stop
                     logger.debug(f"[TRAILING STOP] {pos['symbol']} LONG stop yukarı: {pos['stop_loss']:.2f}")
 
-            # Break-even: Kar PnL'ye geçince SL'yi giriş seviyesine taşı
-            if pos['stop_loss'] is not None and pos['stop_loss'] < entry_price and current_price > entry_price:
-                old_sl = pos['stop_loss']
-                pos['stop_loss'] = entry_price
-                logger.debug(f"[BREAK-EVEN] {pos['symbol']} LONG SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
+            # Break-even: Fiyat 1.0x ATR kadar kâra geçtiğinde SL'yi giriş seviyesine taşı (komisyon buffer'ı ile)
+            min_profit_distance = pos.get('atr', 0.0) * 1.0
+            if pos['stop_loss'] is not None and pos['stop_loss'] < entry_price:
+                if current_price >= entry_price + min_profit_distance:
+                    old_sl = pos['stop_loss']
+                    pos['stop_loss'] = min(current_price * 0.999, entry_price * 1.001)  # Komisyonu kurtarmak için %0.1 buffer, current_price'ı geçmesini engelle
+                    logger.debug(f"[BREAK-EVEN] {pos['symbol']} LONG SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
 
         else:  # SHORT
             # SHORT: Yeni dip kontrolü
@@ -692,11 +694,13 @@ class PositionManager:
                     pos['stop_loss'] = new_stop
                     logger.debug(f"[TRAILING STOP] {pos['symbol']} SHORT stop aşağı: {pos['stop_loss']:.2f}")
 
-            # Break-even: Kar PnL'ye geçince SL'yi giriş seviyesine taşı
-            if pos['stop_loss'] is not None and pos['stop_loss'] > entry_price and current_price < entry_price:
-                old_sl = pos['stop_loss']
-                pos['stop_loss'] = entry_price
-                logger.debug(f"[BREAK-EVEN] {pos['symbol']} SHORT SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
+            # Break-even: Fiyat 1.0x ATR kadar kâra geçtiğinde SL'yi giriş seviyesine taşı (komisyon buffer'ı ile)
+            min_profit_distance = pos.get('atr', 0.0) * 1.0
+            if pos['stop_loss'] is not None and pos['stop_loss'] > entry_price:
+                if current_price <= entry_price - min_profit_distance:
+                    old_sl = pos['stop_loss']
+                    pos['stop_loss'] = max(current_price * 1.001, entry_price * 0.999)  # Komisyonu kurtarmak için %0.1 buffer, current_price'ı geçmesini engelle
+                    logger.debug(f"[BREAK-EVEN] {pos['symbol']} SHORT SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
     
     # ========================================================================
     # PnL HESAPLAMA
