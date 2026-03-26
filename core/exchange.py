@@ -672,7 +672,8 @@ class ExchangeManager:
             # Kullanıcının seçtiği tarihten başla, şu ana kadar devam et
             since = target_start_ms
             logger.info(f"✨ {key} KULLANICININ SEÇTİĞİ TARİHTEN başlatılıyor: {pd.to_datetime(since, unit='ms')}")
-            logger.info(f"   Hedef: ŞU ANA KADAR (15/03/2026)")
+            current_time = pd.Timestamp.now(tz='UTC').strftime('%d/%m/%Y')
+            logger.info(f"   Hedef: ŞU ANA KADAR ({current_time})")
 
         all_downloaded = 0
         limit = 1000 # Binance tek seferde max 1000 mum verir
@@ -1404,7 +1405,7 @@ class ExchangeManager:
         # ============================================
         # 3. YENİ: TÜM MumlAR TUTULUYOR (Limit YOK)
         # ============================================
-        # Kullanıcı 01/01/2026 tarihinden itibaren tüm mumları istedi
+        # Kullanıcının istediği tarihten itibaren tüm mumlar
         # Sistem TÜM mumları tutacak ve işleyecek
         # ============================================
         logger.info(f"✅ [ALL CANDLES] {symbol} için {len(ohlcv_df)} mum yüklendi (TÜM veri tutuluyor)")
