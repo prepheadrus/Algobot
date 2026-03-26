@@ -31,6 +31,24 @@ class DivergenceHunter(BaseStrategy):
 
     def description(self) -> str:
         return "Senkronize Uyuşmazlık Avcısı: Talep Endeksi ve Ultimate Osilatör uyuşmazlığını ADX gücüyle birleştirir ve PSAR ile tetiği çeker."
+    @property
+    def indicators(self) -> list:
+        return ["Demand Index", "Ultimate Oscillator", "ADX", "PSAR"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "Fiyat PSAR ın üzerinde olmalı",
+                "Ultimate Oscillator ve Demand Index pozitif uyuşmazlık göstermeli",
+                "ADX trend gücünü desteklemeli"
+            ],
+            "SHORT": [
+                "Fiyat PSAR ın altında olmalı",
+                "Ultimate Oscillator ve Demand Index negatif uyuşmazlık göstermeli",
+                "ADX trend gücünü desteklemeli"
+            ]
+        }
+
 
     def generate_signal(self, current_row: pd.Series) -> int:
         """

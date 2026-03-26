@@ -63,6 +63,24 @@ class AdaptiveKoncordeX(BaseStrategy):
 
     def description(self) -> str:
         return "Kalman Filtresi, Akıllı Para (Koncorde) ve BTC Volatilite Endeksi (VIX) kullanan adaptif hibrit bot. PineScript v5 uyumlu."
+    @property
+    def indicators(self) -> list:
+        return ["Kalman Filter", "Koncorde", "Supertrend", "EWO", "MACD", "RSI", "Volume"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "Fiyat Kalman Filtresini yukarı kesmeli",
+                "Akıllı Para (Koncorde) pozitif olmalı",
+                "Hacim ve momentum (MACD/RSI) desteklemeli"
+            ],
+            "SHORT": [
+                "Fiyat Kalman Filtresini aşağı kesmeli",
+                "Akıllı Para (Koncorde) negatif olmalı",
+                "Hacim ve momentum desteklemeli"
+            ]
+        }
+
 
     def calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """

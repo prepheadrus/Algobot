@@ -35,6 +35,24 @@ class KNNQuantATRShield(BaseStrategy):
 
     def description(self) -> str:
         return "Makine Öğrenimi (KNN) ile geçmiş fiyat/hacim hareketlerinin Öklid uzaklığını hesaplar. ATR Volatilite Kalkanı ve Çoklu Zaman Dilimi (EMA 50) HTF trend vetosu ile korunur."
+    @property
+    def indicators(self) -> list:
+        return ["KNN Model", "ATR", "EMA 50", "Volume"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "K-En Yakın Komşu (KNN) tahmini pozitif olmalı",
+                "Fiyat EMA 50 nin (HTF) üzerinde olmalı",
+                "Volatilite kalkanı onaylamalı"
+            ],
+            "SHORT": [
+                "K-En Yakın Komşu (KNN) tahmini negatif olmalı",
+                "Fiyat EMA 50 nin (HTF) altında olmalı",
+                "Volatilite kalkanı onaylamalı"
+            ]
+        }
+
 
     def calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """

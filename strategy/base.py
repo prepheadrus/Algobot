@@ -16,6 +16,15 @@ class BaseStrategy(ABC):
     def description(self) -> str:
         pass
 
+    @property
+    def indicators(self) -> list:
+        """Kullanılan indikatörlerin listesini döner."""
+        return []
+
+    def get_conditions(self) -> Dict[str, list]:
+        """LONG ve SHORT koşullarını döner."""
+        return {"LONG": [], "SHORT": []}
+
     @abstractmethod
     def generate_signal(self, current_row: pd.Series) -> int:
         """

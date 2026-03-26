@@ -37,6 +37,27 @@ class OBV_MACD_PAR_Convergence(BaseStrategy):
 
     def name(self) -> str:
         return "OBV-MACD-PAR Convergence Engine"
+    def description(self) -> str:
+        return "MACD-AS (Momentum), OBV (Hacim/Trend Uyuşmazlık) ve Parabolic SAR (Fiyat Yönü) indikatörlerini kombine kullanarak sinyal üretir."
+
+    @property
+    def indicators(self) -> list:
+        return ["OBV", "MACD-AS", "Parabolic SAR (PSAR)"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "OBV kendi ortalamasının üzerinde olmalı",
+                "MACD-AS pozitif olmalı",
+                "Fiyat PSAR ın üzerinde olmalı"
+            ],
+            "SHORT": [
+                "OBV kendi ortalamasının altında olmalı",
+                "MACD-AS negatif olmalı",
+                "Fiyat PSAR ın altında olmalı"
+            ]
+        }
+
 
     def description(self) -> str:
         return "MACD-AS (Momentum), OBV (Hacim/Trend Uyuşmazlık) ve Parabolic SAR (Fiyat Yönü) indikatörlerini kombine kullanarak sinyal üretir."
