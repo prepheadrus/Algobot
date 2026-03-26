@@ -45,16 +45,13 @@ class KNNQuantATRShield(BaseStrategy):
 
         # 1. EMA_50 Hesaplaması (HTF Veto)
         ema_period = self.params.get('ema_period', 50)
-        df['EMA_50'] = df['close'].ewm(span=ema_period, adjust=False).mean()
+
 
         # 2. ATR_14 Hesaplaması (Volatilite Kalkanı)
         atr_period = self.params.get('atr_period', 14)
 
         # True Range (TR)
-        df['prev_close'] = df['close'].shift(1)
-        df['tr1'] = df['high'] - df['low']
-        df['tr2'] = (df['high'] - df['prev_close']).abs()
-        df['tr3'] = (df['low'] - df['prev_close']).abs()
+
         df['TR'] = df[['tr1', 'tr2', 'tr3']].max(axis=1)
 
         # ATR = TR'nin n periyotluk basit hareketli ortalaması (veya Wilder's Smoothing)
@@ -66,7 +63,7 @@ class KNNQuantATRShield(BaseStrategy):
         df['ATR_SMA_14'] = df['ATR_14'].rolling(window=atr_period).mean()
 
         # 3. RSI_14 Hesaplaması (Momentum için - KNN Özellik Matrisi)
-        delta = df['close'].diff()
+
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
@@ -81,11 +78,7 @@ class KNNQuantATRShield(BaseStrategy):
         k = self.params.get('knn_k', 5)
 
         # Özellikleri normalize et (Z-Score) ki Euclidean Distance anlamlı olsun
-        df['Close_Norm'] = (df['close'] - df['close'].rolling(window=50).mean()) / df['close'].rolling(window=50).std()
-        df['RSI_Norm'] = (df['RSI_14'] - df['RSI_14'].rolling(window=50).mean()) / df['RSI_14'].rolling(window=50).std()
 
-        # Hedef değişken (Gelecek 1 mumun yönü) - Eğitim için (Geçmiş veride)
-        df['Target_Dir'] = np.where(df['close'].shift(-1) > df['close'], 1, -1)
 
         # NOT: Gerçek bir KNN modeli vektörize olarak tüm geçmişi taramak için çok maliyetlidir (O(N^2)).
         # Optimizasyon için, sadece basit bir momentum/mean-reversion benzerliği tabanlı "Proxy KNN_Pred" hesaplıyoruz.
@@ -122,8 +115,7 @@ class KNNQuantATRShield(BaseStrategy):
             return 1 # BEKLE
 
         knn_pred = current_row.get('KNN_Pred', 0)
-        close = current_row.get('close', 0.0)
-        open_price = current_row.get('open', 0.0)
+
         ema_50 = current_row.get('EMA_50', 0.0)
         atr_14 = current_row.get('ATR_14', 0.0)
         atr_sma_14 = current_row.get('ATR_SMA_14', 0.0)
