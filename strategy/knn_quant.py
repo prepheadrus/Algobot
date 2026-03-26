@@ -7,7 +7,7 @@ class KNNQuantATRShield(BaseStrategy):
     """
     KNN Quant ATR Shield (K-En Yakın Komşu & Volatilite Kalkanı)
     Bölüm 3.17 (Single-stock KNN) ve Bölüm 18.2 (Cryptocurrencies - ANN) algoritmalarını temel alır.
-
+    
     Özellikler:
     - Sıfır Bağımlılık (pandas_ta yok, sadece numpy/pandas)
     - Veri Bütünlüğü Kalkanı (inf, nan koruması)
@@ -49,19 +49,19 @@ class KNNQuantATRShield(BaseStrategy):
 
         # 2. ATR_14 Hesaplaması (Volatilite Kalkanı)
         atr_period = self.params.get('atr_period', 14)
-
+        
         # True Range (TR)
         df['prev_close'] = df['close'].shift(1)
         df['tr1'] = df['high'] - df['low']
         df['tr2'] = (df['high'] - df['prev_close']).abs()
         df['tr3'] = (df['low'] - df['prev_close']).abs()
         df['TR'] = df[['tr1', 'tr2', 'tr3']].max(axis=1)
-
+        
         # ATR = TR'nin n periyotluk basit hareketli ortalaması (veya Wilder's Smoothing)
         # Klasik olarak SMA veya RMA kullanılır. Basitlik ve performans için SMA kullanıyoruz (RMA da kullanılabilir).
         # TradingView standart RMA kullansa da, numpy/pandas ile en güvenilir ve hızlısı EMA ile Alpha=1/N yapmaktır.
         df['ATR_14'] = df['TR'].ewm(alpha=1/atr_period, adjust=False).mean()
-
+        
         # ATR_SMA_14 (Aşırı gürültülü piyasa tespiti için ATR'nin hareketli ortalaması)
         df['ATR_SMA_14'] = df['ATR_14'].rolling(window=atr_period).mean()
 
@@ -77,25 +77,25 @@ class KNNQuantATRShield(BaseStrategy):
         # Basit vektörize bir Euclidean Distance yaklaşımı:
         # Piyasada genelde geçmişteki 'k' adet benzer momentum/fiyat değişimine bakılır.
         # Tak-Çalıştır ve vektörize olması için: Son k mumluk Close ve RSI değişimlerini bir "özellik vektörü" yapıyoruz.
-
+        
         k = self.params.get('knn_k', 5)
-
+        
         # Özellikleri normalize et (Z-Score) ki Euclidean Distance anlamlı olsun
         df['Close_Norm'] = (df['close'] - df['close'].rolling(window=50).mean()) / df['close'].rolling(window=50).std()
         df['RSI_Norm'] = (df['RSI_14'] - df['RSI_14'].rolling(window=50).mean()) / df['RSI_14'].rolling(window=50).std()
-
+        
         # Hedef değişken (Gelecek 1 mumun yönü) - Eğitim için (Geçmiş veride)
         df['Target_Dir'] = np.where(df['close'].shift(-1) > df['close'], 1, -1)
-
-        # NOT: Gerçek bir KNN modeli vektörize olarak tüm geçmişi taramak için çok maliyetlidir (O(N^2)).
+        
+        # NOT: Gerçek bir KNN modeli vektörize olarak tüm geçmişi taramak için çok maliyetlidir (O(N^2)). 
         # Optimizasyon için, sadece basit bir momentum/mean-reversion benzerliği tabanlı "Proxy KNN_Pred" hesaplıyoruz.
         # K-komşu yerine, son K mumun eğilimine (trend) ve aşırılıklarına bakarak Yön Tahmini:
         # Eğer Fiyat Düşüyor ama RSI Yükseliyorsa (Pozitif Uyumsuzluk) -> +1
         # Eğilimleri basitleştirilmiş KNN Proxy:
-
+        
         # Bu, "Tam bir KNN" yerine, istendiği gibi K=5 periyotluk vektörize bir uzaklık/moment metriğidir.
         df['Mom_Dist'] = df['Close_Norm'].diff(k) + df['RSI_Norm'].diff(k)
-
+        
         # Yön Tahmini (KNN Proxy):
         # 1: Yükseliş Bekliyor (Momentum ve Fiyat Öklid Mesafesinde Pozitif Eğilim)
         # -1: Düşüş Bekliyor
@@ -148,11 +148,11 @@ class KNNQuantATRShield(BaseStrategy):
         """
         Risk Yönetimi ve Dinamik Boyutlandırma (Finans Katmanı)
         PaperTrader ve Risk Engine'e gönderilecek emir parametreleri.
-
+        
         Stop-Loss: Entry Price - (ATR_14 * 2.0)
         Take-Profit: Entry Price + (ATR_14 * 4.0) -> RRR = 2.0
-
-        Dinamik Pozisyon Boyutu, Ratchet Trailing Stop, Slippage ve Fee
+        
+        Dinamik Pozisyon Boyutu, Ratchet Trailing Stop, Slippage ve Fee 
         motor tarafından işlenmek üzere bu metot aracılığıyla geçirilir.
         """
         return {
