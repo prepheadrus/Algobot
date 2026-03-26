@@ -1219,8 +1219,8 @@ body {
 
 .strategy-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 15px;
     padding: 10px;
 }
 
@@ -1228,14 +1228,14 @@ body {
     background: var(--glass-bg);
     backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
-    border-radius: 14px;
-    padding: 24px;
+    border-radius: 12px;
+    padding: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    min-height: 220px;
+    min-height: 200px;
 }
 
 .strategy-card::before {
@@ -1362,13 +1362,13 @@ body {
 /* Responsive adjustments */
 @media (max-width: 1400px) {
     .strategy-grid {
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     }
 }
 
 @media (max-width: 1200px) {
     .strategy-grid {
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
 }
 
