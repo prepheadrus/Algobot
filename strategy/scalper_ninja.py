@@ -33,6 +33,21 @@ class ScalperNinja(BaseStrategy):
 
     def description(self) -> str:
         return "Aşırı satım (Oversold) koşullarında (RSI < 30, Stoch < 20) hızlı dip avcılığına odaklanır."
+    @property
+    def indicators(self) -> list:
+        return ["RSI", "Stochastic"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "RSI aşırı satım bölgesinde olmalı (RSI < 30)",
+                "Stochastic aşırı satım bölgesinde olmalı (Stoch < 20)"
+            ],
+            "SHORT": [
+                "Scalping stratejisi genellikle SHORT işlem açmaz"
+            ]
+        }
+
 
     def generate_signal(self, current_row: pd.Series) -> int:
         """

@@ -30,6 +30,26 @@ class GoldenCombo(BaseStrategy):
 
     def description(self) -> str:
         return "ADX, MACD, EMA ve OBV kombinasyonlu hacim destekli trend yakalama şablonu. Doğrulama olmadan işleme girmez."
+    @property
+    def indicators(self) -> list:
+        return ["ADX", "MACD", "EMA 5", "SMA 20", "OBV"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "EMA 5, SMA 20 nin üzerinde olmalı",
+                "MACD Histogramı pozitif olmalı",
+                "ADX eşik değerin üzerinde olmalı",
+                "OBV kendi ortalamasının üzerinde olmalı"
+            ],
+            "SHORT": [
+                "EMA 5, SMA 20 nin altında olmalı",
+                "MACD Histogramı negatif olmalı",
+                "ADX eşik değerin üzerinde olmalı",
+                "OBV kendi ortalamasının altında olmalı"
+            ]
+        }
+
 
     def generate_signal(self, current_row: pd.Series) -> int:
         # Gerekli verilerin olup olmadığını kontrol et

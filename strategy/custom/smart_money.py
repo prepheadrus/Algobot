@@ -46,8 +46,6 @@ class SmartMoneyStrategy(BaseStrategy):
     def __init__(self):
         """Smart Money stratejisi başlatıcı"""
         super().__init__()
-        self.name = "Smart Money"
-        self.description = "RSI + MACD + OBV konfluansı ile akıllı para girişlerini tespit eder"
         self.timeframe = "1m"
         self.params = self.DEFAULT_PARAMS.copy()
         self.rsi_period = self.params.get('rsi_period', 14)
@@ -56,12 +54,29 @@ class SmartMoneyStrategy(BaseStrategy):
         self.macd_signal = self.params.get('macd_signal', 9)
 
     def name(self) -> str:
-        """Strateji adı"""
         return "Smart Money"
 
     def description(self) -> str:
-        """Strateji açıklaması"""
         return "RSI + MACD + OBV konfluansı ile akıllı para girişlerini tespit eder"
+
+    @property
+    def indicators(self) -> list:
+        return ["RSI", "MACD", "OBV"]
+
+    def get_conditions(self) -> dict:
+        return {
+            "LONG": [
+                "MACD çizgisi Signal in üzerinde olmalı",
+                "RSI 50 den büyük veya dipten dönüyor olmalı",
+                "OBV yükseliş trendinde olmalı"
+            ],
+            "SHORT": [
+                "MACD çizgisi Signal in altında olmalı",
+                "RSI 50 den küçük veya tepeden dönüyor olmalı",
+                "OBV düşüş trendinde olmalı"
+            ]
+        }
+
 
     def timeframe(self) -> str:
         """Zaman aralığı"""
