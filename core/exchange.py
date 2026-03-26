@@ -1416,19 +1416,26 @@ class ExchangeManager:
         try:
             from core.paper import paper_engine
             
-            if paper_engine and len(paper_engine.active_bots) > 0:
-                logger.info(f"🤖 [1-to-N] {symbol} için {len(paper_engine.active_bots)} aktif bot işleniyor...")
+            # Sadece bu poller'ın symbol'üne ait aktif botları bul
+            symbol_active_bots = [
+                bot_id for bot_id, bot_info in (paper_engine.active_bots.items() if paper_engine else [])
+                if bot_info.get('symbol') == symbol and bot_info.get('status') == 'running'
+            ]
+
+            if paper_engine and len(symbol_active_bots) > 0:
+                logger.info(f"🤖 [1-to-N] {symbol} için {len(symbol_active_bots)} aktif bot işleniyor...")
                 
                 # Her bot için task oluştur
                 tasks = []
-                for bot_id in paper_engine.active_bots.keys():
+                for bot_id in symbol_active_bots:
                     bot_info = paper_engine.active_bots.get(bot_id, {})
                     bot_timeframe = bot_info.get('timeframe', '1m')
                     
-                    # Sadece aynı timeframe'deki botları işle
+                    # Sadece aynı timeframe olan botları işle! (Sembol filtresi zaten symbol_active_bots'ta yapıldı)
                     if bot_timeframe == timeframe:
-                        logger.info(f"   🔥 [BOT DEBUG] active_bot_ids={list(paper_engine.active_bots.keys())}")
-                        logger.info(f"   🚀 [BOT GATHER] {len(paper_engine.active_bots)} task çalıştırılıyor...")
+                        # Log çıktısını temizlemek için sadece ilgili botun debug bilgisini basalım
+                        logger.info(f"   🔥 [BOT DEBUG] active_bot_ids={['Bot: '+bot_id]}")
+                        logger.info(f"   🚀 [BOT GATHER] 1 task çalıştırılıyor...")
                         
                         # Bot task'ını başlat (async)
                         task = asyncio.create_task(
