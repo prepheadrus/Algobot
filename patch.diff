@@ -1,0 +1,43 @@
+--- data/data_lake.py
++++ data/data_lake.py
+@@ -248,32 +248,15 @@
+                     # Data integrity sağla
+                     df = self._ensure_integrity(df, timeframe)
+
+-                    if append and file_path.exists():
+-                        # Mevcut dosyaya ekle
+-                        try:
+-                            existing_df = await asyncio.to_thread(pd.read_parquet, file_path)
+-                        except Exception as read_err:
+-                            # Bozuk dosyayı sil ve yeniden başlat
+-                            logger.warning(f"⚠️ [DATA LAKE] Bozuk Parquet dosyası, siliniyor: {file_path} - {read_err}")
+-                            file_path.unlink()
+-                            existing_df = pd.DataFrame()
+-
+-                        # Duplicate kayıtları temizle
+-                        if not existing_df.empty:
+-                            combined_df = pd.concat([existing_df, df], ignore_index=True)
+-                            combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')
+-                        else:
+-                            combined_df = df
+-
+-                        # Tekrar integrity kontrolü
+-                        combined_df = await asyncio.to_thread(self._ensure_integrity, combined_df, timeframe)
+-
+-                        await asyncio.to_thread(combined_df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
+-                        logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum EKLENDI (toplam: {len(combined_df)} mum)")
+-                    else:
+-                        # Yeni dosya yaz
+-                        await asyncio.to_thread(df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
+-                        logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum KAYDEDILDI")
++                    # When writing to Parquet files, always load and write the entire dataset at once (overwriting)
++                    # rather than performing incremental appends, as the Parquet format is inefficient with
++                    # continuous small appends and causes file fragmentation.
++
++                    # Dosya varsa ve appned edilmek isteniyorsa bile, çağrıcının DataFrame'i
++                    # zaten tam olarak birleştirilmiş olmalıdır. Append'i burada dosyayı yükleyerek YAPMAMALIYIZ.
++
++                    await asyncio.to_thread(df.to_parquet, file_path, compression=self.COMPRESSION, index=False)
++                    logger.info(f"💾 [DATA LAKE] {symbol} {timeframe} → {len(df)} mum KAYDEDILDI")
+
+                     return True
