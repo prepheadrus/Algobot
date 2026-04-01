@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+from core.trading.entities.metrics import TradingMetrics
 
 
 class StrategyReporterService:
@@ -18,51 +19,63 @@ class StrategyReporterService:
     @staticmethod
     def _calculate_profit_factor(gross_profit: float, gross_loss: float) -> float:
         if gross_loss == 0:
-            return float('inf') if gross_profit > 0 else 0.0
+            return float("inf") if gross_profit > 0 else 0.0
         return gross_profit / gross_loss
 
     @staticmethod
-    def _generate_recommendation(win_rate: float, profit_factor: float, total_trades: int, total_pnl: float, max_drawdown_pct: float, max_drawdown: float) -> str:
+    def _generate_recommendation(metrics: TradingMetrics) -> str:
         recommendation = ""
-        if profit_factor >= 2.0 and win_rate < 50 and total_trades >= 5:
+        if (
+            metrics.profit_factor >= 2.0
+            and metrics.win_rate < 50
+            and metrics.total_trades >= 5
+        ):
             recommendation = (
-                f"🎯 DÜŞÜK WIN RATE ({win_rate:.0f}%) AMA YÜKSEK KÂRLILIK! "
-                f"Profit Factor: {profit_factor:.2f}. "
+                f"🎯 DÜŞÜK WIN RATE ({metrics.win_rate:.0f}%) AMA YÜKSEK KÂRLILIK! "
+                f"Profit Factor: {metrics.profit_factor:.2f}. "
                 f"Risk/Ödül dengesi muazzam - kayıplar küçük, kazançlar büyük. "
                 f"Strateji 'trend following' tarzı çalışıyor olabilir."
             )
-        elif win_rate < 40 and profit_factor < 1.2 and total_trades >= 3:
+        elif (
+            metrics.win_rate < 40
+            and metrics.profit_factor < 1.2
+            and metrics.total_trades >= 3
+        ):
             recommendation = (
-                f"⚠️ KRİTİK: Düşük başarı oranı ({win_rate:.0f}%) ve zayıf kâr faktörü ({profit_factor:.2f}). "
+                f"⚠️ KRİTİK: Düşük başarı oranı ({metrics.win_rate:.0f}%) ve zayıf kâr faktörü ({metrics.profit_factor:.2f}). "
                 f"Stop-Loss seviyesi hatalı veya işlem yapılan pariteler bu botun tarzına uymuyor. "
                 f"Acil parametre optimizasyonu gerekli!"
             )
-        elif win_rate >= 60 and profit_factor >= 1.5 and total_pnl > 0:
+        elif (
+            metrics.win_rate >= 60
+            and metrics.profit_factor >= 1.5
+            and metrics.total_pnl > 0
+        ):
             recommendation = (
-                f"🏆 MÜKEMMEL UYUM! Win Rate: %{win_rate:.0f}, Profit Factor: {profit_factor:.2f}. "
+                f"🏆 MÜKEMMEL UYUM! Win Rate: %{metrics.win_rate:.0f}, Profit Factor: {metrics.profit_factor:.2f}. "
                 f"Kârlılık ve kazanma oranı muazzam. "
                 f"Kaldıraç oranı ufak çaplı artırılarak gelir katlanabilir."
             )
-        elif win_rate >= 50 and total_pnl < 0:
+        elif metrics.win_rate >= 50 and metrics.total_pnl < 0:
             recommendation = (
-                f"⚠️ DİKKAT: Kazanma oranı iyi (%{win_rate:.0f}) fakat alınan risk (Stop Loss) kârı eritiyor. "
-                f"Profit Factor: {profit_factor:.2f}. "
+                f"⚠️ DİKKAT: Kazanma oranı iyi (%{metrics.win_rate:.0f}) fakat alınan risk (Stop Loss) kârı eritiyor. "
+                f"Profit Factor: {metrics.profit_factor:.2f}. "
                 f"Risk/Ödül oranı iyileştirilmeli (min 1:2) veya spread/fee kontrol edilmeli."
             )
-        elif max_drawdown_pct > 30 and total_trades >= 5:
+        elif metrics.max_drawdown_pct > 30 and metrics.total_trades >= 5:
             recommendation = (
-                f"📉 YÜKSEK DRAWDOWN UYARISI: Maksimum düşüş %{max_drawdown:.1f}. "
+                f"📉 YÜKSEK DRAWDOWN UYARISI: Maksimum düşüş %{metrics.max_drawdown:.1f}. "
                 f"Strateji büyük değer kaybı yaşamış. "
                 f"Pozisyon boyutu küçültülmeli veya kaldıraç düşürülmeli."
             )
-        elif total_trades < 3:
+        elif metrics.total_trades < 3:
             recommendation = (
-                f"ℹ️ İŞLEM HACMİ YETERSİZ: Sadece {total_trades} işlem. "
+                f"ℹ️ İŞLEM HACMİ YETERSİZ: Sadece {metrics.total_trades} işlem. "
                 f"Simülasyon devam etmeli, en az 30 işlem sonrası değerlendirme yapılmalı."
             )
         else:
             recommendation = (
-                f"📊 ORTALAMA PERFORMANS: Win Rate %{win_rate:.0f}, Profit Factor {profit_factor:.2f}. "
+                f"📊 ORTALAMA PERFORMANS: Win Rate %{metrics.win_rate:.0f}, Profit Factor {metrics.profit_factor:.2f}. "
                 f"Risk toleransına göre makul sayılabilir."
             )
         return recommendation
@@ -71,14 +84,18 @@ class StrategyReporterService:
         report = []
         groups = {}
 
-        if not trades_list or (hasattr(trades_list, '__len__') and len(trades_list) == 0):
+        if not trades_list or (
+            hasattr(trades_list, "__len__") and len(trades_list) == 0
+        ):
             return []
 
         for trade in trades_list:
-            strat = self._safe_get(trade, 'strategy_id') or self._safe_get(trade, 'strategy', 'Bilinmiyor')
-            pnl = self._safe_get(trade, 'pnl') or self._safe_get(trade, 'pnl_usd', 0)
-            symbol = self._safe_get(trade, 'symbol', 'Bilinmiyor')
-            timeframe = self._safe_get(trade, 'timeframe', '1m')
+            strat = self._safe_get(trade, "strategy_id") or self._safe_get(
+                trade, "strategy", "Bilinmiyor"
+            )
+            pnl = self._safe_get(trade, "pnl") or self._safe_get(trade, "pnl_usd", 0)
+            symbol = self._safe_get(trade, "symbol", "Bilinmiyor")
+            timeframe = self._safe_get(trade, "timeframe", "1m")
 
             strat_key = f"{strat}"
 
@@ -93,7 +110,7 @@ class StrategyReporterService:
                     "gross_profit": 0.0,
                     "gross_loss": 0.0,
                     "pnl_curve": [],
-                    "symbols": {}
+                    "symbols": {},
                 }
 
             if not groups[strat_key].get("timeframe") and timeframe:
@@ -114,11 +131,7 @@ class StrategyReporterService:
             sym_key = f"{symbol} ({timeframe})"
 
             if sym_key not in groups[strat]["symbols"]:
-                groups[strat]["symbols"][sym_key] = {
-                    "trades": 0,
-                    "wins": 0,
-                    "pnl": 0.0
-                }
+                groups[strat]["symbols"][sym_key] = {"trades": 0, "wins": 0, "pnl": 0.0}
 
             groups[strat]["symbols"][sym_key]["trades"] += 1
             if pnl > 0:
@@ -126,8 +139,14 @@ class StrategyReporterService:
             groups[strat]["symbols"][sym_key]["pnl"] += pnl
 
         for strat, data in groups.items():
-            win_rate = (data["wins"] / data["total_trades"] * 100) if data["total_trades"] > 0 else 0
-            profit_factor = self._calculate_profit_factor(data["gross_profit"], data["gross_loss"])
+            win_rate = (
+                (data["wins"] / data["total_trades"] * 100)
+                if data["total_trades"] > 0
+                else 0
+            )
+            profit_factor = self._calculate_profit_factor(
+                data["gross_profit"], data["gross_loss"]
+            )
 
             max_drawdown = 0.0
             cumulative_pnl = 0.0
@@ -142,9 +161,13 @@ class StrategyReporterService:
                     max_drawdown = drawdown
 
             if peak_pnl > 0:
-                max_drawdown_pct = (max_drawdown / peak_pnl * 100)
+                max_drawdown_pct = max_drawdown / peak_pnl * 100
             elif max_drawdown > 0:
-                max_drawdown_pct = (max_drawdown / abs(cumulative_pnl) * 100) if cumulative_pnl != 0 else 0
+                max_drawdown_pct = (
+                    (max_drawdown / abs(cumulative_pnl) * 100)
+                    if cumulative_pnl != 0
+                    else 0
+                )
             else:
                 max_drawdown_pct = 0
 
@@ -152,41 +175,60 @@ class StrategyReporterService:
             detected_timeframe = data.get("timeframe", "1m")
 
             for s_name, s_data in data["symbols"].items():
-                s_wr = (s_data["wins"] / s_data["trades"] * 100) if s_data["trades"] > 0 else 0
+                s_wr = (
+                    (s_data["wins"] / s_data["trades"] * 100)
+                    if s_data["trades"] > 0
+                    else 0
+                )
                 if " (" in s_name and s_name.endswith(")"):
                     tf = s_name.split(" (")[-1].rstrip(")")
                     if tf:
                         detected_timeframe = tf
 
-                sym_perf.append({
-                    "name": s_name,
-                    "trades": s_data["trades"],
-                    "win_rate": round(s_wr, 1),
-                    "pnl": round(s_data["pnl"], 2)
-                })
+                sym_perf.append(
+                    {
+                        "name": s_name,
+                        "trades": s_data["trades"],
+                        "win_rate": round(s_wr, 1),
+                        "pnl": round(s_data["pnl"], 2),
+                    }
+                )
 
             recommendation = self._generate_recommendation(
-                win_rate, profit_factor, data["total_trades"], data["total_pnl"], max_drawdown_pct, max_drawdown
+                TradingMetrics(
+                    win_rate=win_rate,
+                    profit_factor=profit_factor,
+                    total_trades=data["total_trades"],
+                    total_pnl=data["total_pnl"],
+                    max_drawdown_pct=max_drawdown_pct,
+                    max_drawdown=max_drawdown,
+                )
             )
 
-            report.append({
-                "strategy": strat,
-                "timeframe": detected_timeframe,
-                "total_trades": data["total_trades"],
-                "wins": data["wins"],
-                "losses": data["losses"],
-                "win_rate": round(win_rate, 1),
-                "total_pnl": round(data["total_pnl"], 2),
-                "gross_profit": round(data["gross_profit"], 2),
-                "gross_loss": round(data["gross_loss"], 2),
-                "profit_factor": round(profit_factor, 2) if profit_factor != float('inf') else None,
-                "max_drawdown": round(max_drawdown, 2),
-                "max_drawdown_pct": round(max_drawdown_pct, 1),
-                "symbols": sym_perf,
-                "recommendation": recommendation
-            })
+            report.append(
+                {
+                    "strategy": strat,
+                    "timeframe": detected_timeframe,
+                    "total_trades": data["total_trades"],
+                    "wins": data["wins"],
+                    "losses": data["losses"],
+                    "win_rate": round(win_rate, 1),
+                    "total_pnl": round(data["total_pnl"], 2),
+                    "gross_profit": round(data["gross_profit"], 2),
+                    "gross_loss": round(data["gross_loss"], 2),
+                    "profit_factor": (
+                        round(profit_factor, 2)
+                        if profit_factor != float("inf")
+                        else None
+                    ),
+                    "max_drawdown": round(max_drawdown, 2),
+                    "max_drawdown_pct": round(max_drawdown_pct, 1),
+                    "symbols": sym_perf,
+                    "recommendation": recommendation,
+                }
+            )
 
-        return sorted(report, key=lambda x: x['total_pnl'], reverse=True)
+        return sorted(report, key=lambda x: x["total_pnl"], reverse=True)
 
 
 strategy_reporter_service = StrategyReporterService()
