@@ -14,23 +14,24 @@ Kullanım:
     from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
     
     # Market order oluştur
-    order = Order.create_market_order(
+    from core.trading.entities.order_params import MarketOrderParams, LimitOrderParams
+    order = Order.create_market_order(MarketOrderParams(
         bot_id="bot_123",
         symbol="BTC/USDT",
         side=OrderSide.BUY,
         size=0.1,
         leverage=5.0
-    )
+    ))
     
     # Limit order oluştur
-    order = Order.create_limit_order(
+    order = Order.create_limit_order(LimitOrderParams(
         bot_id="bot_123",
         symbol="BTC/USDT",
         side=OrderSide.BUY,
         size=0.1,
-        limit_price=49000.0,
+        price=49000.0,
         leverage=5.0
-    )
+    ))
     
     # Order durumu güncelle
     order = order.with_status(OrderStatus.FILLED, filled_price=49500.0)
@@ -38,9 +39,17 @@ Kullanım:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from enum import Enum
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from core.trading.entities.order_params import (
+        MarketOrderParams,
+        LimitOrderParams,
+        StopLossOrderParams,
+        TakeProfitOrderParams
+    )
 
 
 class OrderType(str, Enum):
@@ -166,182 +175,113 @@ class Order:
     # ========================================================================
     
     @classmethod
-    def create_market_order(
-        cls,
-        bot_id: str,
-        symbol: str,
-        side: OrderSide,
-        size: float,
-        leverage: float = 1.0,
-        reduce_only: bool = False,
-        metadata: Dict[str, Any] = None
-    ) -> 'Order':
+    def create_market_order(cls, params: 'MarketOrderParams') -> 'Order':
         """
         Market order oluştur.
         
         Args:
-            bot_id: Bot ID
-            symbol: Sembol
-            side: Alış/Satış
-            size: Boyut
-            leverage: Kaldıraç
-            reduce_only: Reduce only
-            metadata: Ek veriler
-        
+            params: MarketOrderParams DTO
+
         Returns:
             Order instance
         """
         now = datetime.utcnow()
         return cls(
             id=f"order_{uuid4().hex[:12]}",
-            bot_id=bot_id,
-            symbol=symbol,
+            bot_id=params.bot_id,
+            symbol=params.symbol,
             type=OrderType.MARKET,
-            side=side,
+            side=params.side,
             status=OrderStatus.PENDING,
-            size=size,
-            leverage=leverage,
+            size=params.size,
+            leverage=params.leverage,
             created_at=now,
-            reduce_only=reduce_only,
-            metadata=metadata or {}
+            reduce_only=params.reduce_only,
+            metadata=params.metadata or {}
         )
     
     @classmethod
-    def create_limit_order(
-        cls,
-        bot_id: str,
-        symbol: str,
-        side: OrderSide,
-        size: float,
-        limit_price: float,
-        leverage: float = 1.0,
-        time_in_force: str = "GTC",
-        post_only: bool = False,
-        reduce_only: bool = False,
-        metadata: Dict[str, Any] = None
-    ) -> 'Order':
+    def create_limit_order(cls, params: 'LimitOrderParams') -> 'Order':
         """
         Limit order oluştur.
         
         Args:
-            bot_id: Bot ID
-            symbol: Sembol
-            side: Alış/Satış
-            size: Boyut
-            limit_price: Limit fiyat
-            leverage: Kaldıraç
-            time_in_force: Time in force
-            post_only: Post only
-            reduce_only: Reduce only
-            metadata: Ek veriler
-        
+            params: LimitOrderParams DTO
+
         Returns:
             Order instance
         """
         now = datetime.utcnow()
         return cls(
             id=f"order_{uuid4().hex[:12]}",
-            bot_id=bot_id,
-            symbol=symbol,
+            bot_id=params.bot_id,
+            symbol=params.symbol,
             type=OrderType.LIMIT,
-            side=side,
+            side=params.side,
             status=OrderStatus.PENDING,
-            size=size,
-            leverage=leverage,
-            price=limit_price,
-            time_in_force=time_in_force,
-            post_only=post_only,
+            size=params.size,
+            leverage=params.leverage,
+            price=params.price,
+            time_in_force=params.time_in_force,
+            post_only=params.post_only,
             created_at=now,
-            reduce_only=reduce_only,
-            metadata=metadata or {}
+            reduce_only=params.reduce_only,
+            metadata=params.metadata or {}
         )
     
     @classmethod
-    def create_stop_loss_order(
-        cls,
-        bot_id: str,
-        symbol: str,
-        side: OrderSide,
-        size: float,
-        stop_price: float,
-        leverage: float = 1.0,
-        reduce_only: bool = True,
-        metadata: Dict[str, Any] = None
-    ) -> 'Order':
+    def create_stop_loss_order(cls, params: 'StopLossOrderParams') -> 'Order':
         """
         Stop loss order oluştur.
         
         Args:
-            bot_id: Bot ID
-            symbol: Sembol
-            side: Alış/Satış
-            size: Boyut
-            stop_price: Stop fiyat
-            leverage: Kaldıraç
-            reduce_only: Reduce only (genellikle True)
-            metadata: Ek veriler
-        
+            params: StopLossOrderParams DTO
+
         Returns:
             Order instance
         """
         now = datetime.utcnow()
         return cls(
             id=f"order_{uuid4().hex[:12]}",
-            bot_id=bot_id,
-            symbol=symbol,
+            bot_id=params.bot_id,
+            symbol=params.symbol,
             type=OrderType.STOP_LOSS,
-            side=side,
+            side=params.side,
             status=OrderStatus.PENDING,
-            size=size,
-            leverage=leverage,
-            stop_price=stop_price,
+            size=params.size,
+            leverage=params.leverage,
+            stop_price=params.stop_price,
             created_at=now,
-            reduce_only=reduce_only,
-            metadata=metadata or {}
+            reduce_only=params.reduce_only,
+            metadata=params.metadata or {}
         )
     
     @classmethod
-    def create_take_profit_order(
-        cls,
-        bot_id: str,
-        symbol: str,
-        side: OrderSide,
-        size: float,
-        take_profit_price: float,
-        leverage: float = 1.0,
-        reduce_only: bool = True,
-        metadata: Dict[str, Any] = None
-    ) -> 'Order':
+    def create_take_profit_order(cls, params: 'TakeProfitOrderParams') -> 'Order':
         """
         Take profit order oluştur.
         
         Args:
-            bot_id: Bot ID
-            symbol: Sembol
-            side: Alış/Satış
-            size: Boyut
-            take_profit_price: Take profit fiyat
-            leverage: Kaldıraç
-            reduce_only: Reduce only (genellikle True)
-            metadata: Ek veriler
-        
+            params: TakeProfitOrderParams DTO
+
         Returns:
             Order instance
         """
         now = datetime.utcnow()
         return cls(
             id=f"order_{uuid4().hex[:12]}",
-            bot_id=bot_id,
-            symbol=symbol,
+            bot_id=params.bot_id,
+            symbol=params.symbol,
             type=OrderType.TAKE_PROFIT,
-            side=side,
+            side=params.side,
             status=OrderStatus.PENDING,
-            size=size,
-            leverage=leverage,
-            stop_price=take_profit_price,  # TP de stop_price kullanır
+            size=params.size,
+            leverage=params.leverage,
+            stop_price=params.target_price,  # TP de stop_price kullanır (veya isteğe bağlı trigger_price)
+            price=params.trigger_price, # Limit fiyatı (varsa) trigger olarak set edilebilir
             created_at=now,
-            reduce_only=reduce_only,
-            metadata=metadata or {}
+            reduce_only=params.reduce_only,
+            metadata=params.metadata or {}
         )
     
     # ========================================================================
