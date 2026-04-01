@@ -189,34 +189,36 @@ def result(self) -> TradeResult:
 ```python
 from core.trading.entities import Order, OrderType, OrderSide, OrderStatus
 
+from core.trading.entities.order_params import MarketOrderParams, LimitOrderParams, StopLossOrderParams
+
 # Market order oluştur
-order = Order.create_market_order(
+order = Order.create_market_order(MarketOrderParams(
     bot_id="bot_123",
     symbol="BTC/USDT",
     side=OrderSide.BUY,
     size=0.1,
     leverage=5.0
-)
+))
 
 # Limit order oluştur
-order = Order.create_limit_order(
+order = Order.create_limit_order(LimitOrderParams(
     bot_id="bot_123",
     symbol="BTC/USDT",
     side=OrderSide.BUY,
     size=0.1,
-    limit_price=49000.0,
+    price=49000.0,
     leverage=5.0
-)
+))
 
 # Stop loss order oluştur
-order = Order.create_stop_loss_order(
+order = Order.create_stop_loss_order(StopLossOrderParams(
     bot_id="bot_123",
     symbol="BTC/USDT",
     side=OrderSide.SELL,
     size=0.1,
     stop_price=49000.0,
     leverage=5.0
-)
+))
 
 # Order status güncelle (immutable)
 order = order.with_status(OrderStatus.FILLED, filled_price=49500.0)
@@ -262,16 +264,16 @@ class Position:
 
 ```python
 @classmethod
-def create_market_order(cls, bot_id, symbol, side, size, leverage):
+def create_market_order(cls, params: MarketOrderParams):
     """Market order oluştur"""
     return cls(
         id=f"order_{uuid4().hex[:12]}",
-        bot_id=bot_id,
-        symbol=symbol,
+        bot_id=params.bot_id,
+        symbol=params.symbol,
         type=OrderType.MARKET,
-        side=side,
-        size=size,
-        leverage=leverage,
+        side=params.side,
+        size=params.size,
+        leverage=params.leverage,
         status=OrderStatus.PENDING
     )
 ```
