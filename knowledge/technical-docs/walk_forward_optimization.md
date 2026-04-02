@@ -68,8 +68,8 @@ Walk-Forward Optimization (WFO), strateji parametrelerini piyasa koşulları de�
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. Server Başlangıcı (api/server.py lifespan)               │
 │    - CONFIG['wfo']['enabled'] kontrolü                      │
-│    - Her sembol için WFO task başlat                        │
-│    - asyncio.create_task(start_wfo_background_task(...))    │
+│    - Her sembol için OptimizationConfig oluştur             │
+│    - asyncio.create_task(start_wfo_background_task(config)) │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐

@@ -13,7 +13,8 @@ Usage:
     engine = WFOEngine()
     
     # Walk-Forward optimizasyon çalıştır
-    best_params = await engine.optimize(
+    from core.wfo_engine import OptimizationConfig
+    config = OptimizationConfig(
         symbol='BTC/USDT',
         timeframe='1h',
         strategy_class=TrendMaster,
@@ -21,6 +22,7 @@ Usage:
         out_of_sample_days=7,
         n_trials=50
     )
+    best_params = await engine.optimize(config)
 """
 
 import asyncio
@@ -28,6 +30,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Callable, Type
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 import optuna
@@ -36,6 +39,21 @@ from optuna.samplers import TPESampler
 from core.logger import logger
 from core.auto_grid import auto_grid
 from data.storage.parquet_lake import get_parquet_lake
+
+
+@dataclass
+class OptimizationConfig:
+    """
+    Optimizasyon parametrelerini kapsülleyen veri sınıfı.
+    """
+    symbol: str
+    timeframe: str
+    strategy_class: Type
+    in_sample_days: Optional[int] = None
+    out_of_sample_days: Optional[int] = None
+    n_trials: Optional[int] = None
+    optimization_metric: Optional[str] = None
+    param_grid: Optional[Dict[str, Any]] = None
 
 
 class WFOEngine:
@@ -60,38 +78,25 @@ class WFOEngine:
         logger.info(f"🧠 [WFO] Engine initialized (TPE Sampler, {self.MAX_WORKERS} workers)")
         logger.info("🎉 [WFO] Zero-Touch Bayesian Optimizasyon Motoru Aktif")
     
-    async def optimize(
-        self,
-        symbol: str,
-        timeframe: str,
-        strategy_class: Type,
-        in_sample_days: int = None,
-        out_of_sample_days: int = None,
-        n_trials: int = None,
-        optimization_metric: str = None,
-        param_grid: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    async def optimize(self, config: OptimizationConfig) -> Dict[str, Any]:
         """
         Walk-Forward Bayesian optimizasyon çalıştır.
         
         Args:
-            symbol: Sembol (örn: BTC/USDT)
-            timeframe: Timeframe (örn: 1h)
-            strategy_class: Strateji sınıfı
-            in_sample_days: In-Sample gün sayısı (eğitim)
-            out_of_sample_days: Out-of-Sample gün sayısı (test)
-            n_trials: Optuna deneme sayısı
-            optimization_metric: Optimizasyon metriği ('sharpe' veya 'net_pnl')
-            param_grid: Manuel param grid (None ise auto-grid)
+            config: Optimizasyon konfigürasyonu
         
         Returns:
             En iyi parametreler ve metrikler
         """
         # Varsayılan değerler
-        in_sample_days = in_sample_days or self.DEFAULT_IN_SAMPLE_DAYS
-        out_of_sample_days = out_of_sample_days or self.DEFAULT_OUT_OF_SAMPLE_DAYS
-        n_trials = n_trials or self.DEFAULT_N_TRIALS
-        optimization_metric = optimization_metric or self.DEFAULT_OPTIMIZATION_METRIC
+        symbol = config.symbol
+        timeframe = config.timeframe
+        strategy_class = config.strategy_class
+        in_sample_days = config.in_sample_days or self.DEFAULT_IN_SAMPLE_DAYS
+        out_of_sample_days = config.out_of_sample_days or self.DEFAULT_OUT_OF_SAMPLE_DAYS
+        n_trials = config.n_trials or self.DEFAULT_N_TRIALS
+        optimization_metric = config.optimization_metric or self.DEFAULT_OPTIMIZATION_METRIC
+        param_grid = config.param_grid
         
         logger.info(f"🧠 [WFO] Optimizasyon başlatılıyor: {symbol} {timeframe}")
         logger.info(f"   📅 In-Sample: {in_sample_days} gün, Out-of-Sample: {out_of_sample_days} gün")
@@ -451,50 +456,27 @@ class WFOEngine:
 wfo_engine = WFOEngine()
 
 # Export
-__all__ = ['WFOEngine', 'wfo_engine', 'start_wfo_background_task']
+__all__ = ['WFOEngine', 'wfo_engine', 'start_wfo_background_task', 'OptimizationConfig']
 
 
 async def start_wfo_background_task(
-    symbol: str,
-    timeframe: str,
-    strategy_class: Type,
-    param_grid: Dict[str, Any] = None,
-    optimization_metric: str = 'sharpe',
-    n_trials: int = 50,
-    in_sample_days: int = 30,
-    out_of_sample_days: int = 7,
+    config: OptimizationConfig,
     reoptimize_interval: int = 168  # Saat (1 hafta)
 ):
     """
     WFO arka plan görevi (otomatik yeniden optimizasyon).
 
     Args:
-        symbol: Sembol
-        timeframe: Timeframe
-        strategy_class: Strateji sınıfı
-        param_grid: Manuel param grid (None ise auto-grid)
-        optimization_metric: Optimizasyon metriği
-        n_trials: Optuna deneme sayısı
-        in_sample_days: In-Sample gün sayısı
-        out_of_sample_days: Out-of-Sample gün sayısı
+        config: Optimizasyon konfigürasyonu
         reoptimize_interval: Yeniden optimizasyon aralığı (saat)
     """
-    logger.info(f"🧠 [WFO] Arka plan görevi başlatıldı: {symbol} {timeframe}")
+    logger.info(f"🧠 [WFO] Arka plan görevi başlatıldı: {config.symbol} {config.timeframe}")
     logger.info(f"   📅 Reoptimize interval: {reoptimize_interval} saat")
 
     while True:
         try:
             # Optimizasyon çalıştır
-            result = await wfo_engine.optimize(
-                symbol=symbol,
-                timeframe=timeframe,
-                strategy_class=strategy_class,
-                in_sample_days=in_sample_days,
-                out_of_sample_days=out_of_sample_days,
-                n_trials=n_trials,
-                optimization_metric=optimization_metric,
-                param_grid=param_grid
-            )
+            result = await wfo_engine.optimize(config)
 
             if not result:
                 logger.warning(f"⚠️ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
@@ -507,7 +489,7 @@ async def start_wfo_background_task(
 
                 # Strateji instance bul ve güncelle
                 from strategy.manager import StrategyManager
-                strategy = StrategyManager.get_strategy_by_symbol(symbol)
+                strategy = StrategyManager.get_strategy_by_symbol(config.symbol)
                 if strategy and hasattr(strategy, 'update_params'):
                     strategy.update_params(result['best_params'])
                     logger.info(f"📝 [WFO] Strateji parametreleri canlı bota uygulandı")
@@ -517,7 +499,7 @@ async def start_wfo_background_task(
             await asyncio.sleep(reoptimize_interval * 3600)
 
         except asyncio.CancelledError:
-            logger.info(f"🛑 [WFO] Arka plan görevi durduruldu: {symbol}")
+            logger.info(f"🛑 [WFO] Arka plan görevi durduruldu: {config.symbol}")
             break
         except Exception as e:
             logger.error(f"❌ [WFO] Arka plan hatası: {e}")
@@ -527,6 +509,10 @@ async def start_wfo_background_task(
 
 # Singleton instance
 _wfo_engine_instance: Optional['WFOEngine'] = None
+
+
+# Kolay import için
+__all__ = ['WFOEngine', 'get_wfo_engine', 'start_wfo_background_task', 'OptimizationConfig']
 
 
 def get_wfo_engine() -> Optional['WFOEngine']:

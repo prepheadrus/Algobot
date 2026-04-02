@@ -97,6 +97,7 @@ POST /api/v1/config/advanced
 | **%30 Esnetme (Flex Ratio)** | ✅ AKTİF | `auto_grid.py` | `FLEX_RATIO = 0.30` |
 | **3 Noktalı Arama Uzayı** | ✅ AKTİF | `auto_grid.py` | `[low, mid, high]` |
 | **Manuel Grid Kaldırıldı** | ✅ KALDIRILDI | `wfo_engine.py` | `param_grid=None` → auto-grid |
+| **OptimizationConfig** | ✅ EKLENDİ | `core/wfo_engine.py` | Parametreler veri sınıfında toplandı |
 
 **Kod Durumu:**
 ```python
