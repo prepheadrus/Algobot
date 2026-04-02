@@ -90,19 +90,18 @@ async def start_background_tasks():
         logger.info("🧠 [WFO] Walk-Forward Optimization aktif")
 
         try:
-            from core.wfo_engine import start_wfo_background_task
+            from core.wfo_engine import start_wfo_background_task, OptimizationConfig
 
             strategy = StrategyManager.get_strategy('trend_master')
             if strategy:
                 for symbol in symbols:
-                    asyncio.create_task(
-                        start_wfo_background_task(
-                            symbol=symbol,
-                            timeframe='1h',
-                            strategy_class=strategy,
-                            n_trials=50
-                        )
+                    config = OptimizationConfig(
+                        symbol=symbol,
+                        timeframe='1h',
+                        strategy_class=strategy,
+                        n_trials=50
                     )
+                    asyncio.create_task(start_wfo_background_task(config))
                     logger.info(f"🧠 [WFO] {symbol} için optimizasyon task'ı başlatıldı")
         except Exception as e:
             logger.warning(f"⚠️ WFO başlatma hatası: {e}")

@@ -137,18 +137,19 @@ best_score = study.best_value
 ### 3. Arka Plan Görevi
 
 ```python
-from core.wfo_engine import start_wfo_background_task
+from core.wfo_engine import start_wfo_background_task, OptimizationConfig
 
-# param_grid=None → Auto-Grid + Bayesian Optimization
-asyncio.create_task(start_wfo_background_task(
+# config oluştur (param_grid=None → Auto-Grid + Bayesian Optimization)
+config = OptimizationConfig(
     symbol="BTCUSDT",
     timeframe="15m",
     strategy_class=TrendMasterPro,
     param_grid=None,  # None → Auto-Grid + Bayesian
-    data_fetcher=fetch_data,
     optimization_metric="sharpe",
     n_trials=50  # Maksimum deneme sayısı
-))
+)
+
+asyncio.create_task(start_wfo_background_task(config))
 ```
 
 ---

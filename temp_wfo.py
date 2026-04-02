@@ -13,7 +13,8 @@ Usage:
     engine = WFOEngine()
 
     # Walk-Forward optimizasyon çalıştır
-    best_params = await engine.optimize(
+    from core.wfo_engine import OptimizationConfig
+    config = OptimizationConfig(
         symbol='BTC/USDT',
         timeframe='1h',
         strategy_class=TrendMaster,
@@ -21,6 +22,7 @@ Usage:
         out_of_sample_days=7,
         n_trials=50
     )
+    best_params = await engine.optimize(config)
 """
 
 import asyncio
@@ -36,6 +38,20 @@ from optuna.samplers import TPESampler
 from core.logger import logger
 from core.auto_grid import auto_grid
 from data.storage.parquet_lake import get_parquet_lake
+
+
+from dataclasses import dataclass
+
+@dataclass
+class OptimizationConfig:
+    symbol: str
+    timeframe: str
+    strategy_class: Type
+    in_sample_days: Optional[int] = None
+    out_of_sample_days: Optional[int] = None
+    n_trials: Optional[int] = None
+    optimization_metric: Optional[str] = None
+    param_grid: Optional[Dict[str, Any]] = None
 
 
 class WFOEngine:
@@ -60,38 +76,25 @@ class WFOEngine:
         logger.info(f"🧠 [WFO] Engine initialized (TPE Sampler, {self.MAX_WORKERS} workers)")
         logger.info("🎉 [WFO] Zero-Touch Bayesian Optimizasyon Motoru Aktif")
 
-    async def optimize(
-        self,
-        symbol: str,
-        timeframe: str,
-        strategy_class: Type,
-        in_sample_days: int = None,
-        out_of_sample_days: int = None,
-        n_trials: int = None,
-        optimization_metric: str = None,
-        param_grid: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    async def optimize(self, config: OptimizationConfig) -> Dict[str, Any]:
         """
         Walk-Forward Bayesian optimizasyon çalıştır.
 
         Args:
-            symbol: Sembol (örn: BTC/USDT)
-            timeframe: Timeframe (örn: 1h)
-            strategy_class: Strateji sınıfı
-            in_sample_days: In-Sample gün sayısı (eğitim)
-            out_of_sample_days: Out-of-Sample gün sayısı (test)
-            n_trials: Optuna deneme sayısı
-            optimization_metric: Optimizasyon metriği ('sharpe' veya 'net_pnl')
-            param_grid: Manuel param grid (None ise auto-grid)
+            config: Optimizasyon konfigürasyonu
 
         Returns:
             En iyi parametreler ve metrikler
         """
         # Varsayılan değerler
-        in_sample_days = in_sample_days or self.DEFAULT_IN_SAMPLE_DAYS
-        out_of_sample_days = out_of_sample_days or self.DEFAULT_OUT_OF_SAMPLE_DAYS
-        n_trials = n_trials or self.DEFAULT_N_TRIALS
-        optimization_metric = optimization_metric or self.DEFAULT_OPTIMIZATION_METRIC
+        symbol = config.symbol
+        timeframe = config.timeframe
+        strategy_class = config.strategy_class
+        in_sample_days = config.in_sample_days or self.DEFAULT_IN_SAMPLE_DAYS
+        out_of_sample_days = config.out_of_sample_days or self.DEFAULT_OUT_OF_SAMPLE_DAYS
+        n_trials = config.n_trials or self.DEFAULT_N_TRIALS
+        optimization_metric = config.optimization_metric or self.DEFAULT_OPTIMIZATION_METRIC
+        param_grid = config.param_grid
 
         logger.info(f"🧠 [WFO] Optimizasyon başlatılıyor: {symbol} {timeframe}")
         logger.info(f"   📅 In-Sample: {in_sample_days} gün, Out-of-Sample: {out_of_sample_days} gün")

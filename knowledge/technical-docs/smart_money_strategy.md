@@ -117,18 +117,21 @@ stop_params = strategy.get_stop_params()
 ### 2. WFO ile Optimizasyon
 
 ```python
-from core.wfo_engine import start_wfo_background_task
+from core.wfo_engine import start_wfo_background_task, OptimizationConfig
 from strategy.custom.smart_money import SmartMoneyStrategy
 
-# Arka plan optimizasyonu başlat
-asyncio.create_task(start_wfo_background_task(
+# config oluştur (param_grid=None → Auto-Grid otomatik oluşturur)
+config = OptimizationConfig(
     symbol="BTCUSDT",
     timeframe="1m",
     strategy_class=SmartMoneyStrategy,
     param_grid=None,  # Auto-Grid otomatik oluşturur
     optimization_metric="sharpe",
     n_trials=50
-))
+)
+
+# Arka plan optimizasyonu başlat
+asyncio.create_task(start_wfo_background_task(config))
 ```
 
 ### 3. Canlı Parametre Güncelleme

@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
     if CONFIG.get('wfo', {}).get('enabled', False):
         logger.info("🧠 [WFO] Otonom optimizasyon sistemi başlatılıyor...")
         try:
-            from core.wfo_engine import start_wfo_background_task
+            from core.wfo_engine import start_wfo_background_task, OptimizationConfig
             from strategy.manager import StrategyManager
 
             wfo_tasks = []
@@ -114,16 +114,15 @@ async def lifespan(app: FastAPI):
                     strategy_instance = StrategyManager.get_strategy(strategy_id)
                     if strategy_instance:
                         timeframe = paper_engine.active_timeframes.get(symbol, '1m')
-                        wfo_task = asyncio.create_task(
-                            start_wfo_background_task(
-                                symbol=symbol,
-                                timeframe=timeframe,
-                                strategy_class=strategy_instance.__class__,
-                                param_grid=None,
-                                optimization_metric=CONFIG['wfo'].get('optimization_metric', 'sharpe'),
-                                n_trials=50
-                            )
+                        config = OptimizationConfig(
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            strategy_class=strategy_instance.__class__,
+                            param_grid=None,
+                            optimization_metric=CONFIG['wfo'].get('optimization_metric', 'sharpe'),
+                            n_trials=50
                         )
+                        wfo_task = asyncio.create_task(start_wfo_background_task(config))
                         wfo_tasks.append(wfo_task)
 
             if wfo_tasks:
