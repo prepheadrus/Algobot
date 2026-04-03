@@ -11,6 +11,9 @@ from core.trading.entities.position import Position, PositionDirection
     (PositionDirection.SHORT, 100.0, 105.0, True),  # SL kırılmış
     (PositionDirection.LONG, None, 90.0, False),    # SL belirlenmemiş
     (PositionDirection.SHORT, None, 110.0, False),  # SL belirlenmemiş
+    (PositionDirection.LONG, 100.0, 0.0, False),    # Fiyat sıfır (Geçersiz)
+    (PositionDirection.SHORT, 100.0, -50.0, False), # Fiyat negatif (Geçersiz)
+    (PositionDirection.LONG, 100.0, None, False),   # Fiyat None (Geçersiz)
 ])
 def test_is_stop_loss_hit(direction, stop_loss, current_price, expected):
     """

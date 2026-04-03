@@ -176,6 +176,9 @@ class Position:
         LONG: current_price <= stop_loss
         SHORT: current_price >= stop_loss
         """
+        if current_price is None or current_price <= 0.0:
+            return False
+
         if self.stop_loss is None:
             return False
         
