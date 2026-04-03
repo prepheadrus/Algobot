@@ -3,6 +3,7 @@ import sys
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta, timezone
 
+
 from core.trading.entities.trade import Trade
 from core.trading.entities.position import PositionDirection
 
@@ -39,3 +40,29 @@ def test_trade_duration_categories(minutes_delta, expected_day, expected_swing):
 
     assert trade.is_day_trade == expected_day
     assert trade.is_swing_trade == expected_swing
+
+def test_trade_return_on_margin_zero():
+    """Test return_on_margin when margin is zero to ensure division by zero is handled."""
+    entry = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    trade = Trade(
+        id="test_trade_rom",
+        bot_id="test_bot",
+        symbol="BTC/USDT",
+        direction=PositionDirection.LONG,
+        entry_price=50000.0,
+        exit_price=51000.0,
+        size=1.0,
+        leverage=2.0,
+        pnl=1000.0,
+        pnl_percent=2.0,
+        opened_at=entry,
+        closed_at=entry + timedelta(minutes=60)
+    )
+
+    # Bypass frozen=True to force margin to 0
+    # margin = (entry_price * size) / leverage
+    object.__setattr__(trade, 'size', 0.0)
+
+    # return_on_margin is a @property, so it evaluates without ()
+    # we just assert it returns 0.0 safely
+    assert pytest.approx(trade.return_on_margin, abs=1e-9) == 0.0
