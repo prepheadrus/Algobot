@@ -60,11 +60,14 @@ def normalize_symbol(symbol: str) -> str:
         symbol = symbol.replace('_', '/').replace('-', '/')
 
     # Adım 2.5: PERP suffix kontrolü (BTC/USDT/PERP → BTC/USDT:USDT)
-    if '/PERP' in symbol.upper():
-        symbol = symbol.upper().replace('/PERP', '')
+    if '/PERP' in symbol.upper() or ':PERP' in symbol.upper():
+        symbol = symbol.upper().replace('/PERP', '').replace(':PERP', '')
         if '/' in symbol:
             quote = symbol.split('/')[-1]
-            symbol = f"{symbol}:{quote}"
+            # ":" already exists? No, we stripped it, wait. Let's safely split
+            if ':' in quote:
+                quote = quote.split(':')[0]
+            symbol = f"{symbol.split(':')[0]}:{quote}"
         else:
             symbol = f"{symbol}/USDT:USDT"
 
