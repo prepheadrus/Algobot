@@ -614,55 +614,36 @@ class PaperTrader:
     # DELEGATION METHODS (Legacy API Uyumluluğu)
     # ========================================================================
 
-    def start_bot(
-        self,
-        symbol: str,
-        strategy_id: str,
-        timeframe: str = "1m",
-        market_type: str = "swap",
-        margin_type: str = "isolated",
-    ) -> str:  # noqa: PLR0913
+    def start_bot(self, config: BotConfig) -> str:
         """
         Bot başlat (legacy API -> BotManager'a delegate).
 
         Args:
-            symbol: Sembol
-            strategy_id: Strateji ID
-            timeframe: Timeframe
-            market_type: Market type
+            config: Bot yapılandırması (BotConfig objesi)
 
         Returns:
             Bot ID
         """
-        # Bot config oluştur
-        config = BotConfig(
-            symbol=symbol,
-            strategy_id=strategy_id,
-            timeframe=timeframe,
-            market_type=MarketType(market_type.lower()),
-            margin_type=MarginType(margin_type.lower()),
-        )
-
         # Bot başlat
         bot_id = self.bot_manager.start_bot(config)
 
         # Legacy tracking
         self.active_bots[bot_id] = {
-            "symbol": symbol,
-            "strategy_id": strategy_id,
-            "timeframe": timeframe,
-            "market_type": market_type,
-            "margin_type": margin_type,
+            "symbol": config.symbol,
+            "strategy_id": config.strategy_id,
+            "timeframe": config.timeframe,
+            "market_type": config.market_type.value,
+            "margin_type": config.margin_type.value,
             "status": "running",
         }
-        self.active_strategies[symbol] = strategy_id
-        self.active_timeframes[symbol] = timeframe
-        self.market_types[symbol] = market_type
-        self.margin_types[symbol] = margin_type
+        self.active_strategies[config.symbol] = config.strategy_id
+        self.active_timeframes[config.symbol] = config.timeframe
+        self.market_types[config.symbol] = config.market_type.value
+        self.margin_types[config.symbol] = config.margin_type.value
 
         # Strateji instance al
-        strategy = StrategyManager.get_strategy(strategy_id)
-        self.strategies[symbol] = strategy
+        strategy = StrategyManager.get_strategy(config.strategy_id)
+        self.strategies[config.symbol] = strategy
 
         logger.info(f"🚀 Bot başlatıldı: {bot_id}")
         return bot_id
