@@ -84,6 +84,7 @@ class BacktestResponse(BaseModel):
     """Backtest yanıtı"""
     status: str = Field(..., description="Durum (success/error)")
     message: str = Field(..., description="Mesaj")
+    backtest_id: Optional[str] = Field(default=None, description="Backtest ID (önbellek için)")
     metrics: BacktestMetrics = Field(..., description="Backtest metrikleri")
     equity_curve: List[EquityPoint] = Field(..., description="Equity eğrisi")
     recent_trades: List[TradeSummary] = Field(..., description="Son 10 işlem")
@@ -366,7 +367,7 @@ async def run_backtest(request: BacktestRequest):
         
         logger.info(f"✅ Backtest tamamlandı: {result.total_trades} işlem, Win Rate: {result.win_rate:.2f}%")
         
-        return BacktestResponse(
+        response = BacktestResponse(
             status="success",
             message=f"Backtest başarılı: {request.symbol} ({request.timeframe}, {request.days} gün)",
             metrics=metrics,
@@ -374,6 +375,21 @@ async def run_backtest(request: BacktestRequest):
             recent_trades=recent_trades,
             total_days=request.days
         )
+
+        from api.services.backtest_service import BacktestService
+        import uuid
+
+        # 1. Generate ID first
+        backtest_id = str(uuid.uuid4())
+
+        # 2. Assign to response so it's included in the final dump
+        response.backtest_id = backtest_id
+
+        # 3. Cache the full dumped representation
+        backtest_service = BacktestService()
+        backtest_service.save_result(response.model_dump(), backtest_id=backtest_id)
+
+        return response
         
     except HTTPException:
         raise
@@ -396,11 +412,18 @@ async def get_backtest_results(backtest_id: str):
     Returns:
         Dict: Backtest sonuçları
     """
-    # TODO: Cache implementasyonu
-    return {
-        "status": "error",
-        "message": "Not implemented yet"
-    }
+    from api.services.backtest_service import BacktestService
+
+    backtest_service = BacktestService()
+    result = backtest_service.get_result(backtest_id)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backtest sonucu bulunamadı veya süresi dolmuş: {backtest_id}"
+        )
+
+    return result
 
 
 @router.post("/optimize")
