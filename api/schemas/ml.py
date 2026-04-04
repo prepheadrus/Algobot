@@ -5,13 +5,14 @@ Pydantic models for ML-related requests and responses.
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, List, Optional
 
 
 # ============================================================================
 # REQUEST SCHEMAS
 # ============================================================================
+
+from pydantic import ConfigDict
 
 class MLTrainRequest(BaseModel):
     """
@@ -25,15 +26,9 @@ class MLTrainRequest(BaseModel):
         tp: Take profit multiplier (varsayılan: 2.0)
         sl: Stop loss multiplier (varsayılan: 2.0)
     """
-    symbol: str = Field(..., description="Sembol (örn: BTC/USDT)")
-    timeframe: str = Field(default="1h", description="Zaman dilimi")
-    limit: int = Field(default=5000, description="Mum sayısı (DB'deki veriye göre otomatik ayarlanır)", ge=100)
-    model_type: str = Field(default="xgboost", description="Model tipi")
-    tp: float = Field(default=2.0, description="Take profit multiplier", ge=1.0, le=5.0)
-    sl: float = Field(default=2.0, description="Stop loss multiplier", ge=1.0, le=5.0)
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
             "example": {
                 "symbol": "BTC/USDT",
                 "timeframe": "1h",
@@ -43,6 +38,14 @@ class MLTrainRequest(BaseModel):
                 "sl": 2.0
             }
         }
+    )
+
+    symbol: str = Field(..., description="Sembol (örn: BTC/USDT)")
+    timeframe: str = Field(default="1h", description="Zaman dilimi")
+    limit: int = Field(default=5000, description="Mum sayısı (DB'deki veriye göre otomatik ayarlanır)", ge=100)
+    model_type: str = Field(default="xgboost", description="Model tipi")
+    tp: float = Field(default=2.0, description="Take profit multiplier", ge=1.0, le=5.0)
+    sl: float = Field(default=2.0, description="Stop loss multiplier", ge=1.0, le=5.0)
 
 
 class MLStatusRequest(BaseModel):
@@ -90,6 +93,8 @@ class MLStatusResponse(BaseModel):
 
 class MLTrainingHistoryItem(BaseModel):
     """ML eğitim geçmişi öğesi"""
+    model_config = ConfigDict(protected_namespaces=())
+
     training_id: str
     symbol: str
     timeframe: str
@@ -111,6 +116,8 @@ class MLTrainingHistoryResponse(BaseModel):
 
 class MLCheckModelResponse(BaseModel):
     """ML model kontrol yanıtı"""
+    model_config = ConfigDict(protected_namespaces=())
+
     status: str
     model_exists: bool
     model_path: Optional[str] = None
@@ -119,6 +126,8 @@ class MLCheckModelResponse(BaseModel):
 
 class MLTrainResponse(BaseModel):
     """ML eğitim başlatma yanıtı"""
+    model_config = ConfigDict(protected_namespaces=())
+
     status: str
     message: str
     model_path: Optional[str] = None
