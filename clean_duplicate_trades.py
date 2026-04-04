@@ -34,24 +34,23 @@ def find_and_remove_duplicates():
     
     print(f"⚠️ {len(duplicates)} duplicate ID bulundu!")
     
-    # Her duplicate için bir kayıt hariç sil
-    total_deleted = 0
-    for trade_id, count in duplicates:
-        # Bir kayıt hariç hepsini sil
-        cursor.execute("""
-            DELETE FROM trades
-            WHERE id = ?
-            AND rowid NOT IN (
-                SELECT MIN(rowid)
-                FROM trades
-                WHERE id = ?
-            )
-        """, (trade_id, trade_id))
-        
-        deleted = cursor.rowcount
-        total_deleted += deleted
-        print(f"  🗑️ {trade_id}: {deleted} kayıt silindi")
+    # Tüm duplicate'ler için toplu silme işlemi (Bulk Delete)
+    cursor.execute("""
+        DELETE FROM trades
+        WHERE id IN (
+            SELECT id
+            FROM trades
+            GROUP BY id
+            HAVING COUNT(*) > 1
+        )
+        AND rowid NOT IN (
+            SELECT MIN(rowid)
+            FROM trades
+            GROUP BY id
+        )
+    """)
     
+    total_deleted = cursor.rowcount
     conn.commit()
     
     print(f"\n✅ Toplam {total_deleted} duplicate kayıt silindi!")
