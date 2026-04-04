@@ -38,7 +38,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from enum import Enum
-import asyncio
 
 from core.logger import logger
 
@@ -65,6 +64,9 @@ class MarginType(str, Enum):
 
     ISOLATED = "isolated"
     CROSS = "cross"
+
+
+_RESUMABLE_STATUSES = frozenset([BotStatus.PAUSED, BotStatus.STOPPED])
 
 
 @dataclass
@@ -295,7 +297,7 @@ class BotManager:
         bot = self.bots[bot_id]
 
         # Sadece paused veya stopped botlar devam edebilir
-        if bot.state.status not in [BotStatus.PAUSED, BotStatus.STOPPED]:
+        if bot.state.status not in _RESUMABLE_STATUSES:
             logger.warning(
                 f"Bot devam edemez: {bot_id} (status={bot.state.status.value})"
             )
