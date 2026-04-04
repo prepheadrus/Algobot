@@ -271,6 +271,7 @@ class ExchangeManager:
         except Exception as e:
             logger.error(f"❌ [EDA] _on_bot_stopped hatası: {e}")
 
+    @exchange_breaker
     async def get_order_book_imbalance(
         self, symbol: str, depth: int = 20
     ) -> Optional[float]:
@@ -450,6 +451,7 @@ class ExchangeManager:
                 logger.error(f"OHLCV Çekme Hatası ({symbol}): {e}")
                 return []
 
+    @exchange_breaker
     async def fetch_available_markets(self):
         """Borsadaki tüm aktif işlem çiftlerini (Spot ve Vadeli) çeker."""
         try:
@@ -543,8 +545,18 @@ class ExchangeManager:
         while True:
             try:
                 # Gerçek zamanlı itme (push) teknolojisi ile anlık veriyi çek
-                ticker = await self.exchange.watch_ticker(symbol)
-                current_price = ticker["last"]
+                try:
+                    ticker = await exchange_breaker._call_async(
+                        self.exchange.watch_ticker, symbol
+                    )
+                    current_price = ticker["last"]
+                except CircuitBreakerError:
+                    # Circuit breaker is open. Wait a bit and try again.
+                    logger.warning(
+                        f"⚠️ [WSS] {symbol} watch_ticker circuit breaker open. Waiting..."
+                    )
+                    await asyncio.sleep(5)
+                    continue
 
                 # ========================================================================
                 # CPU DARBOĞAZ KORUMASI (Throttle)
@@ -708,9 +720,7 @@ class ExchangeManager:
             logger.info(
                 f"🔄 [DATA] {symbol} için {timeframe} talep edildi, ancak SADECE 1m indiriliyor..."
             )
-            logger.info(
-                "📊 [DATA] Resampling Mimarisi: Veritabanı %98 Optimize Edildi"
-            )
+            logger.info("📊 [DATA] Resampling Mimarisi: Veritabanı %98 Optimize Edildi")
             logger.info(
                 f"💡 [DATA] {timeframe} mumlar, 1m verisinden otomatik oluşturulacak (RAM üzerinde)"
             )
@@ -961,7 +971,7 @@ class ExchangeManager:
                 existing_mum_count = 0
 
                 for candle in ohlcv:
-                    candle_ts = candle[0]
+                    candle[0]
 
                     # DB'de bu mum var mı kontrol et (hızlı skip)
                     # Not: save_kline içinde INSERT OR IGNORE var, ama önce kontrol edelim
@@ -1352,7 +1362,6 @@ class ExchangeManager:
 
             # 🧠 ML CONFIDENCE SCORE
             ml_confidence = None
-            ml_prediction = "HOLD"
 
             try:
                 from ml.inference import get_ml_prediction
@@ -1360,7 +1369,7 @@ class ExchangeManager:
                 ml_result = get_ml_prediction(symbol, timeframe, indicators_payload)
                 if ml_result:
                     ml_confidence = ml_result.get("confidence", 0)
-                    ml_prediction = ml_result.get("prediction", "HOLD")
+                    ml_result.get("prediction", "HOLD")
                     if "ml_confidence" in signal_dict_for_logging:
                         signal_dict_for_logging["ml_confidence"] = ml_confidence
             except Exception as ml_err:
@@ -1417,7 +1426,6 @@ class ExchangeManager:
         logger.info(
             f"🚀 [FINAL HYBRID] {symbol} için strateji poller başlatılıyor ({timeframe})..."
         )
-
 
         logger.info(f"📊 [POLLER DEBUG] paper_engine={paper_engine is not None}")
         logger.info(
@@ -1914,9 +1922,16 @@ class ExchangeManager:
             try:
                 # WebSocket üzerinden OHLCV dinle (PUSH - POLLING YOK!)
                 logger.debug("📡 [WSS] watch_ohlcv çağrılıyor...")
-                live_ohlcv = await self.exchange.watch_ohlcv(
-                    symbol, timeframe="1m", limit=100
-                )
+                try:
+                    live_ohlcv = await exchange_breaker._call_async(
+                        self.exchange.watch_ohlcv, symbol, timeframe="1m", limit=100
+                    )
+                except CircuitBreakerError:
+                    logger.warning(
+                        f"⚠️ [WSS] {symbol} watch_ohlcv circuit breaker open. Waiting..."
+                    )
+                    await asyncio.sleep(5)
+                    continue
                 logger.debug(
                     f"✅ [WSS] watch_ohlcv döndü: {len(live_ohlcv) if live_ohlcv else 0} mum"
                 )
@@ -2055,7 +2070,7 @@ class ExchangeManager:
                         f"📊 [ALL CANDLES] {symbol} için toplam {len(ohlcv_df)} mum RAM'de"
                     )
 
-                last_candle_time = ohlcv_df.index[-1]
+                ohlcv_df.index[-1]
                 df_1m = ohlcv_df
 
                 # 4. HEDEF VADEYE DÖNÜŞTÜR (Resampling Engine) - REFACTORED (Async)
@@ -2188,9 +2203,7 @@ class ExchangeManager:
                                 results = await asyncio.gather(
                                     *bot_tasks, return_exceptions=True
                                 )
-                                logger.info(
-                                    "   ✅ [BOT GATHER] Tüm tasklar tamamlandı"
-                                )
+                                logger.info("   ✅ [BOT GATHER] Tüm tasklar tamamlandı")
 
                                 for bot_id, result in zip(active_bot_ids, results):
                                     if isinstance(result, Exception):

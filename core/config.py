@@ -1,73 +1,89 @@
-import os
 import yaml
-from dotenv import load_dotenv
 from pathlib import Path
-
-# Çevresel değişkenleri yükle (.env)
-BASE_DIR = Path(__file__).resolve().parent.parent
-env_path = BASE_DIR / '.env'
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path, override=True)
+from typing import List
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # yaml konfigürasyon dosyasını yükle
-config_path = BASE_DIR / 'config.yaml'
+BASE_DIR = Path(__file__).resolve().parent.parent
+config_path = BASE_DIR / "config.yaml"
+
 
 def load_config():
     if not config_path.exists():
         raise FileNotFoundError(f"Konfigürasyon dosyası bulunamadı: {config_path}")
 
-    with open(config_path, 'r', encoding='utf-8') as file:
+    with open(config_path, "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
+
 
 CONFIG = load_config()
 
-# ============================================================================
-# API KEY YÖNETİMİ (Şifrelenmiş)
-# ============================================================================
 
-def load_api_keys():
+class Settings(BaseSettings):
     """
-    API anahtarlarını şifrelenmiş .env dosyasından yükle ve çöz.
-    Eğer şifrelenmiş veri yoksa, düz metin ortam değişkenlerini kullan.
+    Uygulama ayarlarını (.env) Pydantic BaseSettings ile yönetir.
+    Otomatik validasyon ve tip dönüşümü sağlar.
     """
-    try:
-        from core.security import key_manager
-        
-        # Şifrelenmiş anahtarları yükle ve çöz
-        api_key, api_secret = key_manager.load_api_keys()
-        
-        if api_key and api_secret:
-            return api_key, api_secret
-        
-        # Şifrelenmiş veri yoksa, ortam değişkenlerinden al (düz metin)
-        return (
-            os.getenv("BINANCE_API_KEY", ""),
-            os.getenv("BINANCE_API_SECRET", "")
-        )
-    except Exception as e:
-        # Hata durumunda ortam değişkenlerine fallback
-        logger = None
-        try:
-            from core.logger import logger
-            logger.error(f"API key yükleme hatası: {e}, ortam değişkenlerine fallback")
-        except:
-            pass
-        
-        return (
-            os.getenv("BINANCE_API_KEY", ""),
-            os.getenv("BINANCE_API_SECRET", "")
-        )
 
-# API Anahtarları (Şifrelenmiş veya Düz Metin)
-BINANCE_API_KEY, BINANCE_API_SECRET = load_api_keys()
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
-# Çevresel Değişkenler Sabitleri
-TIMESCALE_DB_URL = os.getenv("TIMESCALE_DB_URL", "")
-REDIS_URL = os.getenv("REDIS_URL", "")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-API_HOST = os.getenv("API_HOST", "127.0.0.1")
-API_PORT = int(os.getenv("API_PORT", 3000))
+    # API Keys
+    BINANCE_API_KEY: str = Field(default="")
+    BINANCE_API_SECRET: str = Field(default="")
 
-# CORS ve Güvenlik
-_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-ALLOWED_ORIGINS = [origin.strip() for origin in _origins_str.split(",")]
+    # Database
+    TIMESCALE_DB_URL: str = Field(default="")
+    REDIS_URL: str = Field(default="")
+
+    # Application
+    ENVIRONMENT: str = Field(default="development")
+    API_HOST: str = Field(default="127.0.0.1")
+    API_PORT: int = Field(default=3000)
+
+    # CORS
+    ALLOWED_ORIGINS: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
+
+    @field_validator("BINANCE_API_KEY", "BINANCE_API_SECRET", mode="after")
+    @classmethod
+    def decrypt_api_keys(cls, v: str) -> str:
+        """
+        Eğer değer şifrelenmişse (gAAAAAB... gibi başlıyorsa) security modülü ile çözer.
+        Şifrelenmemişse (düz metin) olduğu gibi döndürür.
+        """
+        if v and v.startswith("gAAAAAB"):
+            try:
+                from core.security import key_manager
+
+                return key_manager.decrypt(v)
+            except Exception as e:
+                # Loglama için logger import edilebilir
+                try:
+                    from core.logger import logger
+
+                    logger.error(f"API anahtarı çözme hatası: {e}")
+                except ImportError:
+                    pass
+                return ""
+        return v
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """CORS listesini döndürür"""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+
+
+# Singleton instance
+settings = Settings()
+
+# Geriye dönük uyumluluk (Backward Compatibility)
+BINANCE_API_KEY = settings.BINANCE_API_KEY
+BINANCE_API_SECRET = settings.BINANCE_API_SECRET
+TIMESCALE_DB_URL = settings.TIMESCALE_DB_URL
+REDIS_URL = settings.REDIS_URL
+ENVIRONMENT = settings.ENVIRONMENT
+API_HOST = settings.API_HOST
+API_PORT = settings.API_PORT
+ALLOWED_ORIGINS = settings.allowed_origins_list
