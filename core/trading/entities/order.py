@@ -79,6 +79,14 @@ class OrderStatus(str, Enum):
     EXPIRED = "expired"  # Süresi doldu
 
 
+# Performance Optimization: Immutable sets for O(1) membership lookups
+_PRICE_REQUIRED_TYPES = frozenset({OrderType.LIMIT, OrderType.STOP_LIMIT})
+_STOP_PRICE_REQUIRED_TYPES = frozenset({OrderType.STOP_LOSS, OrderType.STOP_LIMIT})
+_ACTIVE_STATUSES = frozenset({OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED})
+_TERMINAL_STATUSES = frozenset({OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED})
+_STOP_TYPES = frozenset({OrderType.STOP_LOSS, OrderType.TAKE_PROFIT})
+
+
 @dataclass(frozen=True)
 class Order:
     """
@@ -161,12 +169,12 @@ class Order:
             object.__setattr__(self, 'updated_at', self.created_at)
         
         # Price validation for limit orders
-        if self.type in [OrderType.LIMIT, OrderType.STOP_LIMIT]:
+        if self.type in _PRICE_REQUIRED_TYPES:
             if self.price is None:
                 raise ValueError(f"{self.type.value} order için price gerekli")
         
         # Stop price validation for stop orders
-        if self.type in [OrderType.STOP_LOSS, OrderType.STOP_LIMIT]:
+        if self.type in _STOP_PRICE_REQUIRED_TYPES:
             if self.stop_price is None:
                 raise ValueError(f"{self.type.value} order için stop_price gerekli")
     
@@ -398,11 +406,7 @@ class Order:
         Returns:
             True ise aktif
         """
-        return self.status in [
-            OrderStatus.PENDING,
-            OrderStatus.OPEN,
-            OrderStatus.PARTIALLY_FILLED
-        ]
+        return self.status in _ACTIVE_STATUSES
     
     @property
     def is_terminal(self) -> bool:
@@ -412,12 +416,7 @@ class Order:
         Returns:
             True ise terminal
         """
-        return self.status in [
-            OrderStatus.FILLED,
-            OrderStatus.CANCELLED,
-            OrderStatus.REJECTED,
-            OrderStatus.EXPIRED
-        ]
+        return self.status in _TERMINAL_STATUSES
     
     @property
     def fill_rate(self) -> float:
@@ -464,7 +463,7 @@ class Order:
     @property
     def is_stop(self) -> bool:
         """Stop emri mi? (stop-loss veya take-profit)"""
-        return self.type in [OrderType.STOP_LOSS, OrderType.TAKE_PROFIT]
+        return self.type in _STOP_TYPES
     
     # ========================================================================
     # SERIALIZATION
