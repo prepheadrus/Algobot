@@ -2,9 +2,9 @@ import asyncio
 import pandas as pd
 from typing import Tuple
 from data.indicators import StrategyIndicators
+from data.indicators.trend import TrendIndicators
 from data.features import AdvancedFeatures
 from core.detector import MarketRegimeDetector
-import numpy as np
 
 # Bellek Optimizasyonu (Downcasting)
 try:
@@ -57,36 +57,35 @@ class SignalGeneratorService:
             htf_trends = {}
             for htf_tf in htf_levels:
                 df_htf = StrategyIndicators.resample_data(df_1m, htf_tf)
-                df_htf = StrategyIndicators.add_all_indicators(df_htf)
                 trend = "NEUTRAL"
                 if not df_htf.empty:
-                    htf_last = df_htf.iloc[-1]
+                    # Optimize: Sadece gereken EMA'ları hesapla, add_all_indicators'u ÇAĞIRMA
                     if trend_method == "ema_stack":
+                        df_htf[f"EMA_{ema_fast}"] = TrendIndicators.ema(df_htf['close'], ema_fast)
+                        df_htf[f"EMA_{ema_slow}"] = TrendIndicators.ema(df_htf['close'], ema_slow)
+
+                        htf_last = df_htf.iloc[-1]
                         ema_f = htf_last.get(f"EMA_{ema_fast}")
                         ema_s = htf_last.get(f"EMA_{ema_slow}")
-                        if (
-                            ema_f is not None
-                            and ema_s is not None
-                            and not np.isnan(ema_f)
-                            and not np.isnan(ema_s)
-                        ):
+
+                        if pd.notna(ema_f) and pd.notna(ema_s):
                             if ema_f > ema_s:
                                 trend = "BULL"
                             elif ema_f < ema_s:
                                 trend = "BEAR"
                     else:
+                        df_htf[f"EMA_{ema_slow}"] = TrendIndicators.ema(df_htf['close'], ema_slow)
+
+                        htf_last = df_htf.iloc[-1]
                         val_c = htf_last.get("close")
                         val_e = htf_last.get(f"EMA_{ema_slow}")
-                        if (
-                            val_c is not None
-                            and val_e is not None
-                            and not np.isnan(val_c)
-                            and not np.isnan(val_e)
-                        ):
+
+                        if pd.notna(val_c) and pd.notna(val_e):
                             if val_c > val_e:
                                 trend = "BULL"
                             elif val_c < val_e:
                                 trend = "BEAR"
+
                     htf_trends[htf_tf] = trend
 
             # 3. Target Indicators & Regime
@@ -94,8 +93,9 @@ class SignalGeneratorService:
             df_target["volatility_ema"] = AdvancedFeatures.get_volatility(
                 df_target["close"], span=20
             )
-            df_target.ffill(inplace=True)
-            df_target.bfill(inplace=True)
+
+            # Vektörize ffill/bfill kopyalamayı azaltmak için atama kullanıyoruz.
+            df_target = df_target.ffill().bfill()
 
             # Bellek Optimizasyonu: İndikatör hesaplamaları (float64) sonrası downcasting yaparak RAM şişmesini önle.
             df_target = reduce_mem_usage(df_target)
