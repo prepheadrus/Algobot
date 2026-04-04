@@ -19,12 +19,13 @@ import pandas as pd
 import numpy as np
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.logger import logger
-from ml.data_prep import apply_triple_barrier, prepare_ml_data
+from ml.data_prep import apply_triple_barrier
 from api.services.ml_service import MLService
-from ml.inference import get_ml_prediction, load_model
 
 
 class MLIntegrationTest:
@@ -34,8 +35,8 @@ class MLIntegrationTest:
 
     def __init__(self):
         self.ml_service = MLService()
-        self.test_symbol = 'BTC/USDT:USDT'
-        self.test_timeframe = '1m'
+        self.test_symbol = "BTC/USDT:USDT"
+        self.test_timeframe = "1m"
         self.test_limit = 1000  # 1000 mum
 
     async def test_1_event_payload_optimization(self):
@@ -45,9 +46,9 @@ class MLIntegrationTest:
         SignalGeneratedEvent payload'unun KESİNLİKLE DataFrame kopyası içermediğini doğrula.
         Sadece skaler veriler (symbol, signal, price, indicator_values_dict) taşımalı.
         """
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("🧪 TEST 1: Event Payload Optimizasyonu (RAM Koruması)")
-        logger.info("="*80)
+        logger.info("=" * 80)
 
         try:
             # 1. SignalGeneratedEvent definition'ı kontrol et
@@ -56,31 +57,48 @@ class MLIntegrationTest:
 
             # 2. Event dataclass alanlarını incele
             if dataclasses.is_dataclass(SignalGeneratedEvent):
-                event_fields = [f.name for f in dataclasses.fields(SignalGeneratedEvent)]
+                event_fields = [
+                    f.name for f in dataclasses.fields(SignalGeneratedEvent)
+                ]
             else:
                 # Dataclass değil, __annotations__ kullan
-                event_fields = list(getattr(SignalGeneratedEvent, '__annotations__', {}).keys())
+                event_fields = list(
+                    getattr(SignalGeneratedEvent, "__annotations__", {}).keys()
+                )
 
             logger.info(f"📊 [TEST] SignalGeneratedEvent alanları: {event_fields}")
 
             # 3. DataFrame tipi alan VAR MI?
             dataframe_fields = []
             for field_name in event_fields:
-                field_type_str = str(getattr(SignalGeneratedEvent, '__annotations__', {}).get(field_name, ''))
-                if 'DataFrame' in field_type_str:
+                field_type_str = str(
+                    getattr(SignalGeneratedEvent, "__annotations__", {}).get(
+                        field_name, ""
+                    )
+                )
+                if "DataFrame" in field_type_str:
                     dataframe_fields.append(field_name)
 
             if dataframe_fields:
-                logger.error(f"❌ [FAIL] DataFrame tipi alanlar bulundu: {dataframe_fields}")
+                logger.error(
+                    f"❌ [FAIL] DataFrame tipi alanlar bulundu: {dataframe_fields}"
+                )
                 return False
 
             # 4. Sadece skaler tipler olmalı
-            expected_scalar_fields = ['bot_id', 'symbol', 'signal', 'price', 'timestamp',
-                                     'indicators', 'metadata']
+            expected_scalar_fields = [
+                "bot_id",
+                "symbol",
+                "signal",
+                "price",
+                "timestamp",
+                "indicators",
+                "metadata",
+            ]
 
-            logger.info(f"✅ [TEST] Event sadece skaler veriler taşıyor")
-            logger.info(f"   ✅ DataFrame kopyası YOK")
-            logger.info(f"   ✅ RAM koruması AKTİF")
+            logger.info("✅ [TEST] Event sadece skaler veriler taşıyor")
+            logger.info("   ✅ DataFrame kopyası YOK")
+            logger.info("   ✅ RAM koruması AKTİF")
             logger.info(f"   ✅ Beklenen alanlar: {expected_scalar_fields}")
 
             return True
@@ -88,149 +106,160 @@ class MLIntegrationTest:
         except Exception as e:
             logger.error(f"❌ [ERROR] {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return False
 
     async def test_2_triple_barrier_leakage(self):
         """
         TEST 2: Triple Barrier ve Veri Sızıntısı Denetimi
-        
+
         Feature engineering sırasında:
         1. NaN değerlerin SADECE ffill() ile doldurulduğunu (bfill() YASAK)
         2. Leakage kolonlarının (future_ret, target, barrier) X'ten çıkarıldığını
         3. Hedef etiketlerin XGBoost formatıyla (0=SHORT, 1=HOLD, 2=LONG) eşleştiğini doğrula
         """
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("🧪 TEST 2: Triple Barrier ve Data Leakage Denetimi")
-        logger.info("="*80)
+        logger.info("=" * 80)
 
         try:
             # 1. Test verisi oluştur
             np.random.seed(42)
             n_samples = 500
-            
-            test_df = pd.DataFrame({
-                'open': np.random.uniform(100, 105, n_samples),
-                'high': np.random.uniform(105, 110, n_samples),
-                'low': np.random.uniform(95, 100, n_samples),
-                'close': np.random.uniform(100, 105, n_samples),
-                'volume': np.random.uniform(1000, 2000, n_samples)
-            })
-            
+
+            test_df = pd.DataFrame(
+                {
+                    "open": np.random.uniform(100, 105, n_samples),
+                    "high": np.random.uniform(105, 110, n_samples),
+                    "low": np.random.uniform(95, 100, n_samples),
+                    "close": np.random.uniform(100, 105, n_samples),
+                    "volume": np.random.uniform(1000, 2000, n_samples),
+                }
+            )
+
             # Timestamp index
             base_time = datetime(2026, 3, 17, 0, 0, 0)
             test_df.index = [base_time + timedelta(minutes=i) for i in range(n_samples)]
-            
+
             logger.info(f"📊 [TEST] Test verisi: {len(test_df)} mum")
-            
+
             # 2. Triple Barrier uygula
             labeled_df = apply_triple_barrier(
-                test_df,
-                tp_multiplier=2.0,
-                sl_multiplier=2.0,
-                time_horizon=10
+                test_df, tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
             )
-            
+
             # 3. Etiket dağılımı
-            unique, counts = np.unique(labeled_df['target'], return_counts=True)
+            unique, counts = np.unique(labeled_df["target"], return_counts=True)
             label_dist = dict(zip(unique, counts))
             logger.info(f"📊 [TEST] Etiket dağılımı: {label_dist}")
-            
+
             # 4. Format kontrolü (0=SHORT, 1=HOLD, 2=LONG)
             expected_labels = {0, 1, 2}
             actual_labels = set(unique)
-            
+
             if not actual_labels.issubset(expected_labels):
-                logger.error(f"❌ [FAIL] Beklenmeyen etiketler: {actual_labels - expected_labels}")
+                logger.error(
+                    f"❌ [FAIL] Beklenmeyen etiketler: {actual_labels - expected_labels}"
+                )
                 return False
-            
-            logger.info(f"✅ [TEST] Etiket formatı DOĞRU (0=SHORT, 1=HOLD, 2=LONG)")
-            
+
+            logger.info("✅ [TEST] Etiket formatı DOĞRU (0=SHORT, 1=HOLD, 2=LONG)")
+
             # 5. bfill() KULLANILMADIĞINI kontrol et (source code analizi)
-            with open('ml/data_prep.py', 'r', encoding='utf-8') as f:
+            with open("ml/data_prep.py", "r", encoding="utf-8") as f:
                 source_code = f.read()
-            
-            if '.bfill(' in source_code:
-                logger.error(f"❌ [FAIL] bfill() kullanımı tespit edildi (Look-ahead bias!)")
+
+            if ".bfill(" in source_code:
+                logger.error(
+                    "❌ [FAIL] bfill() kullanımı tespit edildi (Look-ahead bias!)"
+                )
                 return False
-            
-            logger.info(f"✅ [TEST] bfill() KULLANILMADI (Look-ahead bias ÖNLENDİ)")
-            
+
+            logger.info("✅ [TEST] bfill() KULLANILMADI (Look-ahead bias ÖNLENDİ)")
+
             # 6. Leakage kolon kontrolü
             from ml.data_prep import prepare_ml_data
-            
+
             # prepare_ml_data source'unu kontrol et
             import inspect
+
             source = inspect.getsource(prepare_ml_data)
-            
-            if 'leakage_cols' in source and 'future_ret' in source:
-                logger.info(f"✅ [TEST] Leakage kolonları X'ten çıkarılıyor")
-                logger.info(f"   Çıkarılan: future_ret, target, barrier_reason, vb.")
-            
-            logger.info(f"✅ [PASS] Triple Barrier ve Data Leakage DOĞRU")
-            
+
+            if "leakage_cols" in source and "future_ret" in source:
+                logger.info("✅ [TEST] Leakage kolonları X'ten çıkarılıyor")
+                logger.info("   Çıkarılan: future_ret, target, barrier_reason, vb.")
+
+            logger.info("✅ [PASS] Triple Barrier ve Data Leakage DOĞRU")
+
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ [ERROR] {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return False
 
     async def test_3_ml_confluence_shield(self):
         """
         TEST 3: ML Confluence (Doğrulama) Kalkanı
-        
+
         core/paper.py içindeki on_signal_generated handler'ında:
         1. Strateji sinyal yönü == ML tahmin yönü
         2. ML Confidence >= ml_confidence_threshold (örn: %65)
         3. Sadece bu koşullar sağlanınca işlem açılır
         """
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("🧪 TEST 3: ML Confluence Kalkanı")
-        logger.info("="*80)
+        logger.info("=" * 80)
 
         try:
             # 1. core/paper.py içinde on_signal_generated kontrol et
-            with open('core/paper.py', 'r', encoding='utf-8') as f:
+            with open("core/paper.py", "r", encoding="utf-8") as f:
                 paper_code = f.read()
-            
+
             # 2. ML confidence threshold kontrolü var mı?
-            if 'ml_confidence' in paper_code and 'threshold' in paper_code:
-                logger.info(f"✅ [TEST] ML confidence threshold kontrolü VAR")
+            if "ml_confidence" in paper_code and "threshold" in paper_code:
+                logger.info("✅ [TEST] ML confidence threshold kontrolü VAR")
             else:
-                logger.warning(f"⚠️ [TEST] ML confidence threshold kontrolü bulunamadı")
-            
+                logger.warning("⚠️ [TEST] ML confidence threshold kontrolü bulunamadı")
+
             # 3. Strateji + ML yön eşleşmesi kontrolü
-            if 'ml_approved' in paper_code or 'ml_recommendation' in paper_code:
-                logger.info(f"✅ [TEST] Strateji-ML yön eşleşmesi kontrolü VAR")
+            if "ml_approved" in paper_code or "ml_recommendation" in paper_code:
+                logger.info("✅ [TEST] Strateji-ML yön eşleşmesi kontrolü VAR")
             else:
-                logger.warning(f"⚠️ [TEST] Strateji-ML yön eşleşmesi kontrolü bulunamadı")
-            
+                logger.warning(
+                    "⚠️ [TEST] Strateji-ML yön eşleşmesi kontrolü bulunamadı"
+                )
+
             # 4. core/exchange.py içinde ML ONAY mantığı kontrol et
-            with open('core/exchange.py', 'r', encoding='utf-8') as f:
+            with open("core/exchange.py", "r", encoding="utf-8") as f:
                 exchange_code = f.read()
-            
-            if 'ML ONAY' in exchange_code and 'ml_confidence >= 0.50' in exchange_code:
-                logger.info(f"✅ [TEST] ML ONAY mantığı DOĞRU (threshold: %50)")
-                logger.info(f"   Strateji sinyali + ML aynı yön + Confidence >= 50% → ONAY")
+
+            if "ML ONAY" in exchange_code and "ml_confidence >= 0.50" in exchange_code:
+                logger.info("✅ [TEST] ML ONAY mantığı DOĞRU (threshold: %50)")
+                logger.info(
+                    "   Strateji sinyali + ML aynı yön + Confidence >= 50% → ONAY"
+                )
             else:
-                logger.warning(f"⚠️ [TEST] ML ONAY mantığı bulunamadı")
-            
-            logger.info(f"✅ [PASS] ML Confluence Kalkanı DOĞRU")
-            
+                logger.warning("⚠️ [TEST] ML ONAY mantığı bulunamadı")
+
+            logger.info("✅ [PASS] ML Confluence Kalkanı DOĞRU")
+
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ [ERROR] {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return False
 
     async def test_4_e2e_mock_test(self):
         """
         TEST 4: E2E Mock (Kuru Sürüş) Testi
-        
+
         1. Veritabanından 1000 mum çek
         2. Hızlı model eğit
         3. Mock SignalGeneratedEvent fırlat
@@ -240,35 +269,39 @@ class MLIntegrationTest:
            🧠 [ML] LONG | Confidence: 67.52%
            ✅ [ML ONAY] LONG sinyali ML tarafından onaylandı! (Confidence: 67.52%)
         """
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("🧪 TEST 4: E2E Mock (Kuru Sürüş) Testi")
-        logger.info("="*80)
+        logger.info("=" * 80)
 
         try:
             # 1. Mock veri oluştur (Parquet'ten çekmek yerine)
             np.random.seed(42)
             n_samples = 1000
-            
-            mock_df = pd.DataFrame({
-                'open': np.random.uniform(95000, 96000, n_samples),
-                'high': np.random.uniform(96000, 97000, n_samples),
-                'low': np.random.uniform(94000, 95000, n_samples),
-                'close': np.random.uniform(95000, 96000, n_samples),
-                'volume': np.random.uniform(100, 200, n_samples)
-            })
-            
+
+            mock_df = pd.DataFrame(
+                {
+                    "open": np.random.uniform(95000, 96000, n_samples),
+                    "high": np.random.uniform(96000, 97000, n_samples),
+                    "low": np.random.uniform(94000, 95000, n_samples),
+                    "close": np.random.uniform(95000, 96000, n_samples),
+                    "volume": np.random.uniform(100, 200, n_samples),
+                }
+            )
+
             base_time = datetime(2026, 3, 17, 0, 0, 0)
             mock_df.index = [base_time + timedelta(minutes=i) for i in range(n_samples)]
-            
+
             logger.info(f"📊 [TEST] Mock veri: {len(mock_df)} mum")
-            
+
             # 2. Triple Barrier ile etiketle
-            labeled_df = apply_triple_barrier(mock_df, tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10)
-            
+            labeled_df = apply_triple_barrier(
+                mock_df, tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
+            )
+
             # 3. Feature engineering
             from ml.data_prep import engineer_features
 
-            feature_cols = ['open', 'high', 'low', 'close', 'volume']
+            feature_cols = ["open", "high", "low", "close", "volume"]
             result = engineer_features(labeled_df, feature_cols=feature_cols)
 
             # engineer_features 2 değer döndürür: (df, scaler)
@@ -276,9 +309,9 @@ class MLIntegrationTest:
                 X, scaler = result
                 # String kolonları çıkar
                 numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
-                if 'target' in numeric_cols:
-                    y = X['target'].copy()
-                    X = X[[c for c in numeric_cols if c != 'target']]
+                if "target" in numeric_cols:
+                    y = X["target"].copy()
+                    X = X[[c for c in numeric_cols if c != "target"]]
                 else:
                     y = None
                     X = X[numeric_cols]
@@ -286,71 +319,84 @@ class MLIntegrationTest:
                 X, y, scaler = result
 
             logger.info(f"📊 [TEST] Feature matrix: {X.shape}")
-            
+
             # 4. Mock model eğitimi (XGBoost yerine basit model)
             from sklearn.ensemble import RandomForestClassifier
-            
+
             # Train/test split
             split_idx = int(len(X) * 0.8)
             X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
             y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-            
+
             # Model eğit
-            model = RandomForestClassifier(n_estimators=10, max_depth=5, random_state=42)
+            model = RandomForestClassifier(
+                n_estimators=10, max_depth=5, random_state=42
+            )
             model.fit(X_train, y_train)
-            
+
             # Test accuracy
             train_acc = model.score(X_train, y_train)
             test_acc = model.score(X_test, y_test)
-            
-            logger.info(f"📊 [TEST] Model eğitildi")
+
+            logger.info("📊 [TEST] Model eğitildi")
             logger.info(f"   Train accuracy: {train_acc:.2%}")
             logger.info(f"   Test accuracy: {test_acc:.2%}")
-            
+
             # 5. Mock inference
             # Son mum için tahmin yap
             last_moment = X_test.iloc[-1:].values
             prediction = model.predict(last_moment)[0]
             confidence = np.max(model.predict_proba(last_moment)[0])
-            
-            label_map = {0: 'SHORT', 1: 'HOLD', 2: 'LONG'}
-            ml_prediction = label_map.get(prediction, 'HOLD')
-            
-            logger.info(f"🧠 [ML] Mock inference: {ml_prediction} | Confidence: {confidence:.2%}")
-            
+
+            label_map = {0: "SHORT", 1: "HOLD", 2: "LONG"}
+            ml_prediction = label_map.get(prediction, "HOLD")
+
+            logger.info(
+                f"🧠 [ML] Mock inference: {ml_prediction} | Confidence: {confidence:.2%}"
+            )
+
             # 6. Mock Signal Event simülasyonu
             mock_price = 95432.50
-            strategy_signal = 'LONG'
-            
+            strategy_signal = "LONG"
+
             # ML ONAY mantığı
             ml_approved = (ml_prediction == strategy_signal) and (confidence >= 0.50)
-            
+
             # 7. Beklenen çıktı formatı
-            logger.info(f"")
-            logger.info(f"🎯 [SINYAL] {self.test_symbol} | {strategy_signal} | Fiyat: ${mock_price:.2f} | TF: {self.test_timeframe}")
-            logger.info(f"   📊 Strateji: trend_master | HTF: NEUTRAL | Rejim: SQUEEZE_PRE_TREND")
+            logger.info("")
+            logger.info(
+                f"🎯 [SINYAL] {self.test_symbol} | {strategy_signal} | Fiyat: ${mock_price:.2f} | TF: {self.test_timeframe}"
+            )
+            logger.info(
+                "   📊 Strateji: trend_master | HTF: NEUTRAL | Rejim: SQUEEZE_PRE_TREND"
+            )
             logger.info(f"   🧠 [ML] {ml_prediction} | Confidence: {confidence:.2%}")
-            
+
             if ml_approved:
-                logger.info(f"   ✅ [ML ONAY] {strategy_signal} sinyali ML tarafından onaylandı! (Confidence: {confidence:.2%})")
+                logger.info(
+                    f"   ✅ [ML ONAY] {strategy_signal} sinyali ML tarafından onaylandı! (Confidence: {confidence:.2%})"
+                )
             else:
-                logger.info(f"   ⚠️ [ML RED] {strategy_signal} sinyali ML tarafından onaylanmadı!")
-            
+                logger.info(
+                    f"   ⚠️ [ML RED] {strategy_signal} sinyali ML tarafından onaylanmadı!"
+                )
+
             # 8. Doğrulama
             if ml_approved:
-                logger.info(f"")
-                logger.info(f"✅ [PASS] E2E Mock Test BAŞARILI!")
-                logger.info(f"   ✅ Model eğitildi")
-                logger.info(f"   ✅ Inference yapıldı")
-                logger.info(f"   ✅ ML ONAY mantığı çalıştı")
+                logger.info("")
+                logger.info("✅ [PASS] E2E Mock Test BAŞARILI!")
+                logger.info("   ✅ Model eğitildi")
+                logger.info("   ✅ Inference yapıldı")
+                logger.info("   ✅ ML ONAY mantığı çalıştı")
                 return True
             else:
-                logger.warning(f"⚠️ [TEST] ML ONAY çalışmadı (mock veri rastgele)")
+                logger.warning("⚠️ [TEST] ML ONAY çalışmadı (mock veri rastgele)")
                 return True  # Yine de başarılı say (mock test)
-            
+
         except Exception as e:
             logger.error(f"❌ [ERROR] {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return False
 
@@ -358,43 +404,43 @@ class MLIntegrationTest:
         """
         Tüm testleri çalıştır.
         """
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("🚀 ML INTEGRATION E2E TEST SUITE")
-        logger.info("="*80)
-        
+        logger.info("=" * 80)
+
         results = {
-            'event_payload_optimization': await self.test_1_event_payload_optimization(),
-            'triple_barrier_leakage': await self.test_2_triple_barrier_leakage(),
-            'ml_confluence_shield': await self.test_3_ml_confluence_shield(),
-            'e2e_mock_test': await self.test_4_e2e_mock_test()
+            "event_payload_optimization": await self.test_1_event_payload_optimization(),
+            "triple_barrier_leakage": await self.test_2_triple_barrier_leakage(),
+            "ml_confluence_shield": await self.test_3_ml_confluence_shield(),
+            "e2e_mock_test": await self.test_4_e2e_mock_test(),
         }
-        
+
         # Özet
-        logger.info("\n" + "="*80)
+        logger.info("\n" + "=" * 80)
         logger.info("📊 TEST SONUÇLARI")
-        logger.info("="*80)
-        
+        logger.info("=" * 80)
+
         passed = sum(1 for v in results.values() if v)
         total = len(results)
-        
+
         for test_name, result in results.items():
             status = "✅ PASS" if result else "❌ FAIL"
             logger.info(f"   {status}: {test_name}")
-        
+
         logger.info(f"\n📈 TOPLAM: {passed}/{total} test başarılı")
-        
+
         if passed == total:
-            logger.info(f"\n🎉 TÜM TESTLER BAŞARILI! ML Entegrasyonu doğrulandı.")
-            logger.info(f"   ✅ Event Payload: RAM korumalı")
-            logger.info(f"   ✅ Triple Barrier: Data leakage YOK")
-            logger.info(f"   ✅ ML Confluence: Strateji+ML ONAY çalışıyor")
-            logger.info(f"   ✅ E2E Mock: Model eğitimi + inference OK")
+            logger.info("\n🎉 TÜM TESTLER BAŞARILI! ML Entegrasyonu doğrulandı.")
+            logger.info("   ✅ Event Payload: RAM korumalı")
+            logger.info("   ✅ Triple Barrier: Data leakage YOK")
+            logger.info("   ✅ ML Confluence: Strateji+ML ONAY çalışıyor")
+            logger.info("   ✅ E2E Mock: Model eğitimi + inference OK")
         else:
-            logger.error(f"\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
-        
+            logger.error("\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
+
         # Rapor oluştur
         self._generate_report(results)
-        
+
         return passed == total
 
     def _generate_report(self, results):
@@ -402,7 +448,7 @@ class MLIntegrationTest:
         Test raporu oluştur.
         """
         report_path = Path(__file__).parent / "ML_INTEGRATION_TEST_RAPORU.md"
-        
+
         report = f"""# 📊 ML INTEGRATION E2E TEST RAPORU
 
 **Tarih:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
@@ -537,10 +583,10 @@ Veritabanından 1000 mum çek → Model eğit → Mock Event fırlat → Log do�
 **Rapor Tarihi:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
 **Test Environment:** Windows 11, Python 3.12, Scikit-learn, XGBoost ✅
 """
-        
-        with open(report_path, 'w', encoding='utf-8') as f:
+
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(report)
-        
+
         logger.info(f"\n📄 Test raporu oluşturuldu: {report_path}")
 
 
@@ -550,13 +596,13 @@ Veritabanından 1000 mum çek → Model eğit → Mock Event fırlat → Log do�
 
 if __name__ == "__main__":
     test_suite = MLIntegrationTest()
-    
+
     # Event loop
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
+
     # Test çalıştır
     success = asyncio.run(test_suite.run_all_tests())
-    
+
     # Exit code
     sys.exit(0 if success else 1)
