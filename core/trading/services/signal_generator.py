@@ -6,6 +6,14 @@ from data.features import AdvancedFeatures
 from core.detector import MarketRegimeDetector
 import numpy as np
 
+# Bellek Optimizasyonu (Downcasting)
+try:
+    from data.data_prep import reduce_mem_usage
+except ImportError:
+
+    def reduce_mem_usage(df):
+        return df
+
 
 class SignalGeneratorService:
     """
@@ -14,12 +22,20 @@ class SignalGeneratorService:
     """
 
     @staticmethod
-    async def prepare_target_data_and_detect_regime(df_1m: pd.DataFrame, target_tf: str, htf_levels: list, ema_fast: int, ema_slow: int, trend_method: str) -> Tuple[pd.DataFrame, dict, dict, float]:
+    async def prepare_target_data_and_detect_regime(
+        df_1m: pd.DataFrame,
+        target_tf: str,
+        htf_levels: list,
+        ema_fast: int,
+        ema_slow: int,
+        trend_method: str,
+    ) -> Tuple[pd.DataFrame, dict, dict, float]:
         """
         Ağır pandas hesaplamalarını asyncio.to_thread içine sararak Event Loop'u kilitlemez.
 
         [TZ FIX] DataFrame index'inin UTC olduğundan emin ol.
         """
+
         def _process_data():
             # ========================================================================
             # [TZ FIX] DataFrame index UTC yap (timezone-aware)
@@ -30,9 +46,9 @@ class SignalGeneratorService:
 
             # Sonra timezone-aware yap
             if df_1m.index.tzinfo is None:
-                df_1m.index = df_1m.index.tz_localize('UTC')
+                df_1m.index = df_1m.index.tz_localize("UTC")
             else:
-                df_1m.index = df_1m.index.tz_convert('UTC')
+                df_1m.index = df_1m.index.tz_convert("UTC")
 
             # 1. Resample to Target TF
             df_target = StrategyIndicators.resample_data(df_1m, target_tf)
@@ -45,18 +61,28 @@ class SignalGeneratorService:
                 trend = "NEUTRAL"
                 if not df_htf.empty:
                     htf_last = df_htf.iloc[-1]
-                    if trend_method == 'ema_stack':
-                        ema_f = htf_last.get(f'EMA_{ema_fast}')
-                        ema_s = htf_last.get(f'EMA_{ema_slow}')
-                        if ema_f is not None and ema_s is not None and not np.isnan(ema_f) and not np.isnan(ema_s):
+                    if trend_method == "ema_stack":
+                        ema_f = htf_last.get(f"EMA_{ema_fast}")
+                        ema_s = htf_last.get(f"EMA_{ema_slow}")
+                        if (
+                            ema_f is not None
+                            and ema_s is not None
+                            and not np.isnan(ema_f)
+                            and not np.isnan(ema_s)
+                        ):
                             if ema_f > ema_s:
                                 trend = "BULL"
                             elif ema_f < ema_s:
                                 trend = "BEAR"
                     else:
-                        val_c = htf_last.get('close')
-                        val_e = htf_last.get(f'EMA_{ema_slow}')
-                        if val_c is not None and val_e is not None and not np.isnan(val_c) and not np.isnan(val_e):
+                        val_c = htf_last.get("close")
+                        val_e = htf_last.get(f"EMA_{ema_slow}")
+                        if (
+                            val_c is not None
+                            and val_e is not None
+                            and not np.isnan(val_c)
+                            and not np.isnan(val_e)
+                        ):
                             if val_c > val_e:
                                 trend = "BULL"
                             elif val_c < val_e:
@@ -65,15 +91,22 @@ class SignalGeneratorService:
 
             # 3. Target Indicators & Regime
             df_target = StrategyIndicators.add_all_indicators(df_target)
-            df_target['volatility_ema'] = AdvancedFeatures.get_volatility(df_target['close'], span=20)
+            df_target["volatility_ema"] = AdvancedFeatures.get_volatility(
+                df_target["close"], span=20
+            )
             df_target.ffill(inplace=True)
             df_target.bfill(inplace=True)
 
+            # Bellek Optimizasyonu: İndikatör hesaplamaları (float64) sonrası downcasting yaparak RAM şişmesini önle.
+            df_target = reduce_mem_usage(df_target)
+
             if not df_target.empty:
                 regime_info = MarketRegimeDetector.detect_regime(df_target)
-                current_price = df_target.iloc[-1]['close']
+                current_price = float(
+                    df_target.iloc[-1]["close"]
+                )  # Downcasting float32 olabilir, standard float'a çevir
                 return df_target, htf_trends, regime_info, current_price
-            return df_target, htf_trends, {'regime': 'UNKNOWN'}, None
+            return df_target, htf_trends, {"regime": "UNKNOWN"}, None
 
         # Arka planda çalıştır
         return await asyncio.to_thread(_process_data)
