@@ -225,11 +225,13 @@ class StrategyIndicators:
         # label='left': Her mumun SOL kenarı etiketlenir
         # Bu sayede son (henüz kapanmamış) mum geleceği göstermez
         # ========================================================================
-        resampled_df = df.resample(rule, closed='left', label='left').apply(logic)
+        # .apply() yerine .agg() kullanımı (C düzeyinde vektörize ve optimize)
+        resampled_df = df.resample(rule, closed='left', label='left').agg(logic)
 
-        # Eksik mumları doldur
-        resampled_df['volume'] = resampled_df['volume'].fillna(0)
-        resampled_df.ffill(inplace=True)
+        # Eksik mumları doldur (inplace kopyalamayı ve warning'leri engellemek için doğrudan atama kullan)
+        if 'volume' in resampled_df.columns:
+            resampled_df['volume'] = resampled_df['volume'].fillna(0)
+        resampled_df = resampled_df.ffill()
 
         # ========================================================================
         # [TZ FIX] Index timezone-aware yap (UTC)
