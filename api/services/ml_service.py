@@ -151,6 +151,17 @@ class MLService:
             
             logger.info(f"📊 [ML] ML pipeline başlatılıyor...")
             
+            # 1.5 İndikatörleri ve özelliklerini ekle
+            logger.info(f"📊 [ML] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
+            from data.indicators import StrategyIndicators
+            df = StrategyIndicators.add_all_indicators(df)
+
+            try:
+                from data.features import FeatureEngineer
+                df = FeatureEngineer().add_all_features(df)
+            except (ImportError, AttributeError):
+                logger.debug("FeatureEngineer modülü bulunamadı, yalnızca indikatörler kullanılıyor.")
+
             # 2-3. Feature engineering + Triple Barrier + Train/test split (hepsi bir arada)
             from ml.data_prep import prepare_ml_data
             X_train, X_test, y_train, y_test, scaler = prepare_ml_data(
