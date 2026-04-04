@@ -26,7 +26,7 @@ from shared.events.events import (
 
 # WFO Engine import (opsiyonel - WFO aktifse)
 try:
-    from core.wfo_engine import get_wfo_engine, start_wfo_background_task
+    import core.wfo_engine  # noqa: F401
 
     WFO_AVAILABLE = True
 except ImportError:
@@ -170,9 +170,7 @@ class ExchangeManager:
         self.exchange_class = getattr(ccxtpro, self.exchange_id)
         self.download_stops = {}  # {symbol: bool} - İndirmeyi durdurmak için
         self.download_pauses = {}  # {symbol: bool} - Duraklatmak için
-        self.active_downloads = (
-            {}
-        )  # {symbol: metadata} - Aktif görevleri takip etmek için
+        self.active_downloads = {}  # {symbol: metadata} - Aktif görevleri takip etmek için
 
         # YENİ: Aktif poller'ları takip et (1-to-N mimarisi)
         self.active_pollers = {}  # {symbol: asyncio.Task} - Her sembol için 1 poller
@@ -1868,7 +1866,7 @@ class ExchangeManager:
                     if bot_timeframe == timeframe:
                         # Log çıktısını temizlemek için sadece ilgili botun debug bilgisini basalım
                         logger.info(
-                            f"   🔥 [BOT DEBUG] active_bot_ids={['Bot: '+bot_id]}"
+                            f"   🔥 [BOT DEBUG] active_bot_ids={['Bot: ' + bot_id]}"
                         )
                         logger.info("   🚀 [BOT GATHER] 1 task çalıştırılıyor...")
 
@@ -2119,7 +2117,6 @@ class ExchangeManager:
                 )
 
                 if not df_target.empty:
-
                     # 7.5 STRATEJİ KONTROLÜ - Eğer strateji yoksa işlem yapma
                     strategy = paper_engine.strategies.get(symbol)
                     active_strat_id = paper_engine.active_strategies.get(
