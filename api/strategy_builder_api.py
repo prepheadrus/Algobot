@@ -9,8 +9,30 @@ from typing import Dict, List, Any, Optional
 import json
 import os
 from datetime import datetime
+from cachetools import TTLCache
+import asyncio
+import traceback
 
 from strategy.builder import StrategyBuilder, StrategyExecutor, StrategyValidator
+from api.routers.backtest import fetch_real_data
+from core.backtester import VectorizedBacktester
+from core.logger import logger
+
+# API Rate limitleri ve DB yorgunluğunu önlemek için 1 saatlik (3600 sn), maks 10 verilik önbellek
+real_data_cache = TTLCache(maxsize=10, ttl=3600)
+
+async def get_cached_real_data(symbol: str, timeframe: str, days: int = 30):
+    cache_key = f"{symbol}_{timeframe}_{days}"
+    if cache_key in real_data_cache:
+        return real_data_cache[cache_key]
+
+    # Cache'te yoksa gerçek datayı çek
+    df = await fetch_real_data(symbol, timeframe, days)
+    if df is None or df.empty:
+        raise ValueError("Gerçek test verisi çekilemedi.")
+
+    real_data_cache[cache_key] = df
+    return df
 
 router = APIRouter(prefix="/api/v1/strategy", tags=["Strategy Builder"])
 
@@ -35,22 +57,47 @@ async def test_strategy(strategy: StrategySchema):
     Stratejiyi test et (hızlı backtest)
     """
     try:
-        # JSON'u validate et
+        # 1. JSON'u validate et
         is_valid, errors = StrategyValidator.validate(strategy.dict())
         if not is_valid:
             raise HTTPException(status_code=400, detail=f"Invalid strategy: {errors}")
         
-        # Executor ile test et
-        executor = StrategyExecutor()
-        executor.load_strategy_from_dict(strategy.dict())
+        # 2. Stratejiyi RAM'den yükle (Disk I/O Yok)
+        strategy_dict = strategy.dict()
+        executor = StrategyExecutor(strategy_dict=strategy_dict)
+
+        # 3. Gerçek veriyi önbellekten al (Varsayılan BTC/USDT)
+        default_symbol = "BTC/USDT"
+        timeframe = strategy.timeframe if strategy.timeframe else "15m"
+
+        df = await get_cached_real_data(symbol=default_symbol, timeframe=timeframe, days=30)
         
-        # TODO: Gerçek test data ile backtest
-        # Şimdilik mock sonuç döndür
+        # 4. Veriyi hazırla (indikatörleri hesapla) ve sinyalleri üret
+        from api.routers.backtest import calculate_signals
+        # Cache'teki df'yi değiştirmemek için copy() kullanıyoruz
+        signals = calculate_signals(df.copy(), strategy_dict)
+
+        # 5. Gerçek veri ile backtest çalıştır
+        backtester = VectorizedBacktester(
+            initial_balance=1000.0,
+            fee_rate=0.0004,
+            slippage=1.0001,
+            risk_per_trade=0.02
+        )
+
+        risk_params = strategy_dict.get('risk', {
+            'stop_loss_atr_multiplier': 2.0,
+            'take_profit_atr_multiplier': 4.0
+        })
+
+        results = backtester.run_backtest(df, signals, risk_params)
+
+        # 6. Metrikleri hesapla ve dön
         metrics = {
-            "win_rate": 62.5,
-            "total_trades": 24,
-            "profit_factor": 1.8,
-            "max_drawdown": 8.2
+            "win_rate": float(results.win_rate) if hasattr(results, 'win_rate') else 0.0,
+            "total_trades": int(results.total_trades) if hasattr(results, 'total_trades') else 0,
+            "profit_factor": float(results.profit_factor) if hasattr(results, 'profit_factor') else 0.0,
+            "max_drawdown": float(results.max_drawdown) if hasattr(results, 'max_drawdown') else 0.0
         }
         
         return {
@@ -59,8 +106,12 @@ async def test_strategy(strategy: StrategySchema):
             "metrics": metrics
         }
         
+    except ValueError as e:
+        logger.warning(f"⚠️ Backtest veri hatası: {e}")
+        raise HTTPException(status_code=400, detail=f"{str(e)} Lütfen önce Veri Laboratuvarı'ndan veri indirin.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Backtest hatası: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Backtest hatası: {str(e)}")
 
 
 @router.post("/save")

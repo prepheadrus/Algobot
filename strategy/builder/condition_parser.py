@@ -214,9 +214,7 @@ class RuleGroup:
         if not isinstance(self.logic, LogicOperator):
             raise ValueError(f"Geçersiz logic operatörü: {self.logic}. Geçerli değerler: {[op.value for op in LogicOperator]}")
         
-        # En az bir koşul olmalı
-        if not self.conditions:
-            raise ValueError("RuleGroup en az bir koşul içermeli")
+        # Boş conditions listesine izin ver
     
     def add_condition(self, condition: Union[Condition, 'RuleGroup']) -> None:
         """
@@ -308,8 +306,11 @@ class RuleGroup:
             raise ValueError("Eksik alan: logic")
 
         # "conditions" veya "rules" alanı olabilir (eski stratejiler için)
-        rules_data = data.get('conditions') or data.get('rules')
-        if not rules_data:
+        # Empty list should be allowed
+        rules_data = data.get('conditions')
+        if rules_data is None:
+            rules_data = data.get('rules')
+        if rules_data is None:
             raise ValueError("Eksik alan: conditions veya rules")
         
         # Logic'i enum'a çevir
