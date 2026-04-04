@@ -5,10 +5,9 @@ FastAPI router for system operations.
 Dashboard metrics, config, exchange info.
 """
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, List
-from pathlib import Path
 import os
 import yaml
 import asyncio
@@ -31,6 +30,7 @@ router = APIRouter(prefix="/api/v1", tags=["System"])
 # SANITIZATION HELPERS
 # ============================================================================
 
+
 def sanitize_value(value: Any) -> Any:
     """NaN/Infinity değerlerini 0.0'a çevir"""
     if value is None:
@@ -40,6 +40,7 @@ def sanitize_value(value: Any) -> Any:
             logger.warning(f"⚠️ [SANITIZE] NaN/Infinity detected: {value} → 0.0")
             return 0.0
     return value
+
 
 def sanitize_list(data: list) -> list:
     """Listedeki Infinity ve NaN değerlerini iç içe temizler"""
@@ -53,6 +54,7 @@ def sanitize_list(data: list) -> list:
             clean_data.append(sanitize_value(item))
     return clean_data
 
+
 def sanitize_dict(data: dict) -> dict:
     """Sözlükteki Infinity ve NaN değerlerini iç içe temizler"""
     clean_data = {}
@@ -65,9 +67,11 @@ def sanitize_dict(data: dict) -> dict:
             clean_data[k] = sanitize_value(v)
     return clean_data
 
+
 # ============================================================================
 # WEBSOCKET MANAGER (Frontend Broadcasting)
 # ============================================================================
+
 
 class WebSocketManager:
     """
@@ -83,7 +87,9 @@ class WebSocketManager:
         """Accept WebSocket connection"""
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(f"🔌 [WS] Frontend connected ({len(self.active_connections)} clients)")
+        logger.info(
+            f"🔌 [WS] Frontend connected ({len(self.active_connections)} clients)"
+        )
 
         # Start event handler (first connection only)
         if not self.event_handler_started:
@@ -94,7 +100,9 @@ class WebSocketManager:
         """Remove WebSocket connection"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"🔌 [WS] Frontend disconnected ({len(self.active_connections)} clients)")
+            logger.info(
+                f"🔌 [WS] Frontend disconnected ({len(self.active_connections)} clients)"
+            )
 
     async def broadcast(self, message: dict):
         """Broadcast message to all connected clients"""
@@ -151,35 +159,54 @@ class WebSocketManager:
 
                     # Compute realistic rate limit metrics if exchange available
                     if exchange_manager.exchange:
-                        if hasattr(exchange_manager.exchange, 'rateLimitTokens') and hasattr(exchange_manager.exchange, 'rateLimitMaxTokens'):
-                            tokens = getattr(exchange_manager.exchange, 'rateLimitTokens', 0)
-                            max_tokens = getattr(exchange_manager.exchange, 'rateLimitMaxTokens', 1)
+                        if hasattr(
+                            exchange_manager.exchange, "rateLimitTokens"
+                        ) and hasattr(exchange_manager.exchange, "rateLimitMaxTokens"):
+                            tokens = getattr(
+                                exchange_manager.exchange, "rateLimitTokens", 0
+                            )
+                            max_tokens = getattr(
+                                exchange_manager.exchange, "rateLimitMaxTokens", 1
+                            )
                             # the tokens are what we have available, so usage is the inverse
                             if max_tokens > 0:
                                 used_tokens = max_tokens - tokens
-                                api_rate_limit_percent = int((used_tokens / max_tokens) * 100)
+                                api_rate_limit_percent = int(
+                                    (used_tokens / max_tokens) * 100
+                                )
                                 # cap at 100% just in case
-                                api_rate_limit_percent = min(100, max(0, api_rate_limit_percent))
+                                api_rate_limit_percent = min(
+                                    100, max(0, api_rate_limit_percent)
+                                )
 
                         # Use Ping/Pong RTT if available, otherwise fallback to reasonable low latency approximation
                         # CCXT Pro exchanges typically track lastPing / lastPong times
                         try:
                             client = None
                             # get the first active websocket connection to calculate latency
-                            if hasattr(exchange_manager.exchange, 'clients') and exchange_manager.exchange.clients:
-                                client = list(exchange_manager.exchange.clients.values())[0]
+                            if (
+                                hasattr(exchange_manager.exchange, "clients")
+                                and exchange_manager.exchange.clients
+                            ):
+                                client = list(
+                                    exchange_manager.exchange.clients.values()
+                                )[0]
 
-                            if client and hasattr(client, 'lastPong') and hasattr(client, 'lastPing'):
+                            if (
+                                client
+                                and hasattr(client, "lastPong")
+                                and hasattr(client, "lastPing")
+                            ):
                                 last_ping = client.lastPing
                                 last_pong = client.lastPong
                                 if last_ping and last_pong and last_pong >= last_ping:
                                     ws_latency_ms = int(last_pong - last_ping)
                                 else:
-                                    ws_latency_ms = 45 # Default to ~45ms if not determinable from ping/pong
+                                    ws_latency_ms = 45  # Default to ~45ms if not determinable from ping/pong
                             else:
-                                ws_latency_ms = 45 # fallback
+                                ws_latency_ms = 45  # fallback
                         except Exception:
-                            ws_latency_ms = 50 # fallback
+                            ws_latency_ms = 50  # fallback
                     else:
                         ws_latency_ms = 0
                         api_rate_limit_percent = 0
@@ -188,9 +215,9 @@ class WebSocketManager:
                         type="system.status",
                         payload={
                             "api_rate_limit_percent": api_rate_limit_percent,
-                            "ws_latency_ms": ws_latency_ms
+                            "ws_latency_ms": ws_latency_ms,
                         },
-                        source="system_status_broadcaster"
+                        source="system_status_broadcaster",
                     )
                     await event_bus.publish(event)
 
@@ -207,7 +234,9 @@ class WebSocketManager:
                 "type": event.type,
                 "payload": event.payload,
                 "source": event.source,
-                "timestamp": event.timestamp.isoformat() if hasattr(event, 'timestamp') else None
+                "timestamp": (
+                    event.timestamp.isoformat() if hasattr(event, "timestamp") else None
+                ),
             }
 
             # Broadcast to all connected WebSocket clients
@@ -224,6 +253,7 @@ ws_manager = WebSocketManager()
 
 # Global start time for uptime calculation
 import time
+
 START_TIME = time.time()
 
 
@@ -236,22 +266,30 @@ async def get_health_status() -> Dict[str, Any]:
     try:
         # Event Bus durumu
         from shared.events import event_bus
+
         event_bus_status = "running" if event_bus.running else "stopped"
-        
+
         # Database durumu
         from data.database import db_manager
-        db_status = "connected" if db_manager.sqlite_conn or db_manager.db_pool else "disconnected"
-        
+
+        db_status = (
+            "connected"
+            if db_manager.sqlite_conn or db_manager.db_pool
+            else "disconnected"
+        )
+
         # Exchange bağlantısı
         exchange_status = "connected" if exchange_manager.exchange else "disconnected"
-        
+
         # Aktif botlar
-        active_bots_count = len(paper_engine.active_bots) if hasattr(paper_engine, 'active_bots') else 0
-        
+        active_bots_count = (
+            len(paper_engine.active_bots) if hasattr(paper_engine, "active_bots") else 0
+        )
+
         # Uptime hesaplama
         uptime_seconds = time.time() - START_TIME
         uptime_hours = uptime_seconds / 3600
-        
+
         return {
             "status": "healthy",
             "timestamp": time.time(),
@@ -263,9 +301,9 @@ async def get_health_status() -> Dict[str, Any]:
             "metrics": {
                 "active_bots": active_bots_count,
                 "uptime_hours": round(uptime_hours, 2),
-                "uptime_seconds": int(uptime_seconds)
+                "uptime_seconds": int(uptime_seconds),
             },
-            "version": "4.0.0"
+            "version": "4.0.0",
         }
     except Exception as e:
         logger.error(f"Health check error: {e}")
@@ -273,7 +311,7 @@ async def get_health_status() -> Dict[str, Any]:
             "status": "unhealthy",
             "timestamp": time.time(),
             "error": str(e),
-            "version": "4.0.0"
+            "version": "4.0.0",
         }
 
 
@@ -284,15 +322,16 @@ async def get_system_status() -> Dict[str, Any]:
     """
     return {
         "status": "online",
-        "environment": CONFIG['bot'].get('environment', 'development'),
-        "exchange": CONFIG['trading'].get('exchange', 'binance'),
-        "tracking_symbols": CONFIG['trading'].get('symbols', [])
+        "environment": CONFIG["bot"].get("environment", "development"),
+        "exchange": CONFIG["trading"].get("exchange", "binance"),
+        "tracking_symbols": CONFIG["trading"].get("symbols", []),
     }
 
 
 # ============================================================================
 # WEBSOCKET ENDPOINT (Frontend Real-time Events)
 # ============================================================================
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -331,6 +370,7 @@ async def websocket_endpoint(websocket: WebSocket):
 # DASHBOARD METRICS
 # ============================================================================
 
+
 @router.get("/dashboard-metrics")
 async def get_dashboard_metrics() -> Dict[str, Any]:
     """
@@ -343,39 +383,47 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
 
         # Portfolio bilgisi (NaN/Infinity koruması)
         portfolio = {
-            "balance": sanitize_value(stats.get('balance', 0.0)),
-            "free_margin": sanitize_value(stats.get('free_margin', 0.0)),
-            "used_margin": sanitize_value(stats.get('used_margin', 0.0)),
-            "equity": sanitize_value(stats.get('equity', stats.get('balance', 0.0))),
-            "unrealized_pnl": sanitize_value(stats.get('unrealized_pnl', 0.0)),
-            "total_pnl": sanitize_value(stats.get('total_pnl', 0.0)),
-            "total_trades": int(stats.get('total_trades', 0)),
-            "win_rate": sanitize_value(stats.get('win_rate', 0.0)),
-            "total_commission": sanitize_value(stats.get('total_commission', 0.0)),
-            "total_notional": sanitize_value(stats.get('total_notional', 0.0)),
+            "balance": sanitize_value(stats.get("balance", 0.0)),
+            "free_margin": sanitize_value(stats.get("free_margin", 0.0)),
+            "used_margin": sanitize_value(stats.get("used_margin", 0.0)),
+            "equity": sanitize_value(stats.get("equity", stats.get("balance", 0.0))),
+            "unrealized_pnl": sanitize_value(stats.get("unrealized_pnl", 0.0)),
+            "total_pnl": sanitize_value(stats.get("total_pnl", 0.0)),
+            "total_trades": int(stats.get("total_trades", 0)),
+            "win_rate": sanitize_value(stats.get("win_rate", 0.0)),
+            "total_commission": sanitize_value(stats.get("total_commission", 0.0)),
+            "total_notional": sanitize_value(stats.get("total_notional", 0.0)),
         }
 
         # Aktif pozisyonlar (NaN/Infinity koruması)
         positions = []
         for pos in paper_engine.open_positions:
-            positions.append(sanitize_dict({
-                "bot_id": pos.get('bot_id', 'N/A'),
-                "symbol": pos.get('symbol', ''),
-                "direction": pos.get('direction', ''),
-                "entry_price": sanitize_value(pos.get('entry_price', 0.0)),
-                "current_price": sanitize_value(pos.get('current_price', 0.0)),
-                "size": sanitize_value(pos.get('size', 0.0)),
-                "leverage": sanitize_value(pos.get('leverage', 1.0)),
-                "margin": sanitize_value(pos.get('margin', 0.0)),
-                "unrealized_usd": sanitize_value(pos.get('unrealized_usd', 0.0)),
-                "pnl_percent": sanitize_value(pos.get('pnl_percent', 0.0)),
-                "stop_loss": sanitize_value(pos.get('stop_loss')),
-                "take_profit": sanitize_value(pos.get('take_profit')),
-                "liquidation_price": sanitize_value(pos.get('liquidation_price', 0.0)),
-                "strategy": pos.get('strategy', 'Unknown'),
-                "strategy_id": pos.get('strategy_id', 'unknown'),
-                "timeframe": pos.get('timeframe', 'N/A')
-            }))
+            positions.append(
+                sanitize_dict(
+                    {
+                        "bot_id": pos.get("bot_id", "N/A"),
+                        "symbol": pos.get("symbol", ""),
+                        "direction": pos.get("direction", ""),
+                        "entry_price": sanitize_value(pos.get("entry_price", 0.0)),
+                        "current_price": sanitize_value(pos.get("current_price", 0.0)),
+                        "size": sanitize_value(pos.get("size", 0.0)),
+                        "leverage": sanitize_value(pos.get("leverage", 1.0)),
+                        "margin": sanitize_value(pos.get("margin", 0.0)),
+                        "unrealized_usd": sanitize_value(
+                            pos.get("unrealized_usd", 0.0)
+                        ),
+                        "pnl_percent": sanitize_value(pos.get("pnl_percent", 0.0)),
+                        "stop_loss": sanitize_value(pos.get("stop_loss")),
+                        "take_profit": sanitize_value(pos.get("take_profit")),
+                        "liquidation_price": sanitize_value(
+                            pos.get("liquidation_price", 0.0)
+                        ),
+                        "strategy": pos.get("strategy", "Unknown"),
+                        "strategy_id": pos.get("strategy_id", "unknown"),
+                        "timeframe": pos.get("timeframe", "N/A"),
+                    }
+                )
+            )
 
         # Son kararlar (latest decisions) - sanitize
         latest_decisions = {}
@@ -398,8 +446,8 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
-                "Expires": "0"
-            }
+                "Expires": "0",
+            },
         )
 
     except Exception as e:
@@ -409,9 +457,9 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
                 "portfolio": {"balance": 0.0, "free_margin": 0.0, "used_margin": 0.0},
                 "positions": [],
                 "latest_decisions": {},
-                "market_regime": "UNKNOWN"
+                "market_regime": "UNKNOWN",
             },
-            status_code=500
+            status_code=500,
         )
 
 
@@ -420,7 +468,7 @@ async def get_tracked_symbols() -> Dict[str, Any]:
     """
     İzlenen sembollerin listesini döner.
     """
-    return {"symbols": CONFIG['trading'].get('symbols', [])}
+    return {"symbols": CONFIG["trading"].get("symbols", [])}
 
 
 @router.get("/exchange/markets")
@@ -440,49 +488,67 @@ async def get_exchange_markets() -> Dict[str, Any]:
 # CONFIG ENDPOINTS (Hot-Reload & Persistence)
 # ============================================================================
 
+
+def _modify_yaml_config_sync(modifier_func) -> None:
+    """
+    Senkron YAML okuma/yazma işlemlerini merkezi hale getiren yardımcı fonksiyon.
+    CPU-bound olan yaml.safe_load ve yaml.safe_dump işlemlerini içerir.
+    Bu fonksiyon asenkron uç noktalarda asyncio.to_thread ile çağrılmalıdır
+    ki event loop bloklanmasın.
+    """
+    config_path = "config.yaml"
+    full_config = {}
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            full_config = yaml.safe_load(f) or {}
+
+    # Update logic (injection)
+    modifier_func(full_config)
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(full_config, f, default_flow_style=False, allow_unicode=True)
+
+
 @router.get("/config/bot")
 async def get_bot_config() -> Dict[str, Any]:
     """Genel bot ayarlarını döner."""
-    return {
-        "status": "success",
-        "config": CONFIG.get('bot', {})
-    }
+    return {"status": "success", "config": CONFIG.get("bot", {})}
+
 
 @router.post("/config/bot")
 async def update_bot_config(request: BotConfigUpdate) -> Dict[str, Any]:
     """Genel bot ayarlarını günceller."""
     try:
         # Update memory
-        CONFIG['bot']['environment'] = request.environment
-        CONFIG['bot']['exchange'] = request.exchange
-        CONFIG['bot']['log_level'] = request.log_level
-        
-        # Persist to yaml
-        config_path = "config.yaml"
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                full_config = yaml.safe_load(f)
+        CONFIG["bot"]["environment"] = request.environment
+        CONFIG["bot"]["exchange"] = request.exchange
+        CONFIG["bot"]["log_level"] = request.log_level
 
-            if 'bot' not in full_config: full_config['bot'] = {}
-            full_config['bot']['environment'] = request.environment
-            full_config['bot']['exchange'] = request.exchange
-            full_config['bot']['log_level'] = request.log_level
-            
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(full_config, f, default_flow_style=False, allow_unicode=True)
+        # Define modifier for YAML persistence
+        def _modify_bot(full_config: dict) -> None:
+            if "bot" not in full_config:
+                full_config["bot"] = {}
+            full_config["bot"]["environment"] = request.environment
+            full_config["bot"]["exchange"] = request.exchange
+            full_config["bot"]["log_level"] = request.log_level
 
-        return {"status": "success", "message": "Bot ayarları güncellendi", "config": CONFIG['bot']}
+        # Persist to yaml via thread pool
+        await asyncio.to_thread(_modify_yaml_config_sync, _modify_bot)
+
+        return {
+            "status": "success",
+            "message": "Bot ayarları güncellendi",
+            "config": CONFIG["bot"],
+        }
     except Exception as e:
         logger.error(f"Bot config update error: {e}")
         return {"status": "error", "message": str(e)}
 
+
 @router.get("/config/risk")
 async def get_risk_config() -> Dict[str, Any]:
     """Mevcut risk ayarlarını döner."""
-    return {
-        "status": "success",
-        "config": CONFIG.get('risk_management', {})
-    }
+    return {"status": "success", "config": CONFIG.get("risk_management", {})}
 
 
 @router.post("/config/risk")
@@ -490,51 +556,65 @@ async def update_risk_config(request: RiskConfigUpdate) -> Dict[str, Any]:
     """Risk ayarlarını günceller."""
     try:
         # 1. Memory update
-        CONFIG['risk_management']['max_risk_per_trade_percent'] = request.max_risk_per_trade_percent
-        CONFIG['risk_management']['max_leverage'] = request.max_leverage
-        CONFIG['risk_management']['max_open_positions'] = request.max_open_positions
-        CONFIG['risk_management']['max_consecutive_losses'] = request.max_consecutive_losses
-        CONFIG['risk_management']['kill_switch'] = CONFIG.get('kill_switch', {})
-        CONFIG['risk_management']['kill_switch']['enabled'] = request.kill_switch_enabled
+        CONFIG["risk_management"][
+            "max_risk_per_trade_percent"
+        ] = request.max_risk_per_trade_percent
+        CONFIG["risk_management"]["max_leverage"] = request.max_leverage
+        CONFIG["risk_management"]["max_open_positions"] = request.max_open_positions
+        CONFIG["risk_management"][
+            "max_consecutive_losses"
+        ] = request.max_consecutive_losses
+        CONFIG["risk_management"]["kill_switch"] = CONFIG.get("kill_switch", {})
+        CONFIG["risk_management"]["kill_switch"][
+            "enabled"
+        ] = request.kill_switch_enabled
 
         # 2. YAML persistence
-        config_path = "config.yaml"
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                full_config = yaml.safe_load(f)
-
-            if 'risk_management' not in full_config: full_config['risk_management'] = {}
-            full_config['risk_management'].update({
-                'max_risk_per_trade_percent': request.max_risk_per_trade_percent,
-                'max_leverage': request.max_leverage,
-                'max_open_positions': request.max_open_positions,
-                'max_consecutive_losses': request.max_consecutive_losses,
-                'kill_switch': {
-                    'enabled': request.kill_switch_enabled,
-                    'max_consecutive_losses': request.max_consecutive_losses
+        def _modify_risk(full_config: dict) -> None:
+            if "risk_management" not in full_config:
+                full_config["risk_management"] = {}
+            full_config["risk_management"].update(
+                {
+                    "max_risk_per_trade_percent": request.max_risk_per_trade_percent,
+                    "max_leverage": request.max_leverage,
+                    "max_open_positions": request.max_open_positions,
+                    "max_consecutive_losses": request.max_consecutive_losses,
+                    "kill_switch": {
+                        "enabled": request.kill_switch_enabled,
+                        "max_consecutive_losses": request.max_consecutive_losses,
+                    },
                 }
-            })
+            )
 
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(full_config, f, default_flow_style=False, allow_unicode=True)
+        await asyncio.to_thread(_modify_yaml_config_sync, _modify_risk)
 
         # 3. Paper engine hot-reload
-        if hasattr(paper_engine, 'risk_engine'):
-            paper_engine.risk_engine.config.max_risk_per_trade = request.max_risk_per_trade_percent / 100.0
+        if hasattr(paper_engine, "risk_engine"):
+            paper_engine.risk_engine.config.max_risk_per_trade = (
+                request.max_risk_per_trade_percent / 100.0
+            )
             paper_engine.risk_engine.config.max_leverage = request.max_leverage
-            paper_engine.risk_engine.config.max_open_positions = request.max_open_positions
-            paper_engine.risk_engine.config.max_consecutive_losses = request.max_consecutive_losses
-            
+            paper_engine.risk_engine.config.max_open_positions = (
+                request.max_open_positions
+            )
+            paper_engine.risk_engine.config.max_consecutive_losses = (
+                request.max_consecutive_losses
+            )
+
             # Kill switch hot-reload
             if request.kill_switch_enabled:
-                paper_engine.risk_engine.kill_switch_active = False  # Reset on config change
+                paper_engine.risk_engine.kill_switch_active = (
+                    False  # Reset on config change
+                )
                 paper_engine.risk_engine.consecutive_losses = 0
-            paper_engine.risk_engine.config.kill_switch_enabled = request.kill_switch_enabled
+            paper_engine.risk_engine.config.kill_switch_enabled = (
+                request.kill_switch_enabled
+            )
 
         return {
-            "status": "success", 
-            "message": "Risk ayarları güncellendi", 
-            "config": CONFIG['risk_management']
+            "status": "success",
+            "message": "Risk ayarları güncellendi",
+            "config": CONFIG["risk_management"],
         }
     except Exception as e:
         logger.error(f"Risk config update error: {e}")
@@ -547,12 +627,12 @@ async def get_advanced_config() -> Dict[str, Any]:
     return {
         "status": "success",
         "config": {
-            "wfo": CONFIG.get('wfo', {}),
-            "ml": CONFIG.get('ml', {}),
-            "htf": CONFIG.get('htf', {}),
-            "kalman": CONFIG.get('kalman', {'enabled': True, 'q': 0.001, 'r': 0.1}),
-            "candle_lock": CONFIG.get('candle_lock', {'enabled': True, 'interval': 1})
-        }
+            "wfo": CONFIG.get("wfo", {}),
+            "ml": CONFIG.get("ml", {}),
+            "htf": CONFIG.get("htf", {}),
+            "kalman": CONFIG.get("kalman", {"enabled": True, "q": 0.001, "r": 0.1}),
+            "candle_lock": CONFIG.get("candle_lock", {"enabled": True, "interval": 1}),
+        },
     }
 
 
@@ -560,34 +640,32 @@ async def get_advanced_config() -> Dict[str, Any]:
 async def update_advanced_config(request: AdvancedConfigUpdate) -> Dict[str, Any]:
     """Gelişmiş ayarları güncelle."""
     try:
-        config_path = "config.yaml"
-        full_config = {}
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                full_config = yaml.safe_load(f)
 
-        if request.wfo:
-            CONFIG['wfo'] = request.wfo.dict()
-            full_config['wfo'] = request.wfo.dict()
-        if request.ml:
-            CONFIG['ml'] = request.ml.dict()
-            full_config['ml'] = request.ml.dict()
-            paper_engine.ml_enabled = CONFIG['ml'].get('enabled', True)
-        if request.htf:
-            CONFIG['htf'] = request.htf.dict()
-            full_config['htf'] = request.htf.dict()
-        if request.kalman:
-            CONFIG['kalman'] = request.kalman.dict()
-            full_config['kalman'] = request.kalman.dict()
-        if request.candle_lock:
-            CONFIG['candle_lock'] = request.candle_lock.dict()
-            full_config['candle_lock'] = request.candle_lock.dict()
+        def _modify_adv(full_config: dict) -> None:
+            if request.wfo:
+                CONFIG["wfo"] = request.wfo.model_dump()
+                full_config["wfo"] = request.wfo.model_dump()
+            if request.ml:
+                CONFIG["ml"] = request.ml.model_dump()
+                full_config["ml"] = request.ml.model_dump()
+                paper_engine.ml_enabled = CONFIG["ml"].get("enabled", True)
+            if request.htf:
+                CONFIG["htf"] = request.htf.model_dump()
+                full_config["htf"] = request.htf.model_dump()
+            if request.kalman:
+                CONFIG["kalman"] = request.kalman.model_dump()
+                full_config["kalman"] = request.kalman.model_dump()
+            if request.candle_lock:
+                CONFIG["candle_lock"] = request.candle_lock.model_dump()
+                full_config["candle_lock"] = request.candle_lock.model_dump()
 
-        if os.path.exists(config_path):
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(full_config, f, default_flow_style=False, allow_unicode=True)
+        await asyncio.to_thread(_modify_yaml_config_sync, _modify_adv)
 
-        return {"status": "success", "message": "Gelişmiş ayarlar güncellendi", "config": CONFIG}
+        return {
+            "status": "success",
+            "message": "Gelişmiş ayarlar güncellendi",
+            "config": CONFIG,
+        }
     except Exception as e:
         logger.error(f"Advanced config update error: {e}")
         return {"status": "error", "message": str(e)}
@@ -597,14 +675,19 @@ async def update_advanced_config(request: AdvancedConfigUpdate) -> Dict[str, Any
 # API KEY ENDPOINTS
 # ============================================================================
 
+
 @router.post("/config/api-keys")
 async def save_api_keys(request: ApiKeyUpdateRequest) -> Dict[str, Any]:
     """API anahtarlarını şifreleyerek kaydet."""
     try:
         from core.security import KeyManager
+
         key_manager = KeyManager()
         key_manager.save_api_keys(request.api_key, request.api_secret)
-        return {"status": "success", "message": "API anahtarları şifrelenerek kaydedildi"}
+        return {
+            "status": "success",
+            "message": "API anahtarları şifrelenerek kaydedildi",
+        }
     except Exception as e:
         logger.error(f"API key save error: {e}")
         return {"status": "error", "message": str(e)}
@@ -615,20 +698,23 @@ async def test_api_keys(request: ApiKeyUpdateRequest) -> Dict[str, Any]:
     """API anahtarlarını CCXT ile test et."""
     try:
         import ccxt.async_support as ccxt
-        exchange = ccxt.binance({
-            'apiKey': request.api_key,
-            'secret': request.api_secret,
-            'enableRateLimit': True,
-            'options': {'defaultType': 'future'}
-        })
+
+        exchange = ccxt.binance(
+            {
+                "apiKey": request.api_key,
+                "secret": request.api_secret,
+                "enableRateLimit": True,
+                "options": {"defaultType": "future"},
+            }
+        )
         balance = await exchange.fetch_balance()
         await exchange.close()
-        usdt_balance = balance.get('total', {}).get('USDT', 0)
+        usdt_balance = balance.get("total", {}).get("USDT", 0)
         return {
             "status": "success",
             "message": "API anahtarları geçerli!",
             "valid": True,
-            "usdt_balance": usdt_balance
+            "usdt_balance": usdt_balance,
         }
     except Exception as e:
         logger.error(f"API keys test error: {e}")
