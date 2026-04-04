@@ -21,6 +21,7 @@ Usage:
 
 import pandas as pd
 import numpy as np
+
 from core.logger import logger
 
 # Import all sub-modules
@@ -29,6 +30,11 @@ from data.indicators.momentum import MomentumIndicators
 from data.indicators.volatility import VolatilityIndicators
 from data.indicators.volume import VolumeIndicators
 from data.indicators.advanced import AdvancedIndicators
+
+# Set global pandas option to avoid FutureWarning on downcasting object dtype arrays
+# E402 (Module level import not at top of file) is silenced intentionally,
+# or we move `set_option` after all imports
+pd.set_option('future.no_silent_downcasting', True)
 
 # TA-Lib ve pandas-ta bağımlılıkları SKILL.md gereği kaldırıldı.
 # Tüm hesaplamalar manuel (numpy/pandas) sınıflar üzerinden yapılır.
@@ -249,7 +255,7 @@ class StrategyIndicators:
         # Alternatif: Son 1 dakika içinde kapanmış mumları da düşür (güvenlik)
         time_since_last_mum = now_utc - last_mum_time
         if time_since_last_mum.total_seconds() < 60:  # 1 dakikadan az
-            logger.debug(f"⚠️ [RESAMPLE] Son mum 1 dakika önce kapandı, güvenlik için düşürülüyor")
+            logger.debug("⚠️ [RESAMPLE] Son mum 1 dakika önce kapandı, güvenlik için düşürülüyor")
             resampled_df = resampled_df.iloc[:-1]
 
         # ========================================================================
