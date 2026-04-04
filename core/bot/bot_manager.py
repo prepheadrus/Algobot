@@ -194,7 +194,63 @@ class BotManager:
         self.total_bots_started = 0
         self.total_bots_stopped = 0
 
+        self._setup_event_subscriptions()
+
         logger.info("🤖 Bot Manager initialized")
+
+    def _setup_event_subscriptions(self):
+        """Sistem olaylarına abone ol (Özellikle Circuit Breaker için)"""
+        try:
+            from shared.events import event_bus
+
+            event_bus.subscribe("system.circuit_open", self._handle_circuit_open)
+            event_bus.subscribe("system.circuit_closed", self._handle_circuit_closed)
+            logger.info(
+                "📡 [BOT MANAGER] Event subscriptions for circuit breaker installed."
+            )
+        except Exception as e:
+            logger.error(f"Failed to subscribe BotManager to event bus: {e}")
+
+    async def _handle_circuit_open(self, event):
+        """Acil durum: Circuit Breaker açıldı. Tüm çalışan botları auto-pause yap."""
+        logger.warning(
+            "🚨 [BOT MANAGER] SYSTEM CIRCUIT OPEN DETECTED! Pausing active bots..."
+        )
+        breaker_name = event.payload.get("breaker_name", "unknown")
+
+        paused_count = 0
+        for bot_id, bot in self.bots.items():
+            if bot.state.status == BotStatus.RUNNING:
+                bot.state.status = BotStatus.PAUSED
+                bot.metadata["auto_paused_by_circuit"] = breaker_name
+                paused_count += 1
+                logger.info(f"⏸️ Bot auto-paused by emergency protocol: {bot_id}")
+
+        logger.warning(
+            f"🛑 [BOT MANAGER] Emergency Pause completed. {paused_count} bots paused."
+        )
+
+    async def _handle_circuit_closed(self, event):
+        """Düzelme: Circuit Breaker kapandı. Auto-pause yapılmış botları devam ettir."""
+        logger.info(
+            "✅ [BOT MANAGER] SYSTEM CIRCUIT CLOSED DETECTED! Resuming auto-paused bots..."
+        )
+        breaker_name = event.payload.get("breaker_name", "unknown")
+
+        resumed_count = 0
+        for bot_id, bot in self.bots.items():
+            if (
+                bot.state.status == BotStatus.PAUSED
+                and bot.metadata.get("auto_paused_by_circuit") == breaker_name
+            ):
+                bot.state.status = BotStatus.RUNNING
+                bot.metadata.pop("auto_paused_by_circuit", None)
+                resumed_count += 1
+                logger.info(f"▶️ Bot auto-resumed: {bot_id}")
+
+        logger.info(
+            f"▶️ [BOT MANAGER] Recovery completed. {resumed_count} bots resumed."
+        )
 
     # ========================================================================
     # BOT LIFECYCLE
@@ -303,6 +359,9 @@ class BotManager:
             )
             return False
 
+        # Eğer kullanıcı manuel devam ettiriyorsa, auto_pause bayrağını temizle
+        bot.metadata.pop("auto_paused_by_circuit", None)
+
         # Durum güncelle
         bot.state.status = BotStatus.RUNNING
 
@@ -332,6 +391,9 @@ class BotManager:
                 f"Bot duraklatılamaz: {bot_id} (status={bot.state.status.value})"
             )
             return False
+
+        # Kullanıcı manuel durdurduysa flag temizle ki auto-resume etkilemesin
+        bot.metadata.pop("auto_paused_by_circuit", None)
 
         # Durum güncelle
         bot.state.status = BotStatus.PAUSED
@@ -599,6 +661,38 @@ class LegacyBotManager:
         self.active_bots: Dict[str, Dict] = {}  # bot_id -> metadata
         self.bot_positions: Dict[str, List] = {}  # bot_id -> positions
         self.bot_state: Dict[str, Dict] = {}  # bot_id -> state
+        self._setup_event_subscriptions()
+
+    def _setup_event_subscriptions(self):
+        """Sistem olaylarına abone ol (Legacy için de Circuit Breaker desteği)"""
+        try:
+            from shared.events import event_bus
+
+            event_bus.subscribe("system.circuit_open", self._handle_circuit_open)
+            event_bus.subscribe("system.circuit_closed", self._handle_circuit_closed)
+        except Exception as e:
+            logger.error(f"Failed to subscribe LegacyBotManager to event bus: {e}")
+
+    async def _handle_circuit_open(self, event):
+        """Acil durum: Legacy botları auto-pause yap."""
+        breaker_name = event.payload.get("breaker_name", "unknown")
+        for bot_id, bot in self.active_bots.items():
+            if bot.get("status") == "running":
+                bot["status"] = "paused"
+                bot["auto_paused_by_circuit"] = breaker_name
+                logger.info(f"⏸️ Legacy bot auto-paused: {bot_id}")
+
+    async def _handle_circuit_closed(self, event):
+        """Düzelme: Legacy botları auto-resume yap."""
+        breaker_name = event.payload.get("breaker_name", "unknown")
+        for bot_id, bot in self.active_bots.items():
+            if (
+                bot.get("status") == "paused"
+                and bot.get("auto_paused_by_circuit") == breaker_name
+            ):
+                bot["status"] = "running"
+                bot.pop("auto_paused_by_circuit", None)
+                logger.info(f"▶️ Legacy bot auto-resumed: {bot_id}")
 
     def start_bot(
         self,
