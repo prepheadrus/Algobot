@@ -3,7 +3,7 @@ JSON Validator - Strateji JSON validasyonu
 """
 
 import json
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 
 class StrategyValidator:
@@ -79,27 +79,34 @@ class StrategyValidator:
         seen_ids = set()
         
         for ind in indicators:
+            ind_name = ind.get('name', '')
+            ind_id = ind.get('id', f"{ind_name}_{ind.get('period', '')}")
+
             # ID kontrolü
-            if 'id' not in ind:
+            if not ind_id:
                 errors.append("İndikatör ID'si eksik")
-            elif ind['id'] in seen_ids:
-                errors.append(f"Tekrar eden ID: {ind['id']}")
+            elif ind_id in seen_ids:
+                errors.append(f"Tekrar eden ID: {ind_id}")
             else:
-                seen_ids.add(ind['id'])
+                seen_ids.add(ind_id)
             
             # Tip kontrolü
-            if 'type' not in ind:
+            ind_type = ind.get('type', ind_name)
+            if not ind_type:
                 errors.append("İndikatör tipi eksik")
-            elif ind['type'] not in cls.INDICATOR_REQUIREMENTS:
-                errors.append(f"Bilinmeyen indikatör: {ind['type']}")
+            elif ind_type not in cls.INDICATOR_REQUIREMENTS:
+                errors.append(f"Bilinmeyen indikatör: {ind_type}")
             else:
                 # Parametre kontrolü
-                required_params = cls.INDICATOR_REQUIREMENTS[ind['type']]
+                reqs = cls.INDICATOR_REQUIREMENTS[ind_type]
                 params = ind.get('parameters', {})
+                # Eger indikatordeki dogrudan alanlar varsa (orn. ind['period']), bunlari da params'a dahil edelim
+                # Bu bazi eski stratejilerin uyumlulugu icin gereklidir.
+                merged_params = {**ind, **params}
                 
-                for param in required_params:
-                    if param not in params:
-                        errors.append(f"{ind['type']} için eksik parametre: {param}")
+                for param in reqs:
+                    if param not in merged_params:
+                        errors.append(f"{ind_type} için eksik parametre: {param}")
         
         return errors
     
@@ -107,7 +114,7 @@ class StrategyValidator:
     def _validate_conditions(cls, conditions: Dict, indicators: List[Dict]) -> List[str]:
         """Koşulları validate eder (case-insensitive, safe get)"""
         errors = []
-        indicator_ids = {ind['id'] for ind in indicators}
+        indicator_ids = {ind.get('id', f"{ind.get('name', 'UNKNOWN')}_{ind.get('period', '')}") for ind in indicators}
 
         # Safe get - eğer conditions None veya boş ise hata ver
         if not conditions:
@@ -136,11 +143,15 @@ class StrategyValidator:
                 errors.append(f"Geçersiz logic: {side_cond.get('logic')}")
 
             # Rules kontrolü
-            if 'rules' not in side_cond:
-                errors.append(f"{side} için rules eksik")
+            rules = side_cond.get('rules')
+            if rules is None:
+                rules = side_cond.get('conditions')
+
+            if rules is None:
+                errors.append(f"{side} için rules veya conditions eksik")
                 continue
 
-            for rule in side_cond['rules']:
+            for rule in rules:
                 # Gerekli alanlar
                 for field in ['indicator', 'operator', 'value']:
                     if field not in rule:
@@ -157,9 +168,11 @@ class StrategyValidator:
         return errors
     
     @classmethod
-    def _validate_risk(cls, risk: Dict) -> List[str]:
+    def _validate_risk(cls, risk: Optional[Dict]) -> List[str]:
         """Risk parametrelerini validate eder"""
         errors = []
+        if risk is None:
+            return errors
         
         if 'stop_loss' in risk:
             sl = risk['stop_loss']

@@ -102,37 +102,54 @@ class StrategyExecutor:
         signal = executor.generate_signal(df)  # 0, 1, veya 2
     """
     
-    def __init__(self, strategy_json_path: str):
+    def __init__(self, strategy_json_path: Optional[str] = None, strategy_dict: Optional[Dict[str, Any]] = None):
         """
         StrategyExecutor'ı başlat.
         
         Args:
             strategy_json_path: JSON strateji dosyasının yolu
+            strategy_dict: Doğrudan RAM'den yüklenecek strateji sözlüğü
             
         Raises:
             FileNotFoundError: JSON dosyası bulunamazsa
             json.JSONDecodeError: JSON geçersizse
             ValueError: Gerekli alanlar eksikse
         """
-        self.json_path = Path(strategy_json_path)
+        self.config = None
+        self.strategy_data = {}
         
-        # JSON dosyasını kontrol et
-        if not self.json_path.exists():
-            raise FileNotFoundError(f"Strateji dosyası bulunamadı: {self.json_path}")
-        
-        # JSON'u yükle
-        with open(self.json_path, 'r', encoding='utf-8') as f:
-            self.strategy_data = json.load(f)
+        if strategy_dict is not None:
+            self.load_strategy_from_dict(strategy_dict)
+        elif strategy_json_path is not None:
+            self.load_strategy_from_file(strategy_json_path)
+
+        # Cache için
+        self._last_signal = 1  # Varsayılan: BEKLE
+        self._last_timestamp = None
+
+    def load_strategy_from_dict(self, strategy_dict: Dict[str, Any]) -> None:
+        """Stratejiyi disk IO olmadan RAM üzerinden yükler."""
+        self.strategy_data = strategy_dict
         
         # Gerekli alanları kontrol et
         self._validate_strategy_json()
         
         # Strateji konfigürasyonunu oluştur
         self.config = self._parse_strategy_config()
+
+    def load_strategy_from_file(self, path: str) -> None:
+        """Stratejiyi diskteki JSON dosyasından yükler."""
+        self.json_path = Path(path)
         
-        # Cache için
-        self._last_signal = 1  # Varsayılan: BEKLE
-        self._last_timestamp = None
+        # JSON dosyasını kontrol et
+        if not self.json_path.exists():
+            raise FileNotFoundError(f"Strateji dosyası bulunamadı: {self.json_path}")
+
+        # JSON'u yükle
+        with open(self.json_path, 'r', encoding='utf-8') as f:
+            strategy_data = json.load(f)
+
+        self.load_strategy_from_dict(strategy_data)
     
     def _validate_strategy_json(self) -> None:
         """
@@ -154,8 +171,8 @@ class StrategyExecutor:
         if not conditions:
             logger.warning(f"⚠️ {self.strategy_data.get('name', 'Bilinmeyen')} stratejisi 'conditions' alanı içermiyor. Varsayılan boş koşullar ekleniyor.")
             self.strategy_data["conditions"] = {
-                "LONG": {"logic": "AND", "rules": []},
-                "SHORT": {"logic": "AND", "rules": []}
+                "LONG": {"logic": "AND", "conditions": []},
+                "SHORT": {"logic": "AND", "conditions": []}
             }
         else:
             # Case-insensitive kontrol (LONG/SHORT veya long/short kabul edilir)
@@ -189,6 +206,8 @@ class StrategyExecutor:
         
         # Risk parametreleri (varsayılan değerlerle)
         risk_params = self.strategy_data.get("risk", {})
+        if risk_params is None:
+            risk_params = {}
         risk_params.setdefault("stop_loss_atr_multiplier", 2.0)
         risk_params.setdefault("take_profit_atr_multiplier", 4.0)
         risk_params.setdefault("max_risk_percent", 2.0)
