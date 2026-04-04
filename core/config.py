@@ -53,21 +53,22 @@ class Settings(BaseSettings):
         Eğer değer şifrelenmişse (gAAAAAB... gibi başlıyorsa) security modülü ile çözer.
         Şifrelenmemişse (düz metin) olduğu gibi döndürür.
         """
-        if v and v.startswith("gAAAAAB"):
+        if not v or not v.startswith("gAAAAAB"):
+            return v
+
+        try:
+            from core.security import key_manager
+
+            return key_manager.decrypt(v)
+        except Exception as e:
+            # Loglama için logger import edilebilir
             try:
-                from core.security import key_manager
+                from core.logger import logger
 
-                return key_manager.decrypt(v)
-            except Exception as e:
-                # Loglama için logger import edilebilir
-                try:
-                    from core.logger import logger
-
-                    logger.error(f"API anahtarı çözme hatası: {e}")
-                except ImportError:
-                    pass
-                return ""
-        return v
+                logger.error(f"API anahtarı çözme hatası: {e}")
+            except ImportError:
+                pass
+            return ""
 
     @property
     def allowed_origins_list(self) -> List[str]:
