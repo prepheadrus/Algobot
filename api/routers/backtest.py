@@ -12,21 +12,20 @@ Endpoints:
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 import json
+import asyncio
 import pandas as pd
 import numpy as np
 
 # Backtest modüllerinden import
-from core.backtester import VectorizedBacktester, BacktestResult, Trade
+from core.backtester import VectorizedBacktester
 from strategy.builder.executor import StrategyExecutor
 
 # Bot modüllerinden import
 from core.logger import logger
 from data.indicators import StrategyIndicators
-from data.database import db_manager
-import ccxt.pro as ccxtpro
 
 # Router oluştur
 router = APIRouter(prefix="/api/v1/backtest", tags=["Backtest"])
@@ -36,19 +35,32 @@ router = APIRouter(prefix="/api/v1/backtest", tags=["Backtest"])
 # PYDANTIC MODELLERİ (Request/Response Şemaları)
 # ============================================================================
 
+
 class BacktestRequest(BaseModel):
     """Backtest çalıştırma isteği"""
-    strategy: Dict[str, Any] = Field(..., description="Strateji JSON (name, indicators, conditions, risk)")
-    strategy_filename: Optional[str] = Field(default=None, description="Kaydedilmiş strateji dosya adı")
+
+    strategy: Dict[str, Any] = Field(
+        ..., description="Strateji JSON (name, indicators, conditions, risk)"
+    )
+    strategy_filename: Optional[str] = Field(
+        default=None, description="Kaydedilmiş strateji dosya adı"
+    )
     symbol: str = Field(..., description="Sembol (örn: BTC/USDT)")
-    timeframe: str = Field(default="1h", description="Zaman dilimi (1m, 5m, 15m, 1h, 4h, 1d)")
+    timeframe: str = Field(
+        default="1h", description="Zaman dilimi (1m, 5m, 15m, 1h, 4h, 1d)"
+    )
     days: int = Field(default=30, description="Test edilecek gün sayısı", ge=1, le=365)
-    initial_balance: float = Field(default=10000.0, description="Başlangıç bakiyesi ($)")
-    risk_per_trade: float = Field(default=0.01, description="İşlem başına risk (%)", ge=0.001, le=0.1)
+    initial_balance: float = Field(
+        default=10000.0, description="Başlangıç bakiyesi ($)"
+    )
+    risk_per_trade: float = Field(
+        default=0.01, description="İşlem başına risk (%)", ge=0.001, le=0.1
+    )
 
 
 class TradeSummary(BaseModel):
     """İşlem özeti (response için)"""
+
     entry_time: str = Field(..., description="Giriş zamanı")
     exit_time: str = Field(..., description="Çıkış zamanı")
     entry_price: float = Field(..., description="Giriş fiyatı")
@@ -61,12 +73,14 @@ class TradeSummary(BaseModel):
 
 class EquityPoint(BaseModel):
     """Equity eğrisi noktası"""
+
     timestamp: str = Field(..., description="Zaman damgası")
     equity: float = Field(..., description="Bakiye ($)")
 
 
 class BacktestMetrics(BaseModel):
     """Backtest metrikleri"""
+
     total_trades: int = Field(..., description="Toplam işlem sayısı")
     winning_trades: int = Field(..., description="Kazanan işlem sayısı")
     losing_trades: int = Field(..., description="Kaybeden işlem sayısı")
@@ -82,9 +96,12 @@ class BacktestMetrics(BaseModel):
 
 class BacktestResponse(BaseModel):
     """Backtest yanıtı"""
+
     status: str = Field(..., description="Durum (success/error)")
     message: str = Field(..., description="Mesaj")
-    backtest_id: Optional[str] = Field(default=None, description="Backtest ID (önbellek için)")
+    backtest_id: Optional[str] = Field(
+        default=None, description="Backtest ID (önbellek için)"
+    )
     metrics: BacktestMetrics = Field(..., description="Backtest metrikleri")
     equity_curve: List[EquityPoint] = Field(..., description="Equity eğrisi")
     recent_trades: List[TradeSummary] = Field(..., description="Son 10 işlem")
@@ -94,6 +111,7 @@ class BacktestResponse(BaseModel):
 # ============================================================================
 # YARDIMCI FONKSİYONLAR
 # ============================================================================
+
 
 def clean_value(value: Any) -> Any:
     """
@@ -114,11 +132,7 @@ def clean_value(value: Any) -> Any:
     return value
 
 
-async def fetch_real_data(
-    symbol: str,
-    timeframe: str,
-    days: int
-) -> pd.DataFrame:
+async def fetch_real_data(symbol: str, timeframe: str, days: int) -> pd.DataFrame:
     """
     🏗️ PARQUET DATA LAKE'den gerçek OHLCV verisi çek.
     SMART CACHE: Önce Parquet'ten yükle, eksik varsa SQLite'dan tamamla.
@@ -133,31 +147,33 @@ async def fetch_real_data(
         data_service = DataService()
 
         # Tarih aralığı hesapla
-        end_date = datetime.now(tz=__import__('pytz').timezone('UTC'))
+        end_date = datetime.now(tz=__import__("pytz").timezone("UTC"))
         start_date = end_date - timedelta(days=days)
 
         # SMART CACHE köprü fonksiyonu
         df = await data_service.get_cached_or_fetch_data(
-            symbol=symbol,
-            timeframe=timeframe,
-            start_date=start_date,
-            end_date=end_date
+            symbol=symbol, timeframe=timeframe, start_date=start_date, end_date=end_date
         )
 
         if df is None or len(df) < 100:
-            raise ValueError(f"Yetersiz veri: {len(df) if df else 0} mum. En az 100 mum gerekli.")
+            raise ValueError(
+                f"Yetersiz veri: {len(df) if df else 0} mum. En az 100 mum gerekli."
+            )
 
         # DataFrame formatını kontrol et
         if not isinstance(df.index, pd.DatetimeIndex):
-            if 'timestamp' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-                df.set_index('timestamp', inplace=True)
+            if "timestamp" in df.columns:
+                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+                df.set_index("timestamp", inplace=True)
 
         # ATR ekle (backtest için gerekli)
         from data.indicators import StrategyIndicators
-        df['ATR_14'] = StrategyIndicators.atr(df['high'], df['low'], df['close'], 14)
 
-        logger.info(f"✅ [PARQUET LAKE] {symbol} {timeframe} → {len(df)} mum yüklendi ({days} gün)")
+        df["ATR_14"] = StrategyIndicators.atr(df["high"], df["low"], df["close"], 14)
+
+        logger.info(
+            f"✅ [PARQUET LAKE] {symbol} {timeframe} → {len(df)} mum yüklendi ({days} gün)"
+        )
         logger.info(f"📊 [PARQUET LAKE] İlk: {df.index[0]}, Son: {df.index[-1]}")
 
         return df
@@ -167,11 +183,15 @@ async def fetch_real_data(
         raise ValueError(f"Veri çekilemedi: {str(e)}")
 
 
-def generate_mock_data(
-    symbol: str,
-    timeframe: str,
-    days: int
-) -> pd.DataFrame:
+def read_strategy_file_sync(filepath: Path) -> Dict[str, Any]:
+    """
+    Strateji JSON dosyasını senkron olarak okur (to_thread için yardımcı).
+    """
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def generate_mock_data(symbol: str, timeframe: str, days: int) -> pd.DataFrame:
     """
     Mock OHLCV verisi oluştur (test için - kullanılmıyor).
 
@@ -195,7 +215,10 @@ def calculate_signals(df: pd.DataFrame, strategy_data: Dict[str, Any]) -> pd.Ser
     try:
         # Geçici JSON dosyası oluştur
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
             json.dump(strategy_data, f, indent=2, ensure_ascii=False)
             temp_json_path = f.name
 
@@ -206,35 +229,38 @@ def calculate_signals(df: pd.DataFrame, strategy_data: Dict[str, Any]) -> pd.Ser
         prepared_df = executor.prepare_data(df.copy())
 
         # Eğer indikatör hesaplanmamışsa (JSON'da yoksa), yaygın indikatörleri otomatik hesapla
-        if 'RSI_14' not in prepared_df.columns:
+        if "RSI_14" not in prepared_df.columns:
             logger.warning("RSI_14 bulunamadı, otomatik hesaplanıyor...")
-            prepared_df['RSI_14'] = StrategyIndicators.rsi(prepared_df['close'], 14)
+            prepared_df["RSI_14"] = StrategyIndicators.rsi(prepared_df["close"], 14)
 
-        if 'MACD_12_26_9' not in prepared_df.columns:
+        if "MACD_12_26_9" not in prepared_df.columns:
             logger.warning("MACD_12_26_9 bulunamadı, otomatik hesaplanıyor...")
-            macd, signal, hist = StrategyIndicators.macd(prepared_df['close'], 12, 26, 9)
-            prepared_df['MACD_12_26_9'] = macd
-            prepared_df['MACD_Signal_12_26_9'] = signal
+            macd, signal, hist = StrategyIndicators.macd(
+                prepared_df["close"], 12, 26, 9
+            )
+            prepared_df["MACD_12_26_9"] = macd
+            prepared_df["MACD_Signal_12_26_9"] = signal
 
-        if 'EMA_20' not in prepared_df.columns:
-            prepared_df['EMA_20'] = StrategyIndicators.ema(prepared_df['close'], 20)
+        if "EMA_20" not in prepared_df.columns:
+            prepared_df["EMA_20"] = StrategyIndicators.ema(prepared_df["close"], 20)
 
-        if 'SMA_20' not in prepared_df.columns:
-            prepared_df['SMA_20'] = StrategyIndicators.sma(prepared_df['close'], 20)
+        if "SMA_20" not in prepared_df.columns:
+            prepared_df["SMA_20"] = StrategyIndicators.sma(prepared_df["close"], 20)
 
-        if 'ATR_14' not in prepared_df.columns:
-            prepared_df['ATR_14'] = StrategyIndicators.atr(
-                prepared_df['high'], prepared_df['low'], prepared_df['close'], 14
+        if "ATR_14" not in prepared_df.columns:
+            prepared_df["ATR_14"] = StrategyIndicators.atr(
+                prepared_df["high"], prepared_df["low"], prepared_df["close"], 14
             )
 
         # Sinyalleri üret
         signals = []
         for i in range(len(prepared_df)):
-            signal = executor.generate_signal(prepared_df.iloc[:i+1])
+            signal = executor.generate_signal(prepared_df.iloc[: i + 1])
             signals.append(signal)
 
         # Geçici dosyayı temizle
         import os
+
         os.unlink(temp_json_path)
 
         return pd.Series(signals, index=df.index)
@@ -249,23 +275,26 @@ def calculate_signals(df: pd.DataFrame, strategy_data: Dict[str, Any]) -> pd.Ser
 # ENDPOINT'LER
 # ============================================================================
 
+
 @router.post("/run", response_model=BacktestResponse)
 async def run_backtest(request: BacktestRequest):
     """
     Backtest çalıştır.
-    
+
     Args:
         request: BacktestRequest (strategy, symbol, timeframe, days)
-        
+
     Returns:
         BacktestResponse: Backtest sonuçları (metrics, equity_curve, trades)
-        
+
     Raises:
         HTTPException: Backtest başarısızsa
     """
     try:
-        logger.info(f"🧪 Backtest isteği: {request.symbol} ({request.timeframe}, {request.days} gün)")
-        
+        logger.info(
+            f"🧪 Backtest isteği: {request.symbol} ({request.timeframe}, {request.days} gün)"
+        )
+
         # 1. Strateji JSON'u al
         if request.strategy_filename:
             # Kaydedilmiş dosyadan yükle
@@ -275,11 +304,11 @@ async def run_backtest(request: BacktestRequest):
             if not filepath.exists():
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Strateji dosyası bulunamadı: {request.strategy_filename}"
+                    detail=f"Strateji dosyası bulunamadı: {request.strategy_filename}",
                 )
 
-            with open(filepath, 'r', encoding='utf-8') as f:
-                strategy_data = json.load(f)
+            # Asenkron non-blocking okuma (Event Loop'u kitlemez)
+            strategy_data = await asyncio.to_thread(read_strategy_file_sync, filepath)
         else:
             # Direkt JSON kullan
             strategy_data = request.strategy
@@ -292,64 +321,70 @@ async def run_backtest(request: BacktestRequest):
             # Yeterli veri yoksa anlamlı hata mesajı
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{str(e)} Lütfen önce Veri Laboratuvarı'ndan veri indirin."
+                detail=f"{str(e)} Lütfen önce Veri Laboratuvarı'ndan veri indirin.",
             )
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Veri çekme hatası: {str(e)}"
+                detail=f"Veri çekme hatası: {str(e)}",
             )
 
         if df.empty:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Veri alınamadı"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Veri alınamadı"
             )
-        
+
         # 3. Sinyalleri üret
         logger.info("📈 Sinyaller hesaplanıyor...")
         signals = calculate_signals(df, strategy_data)
-        
+
         # 4. Backtest çalıştır
         logger.info("⚙️ Backtest çalıştırılıyor...")
         backtester = VectorizedBacktester(
             initial_balance=request.initial_balance,
             fee_rate=0.0004,  # %0.04
             slippage=1.0001,  # %0.01
-            risk_per_trade=request.risk_per_trade
+            risk_per_trade=request.risk_per_trade,
         )
-        
-        risk_params = strategy_data.get('risk', {
-            'stop_loss_atr_multiplier': 2.0,
-            'take_profit_atr_multiplier': 4.0
-        })
-        
+
+        risk_params = strategy_data.get(
+            "risk", {"stop_loss_atr_multiplier": 2.0, "take_profit_atr_multiplier": 4.0}
+        )
+
         result = backtester.run_backtest(df, signals, risk_params)
-        
+
         # 5. Equity curve hazırla
         equity_curve = []
         equity_values = backtester.get_equity_curve()
-        
+
         for i, equity in enumerate(equity_values):
-            equity_curve.append(EquityPoint(
-                timestamp=df.index[i].isoformat() if i < len(df.index) else datetime.now().isoformat(),
-                equity=clean_value(equity)
-            ))
-        
+            equity_curve.append(
+                EquityPoint(
+                    timestamp=(
+                        df.index[i].isoformat()
+                        if i < len(df.index)
+                        else datetime.now().isoformat()
+                    ),
+                    equity=clean_value(equity),
+                )
+            )
+
         # 6. Recent trades hazırla (son 10 işlem)
         recent_trades = []
         for trade in result.trades[-10:]:
-            recent_trades.append(TradeSummary(
-                entry_time=clean_value(trade.entry_time),
-                exit_time=clean_value(trade.exit_time),
-                entry_price=clean_value(trade.entry_price),
-                exit_price=clean_value(trade.exit_price),
-                direction=trade.direction,
-                pnl=clean_value(trade.pnl),
-                pnl_percent=clean_value(trade.pnl_percent),
-                exit_reason=trade.exit_reason
-            ))
-        
+            recent_trades.append(
+                TradeSummary(
+                    entry_time=clean_value(trade.entry_time),
+                    exit_time=clean_value(trade.exit_time),
+                    entry_price=clean_value(trade.entry_price),
+                    exit_price=clean_value(trade.exit_price),
+                    direction=trade.direction,
+                    pnl=clean_value(trade.pnl),
+                    pnl_percent=clean_value(trade.pnl_percent),
+                    exit_reason=trade.exit_reason,
+                )
+            )
+
         # 7. Metrics hazırla
         metrics = BacktestMetrics(
             total_trades=clean_value(result.total_trades),
@@ -362,18 +397,20 @@ async def run_backtest(request: BacktestRequest):
             avg_trade_pnl=clean_value(result.avg_trade_pnl),
             avg_win=clean_value(result.avg_win),
             avg_loss=clean_value(result.avg_loss),
-            profit_factor=clean_value(result.profit_factor)
+            profit_factor=clean_value(result.profit_factor),
         )
-        
-        logger.info(f"✅ Backtest tamamlandı: {result.total_trades} işlem, Win Rate: {result.win_rate:.2f}%")
-        
+
+        logger.info(
+            f"✅ Backtest tamamlandı: {result.total_trades} işlem, Win Rate: {result.win_rate:.2f}%"
+        )
+
         response = BacktestResponse(
             status="success",
             message=f"Backtest başarılı: {request.symbol} ({request.timeframe}, {request.days} gün)",
             metrics=metrics,
             equity_curve=equity_curve,
             recent_trades=recent_trades,
-            total_days=request.days
+            total_days=request.days,
         )
 
         from api.services.backtest_service import BacktestService
@@ -390,14 +427,14 @@ async def run_backtest(request: BacktestRequest):
         backtest_service.save_result(response.model_dump(), backtest_id=backtest_id)
 
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Backtest hatası: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest başarısız: {str(e)}"
+            detail=f"Backtest başarısız: {str(e)}",
         )
 
 
@@ -405,10 +442,10 @@ async def run_backtest(request: BacktestRequest):
 async def get_backtest_results(backtest_id: str):
     """
     Backtest sonuçlarını al (opsiyonel - cache için).
-    
+
     Args:
         backtest_id: Backtest ID
-        
+
     Returns:
         Dict: Backtest sonuçları
     """
@@ -420,7 +457,7 @@ async def get_backtest_results(backtest_id: str):
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Backtest sonucu bulunamadı veya süresi dolmuş: {backtest_id}"
+            detail=f"Backtest sonucu bulunamadı veya süresi dolmuş: {backtest_id}",
         )
 
     return result
@@ -430,15 +467,12 @@ async def get_backtest_results(backtest_id: str):
 async def optimize_strategy(request: BacktestRequest):
     """
     Strateji optimizasyonu (Grid Search).
-    
+
     Args:
         request: BacktestRequest
-        
+
     Returns:
         Dict: Optimizasyon sonuçları
     """
     # TODO: Grid search implementasyonu
-    return {
-        "status": "error",
-        "message": "Not implemented yet"
-    }
+    return {"status": "error", "message": "Not implemented yet"}
