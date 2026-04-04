@@ -12,6 +12,7 @@ from pathlib import Path
 import os
 import yaml
 import asyncio
+import math
 
 from core.logger import logger
 from core.config import CONFIG
@@ -25,6 +26,44 @@ from api.schemas.config import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["System"])
+
+# ============================================================================
+# SANITIZATION HELPERS
+# ============================================================================
+
+def sanitize_value(value: Any) -> Any:
+    """NaN/Infinity değerlerini 0.0'a çevir"""
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        if math.isnan(value) or math.isinf(value):
+            logger.warning(f"⚠️ [SANITIZE] NaN/Infinity detected: {value} → 0.0")
+            return 0.0
+    return value
+
+def sanitize_list(data: list) -> list:
+    """Listedeki Infinity ve NaN değerlerini iç içe temizler"""
+    clean_data = []
+    for item in data:
+        if isinstance(item, dict):
+            clean_data.append(sanitize_dict(item))
+        elif isinstance(item, list):
+            clean_data.append(sanitize_list(item))
+        else:
+            clean_data.append(sanitize_value(item))
+    return clean_data
+
+def sanitize_dict(data: dict) -> dict:
+    """Sözlükteki Infinity ve NaN değerlerini iç içe temizler"""
+    clean_data = {}
+    for k, v in data.items():
+        if isinstance(v, dict):
+            clean_data[k] = sanitize_dict(v)
+        elif isinstance(v, list):
+            clean_data[k] = sanitize_list(v)
+        else:
+            clean_data[k] = sanitize_value(v)
+    return clean_data
 
 # ============================================================================
 # WEBSOCKET MANAGER (Frontend Broadcasting)
@@ -299,22 +338,6 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
     NaN/Infinity koruması ile JSON serileştirme hatalarını önler.
     """
     try:
-        import math
-
-        def sanitize_value(value):
-            """NaN/Infinity değerlerini 0.0'a çevir"""
-            if value is None:
-                return 0.0
-            if isinstance(value, (int, float)):
-                if math.isnan(value) or math.isinf(value):
-                    logger.warning(f"⚠️ [SANITIZE] NaN/Infinity detected: {value} → 0.0")
-                    return 0.0
-            return value
-
-        def sanitize_dict(data: dict) -> dict:
-            """Dict içindeki tüm değerleri sanitize et"""
-            return {k: sanitize_value(v) for k, v in data.items()}
-
         # Paper engine'den stats al
         stats = paper_engine.get_stats()
 
