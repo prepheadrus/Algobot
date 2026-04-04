@@ -19,6 +19,7 @@ import time
 from functools import wraps
 from typing import Callable, Any, Optional, Dict
 from enum import Enum
+import ccxt
 from core.logger import logger
 
 
@@ -309,7 +310,12 @@ exchange_breaker = CircuitBreaker(
     failure_threshold=5,
     recovery_timeout=60,
     success_threshold=3,
-    expected_exceptions=(Exception,),
+    expected_exceptions=(
+        ccxt.NetworkError,
+        ccxt.ExchangeNotAvailable,
+        ccxt.RequestTimeout,
+        asyncio.TimeoutError,
+    ),
 )
 
 # Database çağrıları için

@@ -953,13 +953,13 @@ class ExchangeManager:
                 # Eğer indirdiğimiz son mum DB'deki son mumdan SONRA ise, devam et (yeni mumlar)
                 # Eğer indirdiğimiz son mum DB'deki son mumdan ÖNCE ise, atla (eski veri)
                 if latest_ts and last_candle_ts <= latest_ts:
-                    logger.info(
+                    logger.debug(
                         f"⏭️ [GAP CHECK] {symbol} bu mumlar DB'de var, atlanıyor."
                     )
-                    logger.info(
+                    logger.debug(
                         f"   İndirilen son mum: {pd.to_datetime(last_candle_ts, unit='ms')}"
                     )
-                    logger.info(
+                    logger.debug(
                         f"   DB son mum: {pd.to_datetime(latest_ts, unit='ms')}"
                     )
                     # since'i güncelle, devam et
@@ -1421,21 +1421,21 @@ class ExchangeManager:
         symbol = normalize_symbol(symbol)
 
         # 🔥 KRITIK LOGLAMA - Poller başlangıcını izle
-        logger.info(f"🔥 [POLLER DEBUG] {symbol} run_strategy_poller BAŞLADI")
-        logger.info(f"🔥 [POLLER DEBUG] symbol={symbol}, timeframe={timeframe}")
+        logger.debug(f"🔥 [POLLER DEBUG] {symbol} run_strategy_poller BAŞLADI")
+        logger.debug(f"🔥 [POLLER DEBUG] symbol={symbol}, timeframe={timeframe}")
         logger.info(
             f"🚀 [FINAL HYBRID] {symbol} için strateji poller başlatılıyor ({timeframe})..."
         )
 
-        logger.info(f"📊 [POLLER DEBUG] paper_engine={paper_engine is not None}")
-        logger.info(
+        logger.debug(f"📊 [POLLER DEBUG] paper_engine={paper_engine is not None}")
+        logger.debug(
             f"📊 [POLLER DEBUG] active_bots={len(paper_engine.active_bots) if paper_engine else 0}"
         )
 
         # ========================================================================
         # YENİ: VERİ BOŞLUĞU KONTROLÜ (Gap Detection & Auto-Fill) - Refactored
         # ========================================================================
-        logger.info("🔥 [GAP CHECK] check_and_fill_gap başlatılıyor...")
+        logger.debug("🔥 [GAP CHECK] check_and_fill_gap başlatılıyor...")
         try:
             from core.trading.services.data_sync import data_synchronizer
 
@@ -1444,7 +1444,7 @@ class ExchangeManager:
                 data_synchronizer.check_and_fill_gap(symbol, self),
                 timeout=30.0,  # 30 saniye timeout
             )
-            logger.info("✅ [GAP CHECK] check_and_fill_gap TAMAMLANDI")
+            logger.debug("✅ [GAP CHECK] check_and_fill_gap TAMAMLANDI")
         except asyncio.TimeoutError:
             logger.warning(
                 "⚠️ [GAP CHECK] check_and_fill_gap TIMEOUT (30s) - devam ediliyor"
