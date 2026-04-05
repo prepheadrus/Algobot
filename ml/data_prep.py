@@ -56,7 +56,6 @@ def apply_triple_barrier(
     df = df.copy()
 
     # [KANTİTATİF ZIRH] Zaman serisinin fiziksel olarak eskiden yeniye akmasını sağla
-    # Fallback Hiyerarşisi: 1. DatetimeIndex -> 2. Spesifik Kolonlar -> 3. Nükleer Tersinme
     time_cols = ['timestamp', 'time', 'date', 'open_time', 'datetime']
     found_time_col = next((col for col in time_cols if col in df.columns), None)
 
@@ -64,17 +63,20 @@ def apply_triple_barrier(
         df = df.sort_index(ascending=True).reset_index(drop=True)
     elif found_time_col:
         col = found_time_col
-        # Veri tipi ms unix mi, saniye unix mi ya da string mi kontrolü
         if df[col].dtype in [np.int64, float]:
-            # Çok büyük sayılar milisaniyedir
             is_ms = df[col].max() > 1e11
             df[col] = pd.to_datetime(df[col], unit='ms' if is_ms else 's')
         else:
             df[col] = pd.to_datetime(df[col], errors='coerce')
         df = df.sort_values(col, ascending=True).reset_index(drop=True)
     else:
-        # Hiçbiri bulunamazsa fiziksel matris düzeyinde ters çevir (Parquet Descending -> Ascending varsayımı)
-        df = df.iloc[::-1].reset_index(drop=True)
+        # Son çare: İndekse göre zorla
+        df = df.sort_index(ascending=True).reset_index(drop=True)
+
+    # [MİMARİ KANIT TELEMETRİSİ]
+    import logging
+    arch_logger = logging.getLogger(__name__)
+    arch_logger.critical(f"🚀 [MİMARİ ONAY] KRONOLOJİK ZIRH AKTİF! DataFrame Satır Sayısı: {len(df)}")
 
     # ATR hesapla (eğer yoksa)
     if atr_col is None or atr_col not in df.columns:

@@ -148,10 +148,9 @@ class ModelTrainer:
             reg_lambda=reg_lambda,
             random_state=random_state,
             n_jobs=n_jobs,
-            objective='multi:softprob',
+            objective='multi:softmax',
             eval_metric='mlogloss',
-            num_class=num_class,
-            use_label_encoder=False
+            num_class=3
         )
 
         # Random Forest modelini başlat
