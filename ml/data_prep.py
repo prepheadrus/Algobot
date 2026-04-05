@@ -234,40 +234,36 @@ def engineer_features(
         "PVI",
         "NVI",
         "VWAP",  # VWAP'ın kendisi de fiyat içerir, biz oranını ('dist_to_vwap') kullanacağız.
-    ]
-
-    # --- 3. KEEP LIST (Tutulacaklar - Temel Gücümüz) ---
-    # Modelde kalmayı hak edenler
-    keep_list = [
-        "RSI_14",
-        "MACDh_12_26_9",
-        "ATR_14",
-        "OBV_EMA",
         "ADX_14",
-        "KONKORDE_AZUL",
-        "KONKORDE_VERDE",
         "KONKORDE_MARRON",
         "SWING_HIGH",
         "SWING_LOW",
         "volatility_ema",
-        "BTC_VIX",
         "PVIM",
         "NVIM",
         "STOCH_K_14_3_3",
+        "bollinger_pct_b", # Alpha listten çıkardık
     ]
 
-    # Yeni eklenen Alpha Faktörleri
-    alpha_list = [
-        "frac_diff_04",
+    # --- 3. KEEP LIST (Tutulacaklar - Temel Gücümüz) ---
+    # Modelde kalmayı hak edenler (Target özellikleri belirlediğimiz liste)
+    target_features = [
         "kalman_ret",
+        "frac_diff_04",
         "dist_to_vwap",
         "dist_to_ema50",
-        "bollinger_pct_b",
+        "MACDh_12_26_9",
+        "RSI_14",
+        "BTC_VIX",
+        "ROC_10",
+        "OBV_EMA",
+        "KONKORDE_AZUL",
+        "KONKORDE_VERDE",
+        "ATR_14",
     ]
 
     # Otomatik özellik kolonları seç (eğer belirtilmemişse)
     if feature_cols is None:
-        target_features = keep_list + alpha_list
         # Sadece DataFrame'de var olan ve hesaplanabilen kolonları al
         feature_cols = [col for col in target_features if col in df.columns]
 
@@ -289,14 +285,11 @@ def engineer_features(
         f"Özellik mühendisliği: {len(feature_cols)} kolon kullanılıyor. (Curse of Dimensionality önlendi)"
     )
 
-    # NaN ve Infinity temizliği (standartımız)
-    # Yeni eklenen alpha faktörleri (örn pct_change veya fraksiyonel fark) NaN üretebilir.
-    for col in feature_cols:
-        if col in df.columns:
-            df[col] = df[col].replace([np.inf, -np.inf], np.nan)
-            df[col] = df[col].fillna(
-                0
-            )  # XGBoost NaN'leri tolere edebilir ancak scaler için doldurmak güvenlidir.
+    # NaN ve Infinity temizliği (standartımız) - SADECE FEATURE COLUMNS İÇİN!
+    # Hedef (target) ve metadata kolonlarını bozmamak için pandas subset fillna kullanıyoruz
+    existing_feature_cols = [col for col in feature_cols if col in df.columns]
+    if existing_feature_cols:
+        df[existing_feature_cols] = df[existing_feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
 
     # Performans optimizasyonu (Hafıza kullanımı azaltma)
     try:
