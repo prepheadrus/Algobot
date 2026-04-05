@@ -212,9 +212,12 @@ class MLService:
             self.training_state["message"] = "Model kaydediliyor..."
             self.training_state["current_step"] = "Save model"
 
+            # Model ID olarak geçerli timestamp'i kullan
+            model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+
             # Merkezi path generator fonksiyonunu kullan
             from ml.model_training import get_model_paths
-            model_paths = get_model_paths(request.symbol, request.timeframe)
+            model_paths = get_model_paths(request.symbol, request.timeframe, model_id=model_id)
 
             # Model dizinini oluştur
             os.makedirs("artifacts/models", exist_ok=True)
@@ -244,7 +247,8 @@ class MLService:
                 X_train.shape[0] + X_test.shape[0],  # Toplam örnek sayısı
                 X_train.shape[1],  # Feature sayısı
                 training_metrics,  # Eğitim metrikleri
-                start_time
+                start_time,
+                model_id=model_id
             )
 
             # 8. Tamamlandı
@@ -297,7 +301,7 @@ class MLService:
                 "message": str(e)
             }
 
-    def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None):
+    def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None):
         """Eğitim geçmişini kaydet."""
         try:
             history_file = "artifacts/ml_training_history.json"
@@ -329,8 +333,10 @@ class MLService:
             duration_seconds = (completed_at - started_at).total_seconds()
 
             # Yeni kayıt - TÜM METRKLERİ KAYDET
+            training_id_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             new_entry = {
-                "training_id": f"{request.symbol}_{request.timeframe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                "training_id": f"{request.symbol}_{request.timeframe}_{training_id_timestamp}",
+                "model_id": model_id if model_id else training_id_timestamp,
                 "symbol": request.symbol,
                 "timeframe": request.timeframe,
                 "model_type": request.model_type,

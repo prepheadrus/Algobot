@@ -14,7 +14,7 @@ class SignalValidatorService:
         self.ml_models = ml_models_cache
         self.ml_enabled = True
 
-    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int) -> Tuple[bool, float, str, str]:
+    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int, model_id: Optional[str] = None) -> Tuple[bool, float, str, str]:
         """
         ML modeline danışarak mevcut sinyali onaylar veya reddeder.
 
@@ -31,7 +31,7 @@ class SignalValidatorService:
         if not self.ml_enabled:
             return True, ml_confidence, ml_rec, ml_rec_norm
 
-        ml_data = await self._get_ml_confirmation(symbol, timeframe, indicators)
+        ml_data = await self._get_ml_confirmation(symbol, timeframe, indicators, model_id)
         if ml_data:
             ml_rec = ml_data.get('recommendation', 'HOLD')
             ml_confidence = ml_data.get('confidence', 0.5)
@@ -60,12 +60,50 @@ class SignalValidatorService:
 
         return ml_confirmed, ml_confidence, ml_rec, ml_rec_norm
 
-    async def _get_ml_confirmation(self, symbol: str, timeframe: str, indicators: Dict[str, float]) -> Optional[Dict[str, Any]]:
+    async def _get_ml_confirmation(self, symbol: str, timeframe: str, indicators: Dict[str, float], model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         try:
             from ml.model_training import ModelTrainer, get_model_paths
-            cache_key = f"{symbol}_{timeframe}"
-            model_paths = get_model_paths(symbol, timeframe)
-            model_path = model_paths['xgboost_path']
+            import json
+
+            cache_key = f"{symbol}_{timeframe}_{model_id}" if model_id else f"{symbol}_{timeframe}"
+
+            # Eğer model_id varsa doğrudan onu kullan
+            if model_id:
+                model_paths = get_model_paths(symbol, timeframe, model_id=model_id)
+                model_path = model_paths['xgboost_path']
+            else:
+                # 1. Önce eski sistem (legacy) modeli ara (model_id=None)
+                legacy_paths = get_model_paths(symbol, timeframe)
+                if os.path.exists(legacy_paths['xgboost_path']):
+                    model_path = legacy_paths['xgboost_path']
+                    logger.debug(f"🧠 [ML] Legacy model bulundu: {model_path}")
+                else:
+                    # 2. Legacy yoksa, history'den bu sembol ve tf için son başarılı modeli bul
+                    history_file = "artifacts/ml_training_history.json"
+                    last_model_id = None
+                    if os.path.exists(history_file):
+                        with open(history_file, 'r') as f:
+                            history = json.load(f)
+
+                        # Bu sembol/tf için olanları filtrele ve tarihe göre sırala
+                        symbol_history = [
+                            h for h in history
+                            if h.get("symbol") == symbol and h.get("timeframe") == timeframe and h.get("model_id")
+                        ]
+
+                        if symbol_history:
+                            # En son eğitileni (listenin sonuncusu veya tarihe göre en yeni)
+                            symbol_history.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
+                            last_model_id = symbol_history[0].get("model_id")
+
+                    if last_model_id:
+                        model_paths = get_model_paths(symbol, timeframe, model_id=last_model_id)
+                        model_path = model_paths['xgboost_path']
+                        cache_key = f"{symbol}_{timeframe}_{last_model_id}"
+                        logger.debug(f"🧠 [ML] Fallback olarak en son model seçildi: {model_path}")
+                    else:
+                        # Hiçbir şey bulunamadı
+                        model_path = legacy_paths['xgboost_path']
 
             if not os.path.exists(model_path):
                 logger.debug(f"🧠 [ML] XGBoost model bulunamadı: {model_path}")

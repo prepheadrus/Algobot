@@ -57,6 +57,7 @@ class BotService:
                 timeframe=request.timeframe,
                 market_type=MarketType(request.market_type.value.lower()),
                 margin_type=MarginType(request.margin_type.value.lower()),
+                model_id=request.model_id
             )
 
             # Bot başlat (1-to-N mimarisi)

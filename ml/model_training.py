@@ -48,9 +48,11 @@ def _clean_symbol(symbol: str) -> str:
     return symbol.replace('/', '').replace(':', '').replace('-', '').lower()
 
 
-def get_model_paths(symbol: str, timeframe: str, base_dir: str = "artifacts/models") -> dict:
+def get_model_paths(symbol: str, timeframe: str, model_id: str = None, base_dir: str = "artifacts/models") -> dict:
     """
     ML model dosyaları için standartlaştırılmış dosya yollarını üretir.
+    Eğer model_id (timestamp veya UUID) verilmezse, eski "legacy" dosya yollarını döner.
+    Verilirse model_id sonuna eklenir.
 
     Bu fonksiyon, eğitim (save) ve yükleme (load) işlemlerinde
     tutarlı dosya isimlendirmesi sağlar.
@@ -58,6 +60,7 @@ def get_model_paths(symbol: str, timeframe: str, base_dir: str = "artifacts/mode
     Args:
         symbol: Sembol (örn: 'DOGE/USDT:USDT', 'BTC/USDT')
         timeframe: Zaman dilimi (örn: '1m', '1h')
+        model_id: Modelin benzersiz kimliği, genellikle bir timestamp (örn: '20260405_1830').
         base_dir: Model dosyalarının kaydedileceği temel dizin
 
     Returns:
@@ -65,21 +68,18 @@ def get_model_paths(symbol: str, timeframe: str, base_dir: str = "artifacts/mode
             - xgboost_path: XGBoost model dosyası (.json)
             - rf_path: Random Forest model dosyası (.joblib)
             - metadata_path: Metadata dosyası (.json)
-
-    Örnek:
-        >>> get_model_paths('DOGE/USDT:USDT', '1m')
-        {
-            'xgboost_path': 'artifacts/models/xgb_model_dogeusdtusdt_1m.json',
-            'rf_path': 'artifacts/models/xgb_model_dogeusdtusdt_1m_rf.joblib',
-            'metadata_path': 'artifacts/models/xgb_model_dogeusdtusdt_1m_metadata.json'
-        }
     """
     symbol_clean = _clean_symbol(symbol)
 
+    if model_id:
+        suffix = f"_{model_id}"
+    else:
+        suffix = ""
+
     return {
-        'xgboost_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}.json",
-        'rf_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}_rf.joblib",
-        'metadata_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}_metadata.json"
+        'xgboost_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}.json",
+        'rf_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}_rf.joblib",
+        'metadata_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}_metadata.json"
     }
 
 

@@ -71,6 +71,57 @@ async def get_training_history(limit: int = 50) -> Dict[str, Any]:
     return ml_service.get_training_history(limit)
 
 
+@router.get("/models")
+async def get_available_models(symbol: str, timeframe: str) -> Dict[str, Any]:
+    """
+    Belirli bir sembol ve zaman dilimi için mevcut (eğitilmiş) modelleri listeler.
+    Bu modeller history üzerinden getirilir.
+    """
+    try:
+        history_response = ml_service.get_training_history(limit=500)
+        if history_response.get("status") != "success":
+            raise HTTPException(status_code=500, detail="History yüklenemedi")
+
+        all_history = history_response.get("history", [])
+
+        # Sadece ilgili symbol ve timeframe için filtrele, en yeniler üstte
+        filtered_models = [
+            h for h in all_history
+            if h.get("symbol") == symbol and h.get("timeframe") == timeframe
+        ]
+
+        # Sonuçları hazırlanırken frontend için daha okunaklı formatta dön
+        models_list = []
+        for model in sorted(filtered_models, key=lambda x: x.get("completed_at", ""), reverse=True):
+            model_id = model.get("model_id")
+            if not model_id:
+                # Eski modellerde model_id olmayabilir, timestamp veya id uyduruyoruz
+                model_id = model.get("training_id", "").split("_")[-2] + "_" + model.get("training_id", "").split("_")[-1]
+
+            metrics = model.get("metrics", {})
+            accuracy = metrics.get("accuracy", 0) * 100
+
+            models_list.append({
+                "model_id": model_id,
+                "completed_at": model.get("completed_at"),
+                "accuracy": round(accuracy, 2),
+                "tp_multiplier": model.get("tp_multiplier"),
+                "sl_multiplier": model.get("sl_multiplier"),
+                "is_legacy": "model_id" not in model, # History'de explicit olarak model_id yoksa legacy'dir
+                "training_id": model.get("training_id")
+            })
+
+        return {
+            "status": "success",
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "models": models_list
+        }
+    except Exception as e:
+        logger.error(f"Modeller listelenirken hata: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/training-history")
 async def delete_training_history() -> Dict[str, Any]:
     """
