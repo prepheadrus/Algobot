@@ -13,16 +13,18 @@ import numpy as np
 _model_cache = {}
 
 
-def get_model_paths(symbol: str, timeframe: str) -> Dict[str, Path]:
+def get_model_paths(symbol: str, timeframe: str, model_id: str = None) -> dict:
     """Model dosya yollarını döner."""
     # Symbol formatını temizle (BTC/USDT:USDT → btcusdtusdt)
     symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
     base_path = Path("artifacts/models")
     
+    suffix = f"_{model_id}" if model_id else ""
+
     return {
-        'xgboost': base_path / f"xgb_model_{symbol_clean}_{timeframe}.json",
-        'random_forest': base_path / f"xgb_model_{symbol_clean}_{timeframe}_rf.joblib",
-        'metadata': base_path / f"xgb_model_{symbol_clean}_{timeframe}_metadata.json"
+        'xgboost': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}.json",
+        'random_forest': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}_rf.joblib",
+        'metadata': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}_metadata.json"
     }
 
 
