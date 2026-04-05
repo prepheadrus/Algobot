@@ -1,20 +1,22 @@
 import asyncio
-from api.strategy_builder_api import test_strategy, StrategySchema
+from fastapi.testclient import TestClient
+from main import app
 
-strategy = StrategySchema(
-    name="Test API",
-    indicators=[],
-    conditions={
-        "LONG": {"logic": "AND", "conditions": []},
-        "SHORT": {"logic": "AND", "conditions": []}
+client = TestClient(app)
+
+response = client.post(
+    "/api/v1/ml/train",
+    json={
+        "symbol": "BTC/USDT",
+        "timeframe": "1h",
+        "limit": 100,
+        "tp": 1.5,
+        "sl": 1.5,
+        "time_horizon": 12,
+        "n_estimators": 800,
+        "max_depth": 6,
+        "learning_rate": 0.01
     }
 )
-
-async def run():
-    try:
-        res = await test_strategy(strategy)
-        print("Success:", res)
-    except Exception as e:
-        print("Error:", e)
-
-asyncio.run(run())
+print(response.status_code)
+print(response.json())
