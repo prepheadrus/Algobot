@@ -10,7 +10,6 @@ import asyncio
 import yaml
 import os
 from core.config import CONFIG
-from core.logger import logger
 
 
 async def test_settings():

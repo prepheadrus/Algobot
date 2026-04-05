@@ -5,10 +5,8 @@ FastAPI router for ML operations.
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, List
+from typing import Dict, Any
 import traceback
-import calendar
-from datetime import datetime
 
 from core.logger import logger
 from api.schemas.ml import MLTrainRequest
@@ -192,7 +190,7 @@ async def run_visual_analysis(
 
         except Exception as e:
             logger.warning(f"⚠️ [STORAGE] Flat file yükleme hatası: {e}")
-            logger.info(f"🔄 [STORAGE] 1m'den resample'a geçiliyor...")
+            logger.info("🔄 [STORAGE] 1m'den resample'a geçiliyor...")
 
         # Flat file yoksa, 1m'den çek + resample
         if not klines_data or len(klines_data) == 0:
@@ -241,7 +239,7 @@ async def run_visual_analysis(
                 # NaN satırları temizle (boş mumlar)
                 df = df.dropna()
 
-                logger.info(f"✅ [DATA] Resampling Mimarisi Aktif: Veritabanı %98 Optimize Edildi")
+                logger.info("✅ [DATA] Resampling Mimarisi Aktif: Veritabanı %98 Optimize Edildi")
                 logger.info(f"✅ [ML] Resampling tamamlandı: {len(df)} mum ({timeframe})")
 
                 # Flat file'a kaydet (gelecek için)
@@ -251,13 +249,13 @@ async def run_visual_analysis(
                 except Exception as e:
                     logger.warning(f"⚠️ [STORAGE] Flat file kaydetme hatası: {e}")
             else:
-                logger.info(f"✅ [ML] 1m veri - Resampling gerek yok")
+                logger.info("✅ [ML] 1m veri - Resampling gerek yok")
         else:
             # Flat file'dan yüklendi, DataFrame'e çevir
             df = pd.DataFrame(klines_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
         # 2. İndikatör ve Özellikleri Hesapla
-        logger.info(f"📊 [ML] İndikatörler ve özellikler hesaplanıyor...")
+        logger.info("📊 [ML] İndikatörler ve özellikler hesaplanıyor...")
         df = StrategyIndicators.add_all_indicators(df)
 
         # [SYNC] LWC için saniye formatına kesin zorla (int64)

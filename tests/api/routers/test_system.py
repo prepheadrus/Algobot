@@ -1,5 +1,4 @@
 import pytest
-import math
 
 from api.routers.system import sanitize_value, sanitize_dict
 

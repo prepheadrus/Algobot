@@ -56,9 +56,7 @@ sys.modules['api.services.bot_service'] = MagicMock()
 sys.modules['api.services.data_service'] = MagicMock()
 sys.modules['api.services.strategy_service'] = MagicMock()
 
-import pytest
 from unittest.mock import patch
-import os
 
 # We need a proper mock for MLTrainRequest to avoid errors in ml_service.py if it's imported
 class MockMLTrainRequest:

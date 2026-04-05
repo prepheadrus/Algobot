@@ -1,7 +1,6 @@
 from strategy.base import BaseStrategy
 import pandas as pd
 import numpy as np
-from core.logger import logger
 
 class AdaptiveKoncordeX(BaseStrategy):
     """
@@ -97,7 +96,6 @@ class AdaptiveKoncordeX(BaseStrategy):
         from data.indicators.momentum import MomentumIndicators
         from data.indicators.volatility import VolatilityIndicators
         from data.indicators.advanced import AdvancedIndicators
-        from data.indicators.volume import VolumeIndicators
 
         close = df['close']
         high = df['high']

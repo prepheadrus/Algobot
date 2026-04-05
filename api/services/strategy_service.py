@@ -4,7 +4,7 @@ Strategy Service
 Business logic for strategy operations.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 import pandas as pd
 
 from core.logger import logger

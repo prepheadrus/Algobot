@@ -17,7 +17,6 @@ Kullanım:
 - Event akış istatistikleri
 """
 
-import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
 from collections import Counter

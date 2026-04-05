@@ -4,7 +4,7 @@ Data Service
 Business logic for data operations.
 """
 
-from typing import Dict, Any, List, Optional, Final
+from typing import Dict, Any, Optional, Final
 from datetime import datetime
 import pandas as pd
 
@@ -73,7 +73,7 @@ class DataService:
         Returns:
             pd.DataFrame veya None
         """
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timezone
         import pandas as pd
         from data.indicators import StrategyIndicators
 
@@ -94,7 +94,7 @@ class DataService:
         # NOT: DataLake _sadece_ 1m veriyi yükleyecek şekilde zorlanıyor. (Master Data = 1m)
         lake = self._get_parquet_lake()
 
-        logger.info(f"🔍 [HYBRID DATA] (A) Parquet Lake üzerinden 1m (Master Data) taranıyor...")
+        logger.info("🔍 [HYBRID DATA] (A) Parquet Lake üzerinden 1m (Master Data) taranıyor...")
         df_1m = await lake.load_datasets(symbol, MASTER_TIMEFRAME, start_date, end_date)
 
         if df_1m is not None and not df_1m.empty:
@@ -104,7 +104,7 @@ class DataService:
             if df_1m.index.tzinfo is not None:
                 df_1m.index = df_1m.index.tz_convert(None)
         else:
-            logger.info(f"⚠️ [HYBRID DATA] Diskte 1m Master Data bulunamadı.")
+            logger.info("⚠️ [HYBRID DATA] Diskte 1m Master Data bulunamadı.")
             df_1m = pd.DataFrame()
 
         # 2. Gap Fill (Diskteki son veri ile günümüz arasını tamamla veya API'den tümünü çek)
@@ -126,7 +126,7 @@ class DataService:
             # Parquet 1m Master Data'nın zorunlu olmasını sağlıyoruz. WFO'yu veya stratejiyi 1500 mumla aldatmamak için
             # None dönüp hata atıyoruz, böylece arka plan processi beklemeye geçer.
             logger.error(f"❌ [HYBRID DATA] (BLOCKER) Diskte {symbol} için {MASTER_TIMEFRAME} Master Data bulunamadı!")
-            logger.warning(f"⚠️ [HYBRID DATA] Tam geçmiş veri indirmesi başlatılmadan botlar veya optimizasyonlar çalışamaz.")
+            logger.warning("⚠️ [HYBRID DATA] Tam geçmiş veri indirmesi başlatılmadan botlar veya optimizasyonlar çalışamaz.")
             return None
 
         else:
@@ -173,7 +173,7 @@ class DataService:
                 df_1m = df_1m[df_1m.index <= end_ts]
 
         if df_1m.empty:
-            logger.warning(f"❌ [HYBRID DATA] Birleştirme ve filtreleme sonrası veri yok!")
+            logger.warning("❌ [HYBRID DATA] Birleştirme ve filtreleme sonrası veri yok!")
             return None
 
         # 4. On-the-Fly Resampling (B)
@@ -242,8 +242,8 @@ class DataService:
         # YENİ: RESAMPLING MİMARİSİ - Her zaman 1m indirilir
         # ========================================================================
         logger.info(f"🔄 [DATA] {request.symbol} için {request.timeframe} talep edildi, ancak SADECE 1m indiriliyor...")
-        logger.info(f"📊 [DATA] Resampling Mimarisi: Veritabanı %98 Optimize Edildi")
-        logger.info(f"💡 [DATA] Diğer TF'ler (5m, 15m, 1h, vb.) RAM üzerinde otomatik oluşturulacak")
+        logger.info("📊 [DATA] Resampling Mimarisi: Veritabanı %98 Optimize Edildi")
+        logger.info("💡 [DATA] Diğer TF'ler (5m, 15m, 1h, vb.) RAM üzerinde otomatik oluşturulacak")
 
         # Timeframe'i 1m'ye zorla (kullanıcı ne seçerse seçsin)
         download_timeframe = '1m'
@@ -416,7 +416,7 @@ class DataService:
                 if total_pq_deleted > 0:
                     logger.info(f"✅ [PARQUET] Toplam {total_pq_deleted} sembol Parquet'ten silindi")
                 else:
-                    logger.warning(f"⚠️ [PARQUET] Hiçbir Parquet dosyası bulunamadı veya silinmedi")
+                    logger.warning("⚠️ [PARQUET] Hiçbir Parquet dosyası bulunamadı veya silinmedi")
 
             except Exception as parquet_err:
                 logger.error(f"❌ [PARQUET] Silme hatası: {parquet_err}")
@@ -495,7 +495,7 @@ class DataService:
             # ========================================================================
             # 3. YANIT
             # ========================================================================
-            logger.info(f"📊 [DATA] Resampling Mimarisi: Artık SADECE 1m mumları indireceğiz!")
+            logger.info("📊 [DATA] Resampling Mimarisi: Artık SADECE 1m mumları indireceğiz!")
 
             return {
                 "status": "success",
@@ -603,7 +603,7 @@ class DataService:
             return {
                 "status": "success",
                 "message": f"{request.symbol} için {deleted_count} görev silindi." +
-                          (f" Veri de temizlendi." if request.timeframe else "")
+                          (" Veri de temizlendi." if request.timeframe else "")
             }
         except Exception as e:
             logger.error(f"Delete download task error: {e}")

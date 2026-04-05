@@ -33,7 +33,7 @@ from shared.events import event_bus
 # New Managers (Aşama 2'de oluşturuldu)
 from core.trading.position_manager import PositionManager
 from core.risk.risk_engine import RiskEngine, RiskConfig
-from core.bot.bot_manager import BotManager, BotConfig, MarketType, MarginType
+from core.bot.bot_manager import BotManager, BotConfig
 
 # Legacy imports (geriye dönük uyumluluk)
 from strategy.manager import StrategyManager

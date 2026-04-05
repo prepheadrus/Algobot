@@ -37,7 +37,7 @@ from api.routers.trades import router as trades_router
 # LIFESPAN EVENTS
 # ============================================================================
 
-from core.config import CONFIG, API_HOST, API_PORT, ALLOWED_ORIGINS
+from core.config import API_HOST, API_PORT, ALLOWED_ORIGINS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

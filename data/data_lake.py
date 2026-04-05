@@ -24,12 +24,10 @@ Dosya Yapısı:
 - Columnar storage (sadece ihtiyacın olan kolonu oku)
 """
 
-import os
-import time  # 🔒 File lock retry için
 import asyncio
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from datetime import datetime
 import numpy as np
 from core.logger import logger
@@ -72,7 +70,7 @@ class DataLakeStorage:
 
         # Base directory oluştur (yoksa)
         self.BASE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"🏗️ [DATA LAKE] Resampling Dosya Sistemi (data/ohlcv/) Devrede")
+        logger.info("🏗️ [DATA LAKE] Resampling Dosya Sistemi (data/ohlcv/) Devrede")
         logger.info(f"📁 [DATA LAKE] Base directory: {self.BASE_DIR.absolute()}")
         logger.info(f"💾 [DATA LAKE] Compression: {self.COMPRESSION}")
         logger.info(f"🚀 [DATA LAKE] PyArrow: {'✅ Aktif' if PYARROW_AVAILABLE else '❌ Pasif'}")

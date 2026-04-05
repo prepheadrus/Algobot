@@ -16,11 +16,10 @@ Usage:
     df = storage.load_ohlcv('BTC/USDT', '1m', start_date, end_date)
 """
 
-import os
 import pandas as pd
 from pathlib import Path
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from typing import Optional, List
+from datetime import datetime
 from core.logger import logger
 
 
@@ -39,7 +38,7 @@ class OHLCVStorage:
     def __init__(self):
         """OHLCV Storage'ı başlat."""
         self.BASE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"📦 [OHLCV_STORAGE] Legacy Flat File Uyumluluk Katmanı Aktif")
+        logger.info("📦 [OHLCV_STORAGE] Legacy Flat File Uyumluluk Katmanı Aktif")
         logger.info(f"📁 [OHLCV_STORAGE] Base directory: {self.BASE_DIR.absolute()}")
     
     def _symbol_to_path(self, symbol: str) -> str:

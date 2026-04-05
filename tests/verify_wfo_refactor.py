@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from core.wfo_engine import WFOEngine, OptimizationConfig
 import pandas as pd
 import numpy as np

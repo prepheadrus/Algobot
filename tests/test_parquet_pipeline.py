@@ -61,7 +61,7 @@ class ParquetPipelineTest:
             test_df['timestamp'] = pd.to_datetime(test_df['timestamp'], unit='ms')
             test_df.set_index('timestamp', inplace=True)
 
-            logger.info(f"📊 [TEST] Oluşturulan DataFrame (tz-naive):")
+            logger.info("📊 [TEST] Oluşturulan DataFrame (tz-naive):")
             logger.info(f"   Index tzinfo: {test_df.index.tzinfo}")
             logger.info(f"   İlk satır: {test_df.index[0]}")
 
@@ -92,7 +92,7 @@ class ParquetPipelineTest:
             else:
                 test_df.index = test_df.index.tz_convert('UTC')
 
-            logger.info(f"✅ [TEST] Timezone dönüşümü sonrası:")
+            logger.info("✅ [TEST] Timezone dönüşümü sonrası:")
             logger.info(f"   Index tzinfo: {test_df.index.tzinfo}")
             logger.info(f"   İlk satır: {test_df.index[0]}")
 
@@ -100,9 +100,9 @@ class ParquetPipelineTest:
             assert test_df.index.tzinfo is not None, "❌ Index tz-naive kaldı!"
             assert str(test_df.index.tzinfo) == 'UTC', f"❌ Timezone UTC değil: {test_df.index.tzinfo}"
 
-            logger.info(f"✅ [PASS] Timezone standardization BAŞARILI!")
-            logger.info(f"   ✅ Tüm timestamp'ler UTC (offset-aware)")
-            logger.info(f"   ✅ can't compare offset-naive and offset-aware hatası ÇÖZÜLDÜ")
+            logger.info("✅ [PASS] Timezone standardization BAŞARILI!")
+            logger.info("   ✅ Tüm timestamp'ler UTC (offset-aware)")
+            logger.info("   ✅ can't compare offset-naive and offset-aware hatası ÇÖZÜLDÜ")
 
             return True
 
@@ -143,12 +143,12 @@ class ParquetPipelineTest:
             temp_path.parent.mkdir(parents=True, exist_ok=True)
             
             # 3. Senkron yazma (to_thread ile)
-            logger.info(f"📝 [TEST] Parquet yazma (asyncio.to_thread)...")
+            logger.info("📝 [TEST] Parquet yazma (asyncio.to_thread)...")
             await asyncio.to_thread(test_df.to_parquet, temp_path, compression='snappy', index=False)
             logger.info(f"✅ [TEST] Dosya yazıldı: {temp_path}")
             
             # 4. Senkron okuma (to_thread ile)
-            logger.info(f"📖 [TEST] Parquet okuma (asyncio.to_thread)...")
+            logger.info("📖 [TEST] Parquet okuma (asyncio.to_thread)...")
             loaded_df = await asyncio.to_thread(pd.read_parquet, temp_path)
             logger.info(f"✅ [TEST] Dosya okundu: {len(loaded_df)} satır")
             
@@ -159,12 +159,12 @@ class ParquetPipelineTest:
             
             # 6. Temizlik
             temp_path.unlink()
-            logger.info(f"🗑️ [TEST] Geçici dosya silindi")
+            logger.info("🗑️ [TEST] Geçici dosya silindi")
             
-            logger.info(f"✅ [PASS] Async I/O isolation BAŞARILI!")
-            logger.info(f"   ✅ asyncio.to_thread() doğru kullanılıyor")
-            logger.info(f"   ✅ Coroutine sızıntısı YOK")
-            logger.info(f"   ✅ 'coroutine object has no attribute empty' hatası ÇÖZÜLDÜ")
+            logger.info("✅ [PASS] Async I/O isolation BAŞARILI!")
+            logger.info("   ✅ asyncio.to_thread() doğru kullanılıyor")
+            logger.info("   ✅ Coroutine sızıntısı YOK")
+            logger.info("   ✅ 'coroutine object has no attribute empty' hatası ÇÖZÜLDÜ")
             
             return True
             
@@ -197,7 +197,7 @@ class ParquetPipelineTest:
             logger.info(f"📊 [TEST] Sembol: {self.test_symbol}, Timeframe: {self.test_timeframe}")
             
             # 2. Binance'den veri çek
-            logger.info(f"📥 [TEST] Binance'den veri çekiliyor...")
+            logger.info("📥 [TEST] Binance'den veri çekiliyor...")
             klines = await self.exchange.fetch_ohlcv(
                 self.test_symbol,
                 self.test_timeframe,
@@ -206,7 +206,7 @@ class ParquetPipelineTest:
             )
             
             if not klines or len(klines) == 0:
-                logger.error(f"❌ [FAIL] Binance'den veri çekilemedi!")
+                logger.error("❌ [FAIL] Binance'den veri çekilemedi!")
                 return False
             
             logger.info(f"✅ [TEST] {len(klines)} mum çekildi")
@@ -222,7 +222,7 @@ class ParquetPipelineTest:
             logger.info(f"   Son mum: {df.index[-1]}")
             
             # 4. Parquet'e yaz
-            logger.info(f"💾 [TEST] Parquet'e yazılıyor...")
+            logger.info("💾 [TEST] Parquet'e yazılıyor...")
             save_success = await self.lake.save(self.test_symbol, self.test_timeframe, df, append=False)
 
             # 🔥 DÜZELTME: ParquetDataLake MTF-Daily yapısı kullanıyor
@@ -231,7 +231,7 @@ class ParquetPipelineTest:
             test_path = self.lake.BASE_DIR / "binance" / self.test_symbol / self.test_timeframe
 
             if not save_success:
-                logger.warning(f"⚠️ [TEST] save() False döndü ama dosyaları kontrol ediyoruz...")
+                logger.warning("⚠️ [TEST] save() False döndü ama dosyaları kontrol ediyoruz...")
 
             # 🔍 YENİ: MTF-Daily yapısını kontrol et (YYYY/MM/DD/data.parquet)
             parquet_files = []
@@ -244,7 +244,7 @@ class ParquetPipelineTest:
                             parquet_files.extend(day_files)
 
             if not parquet_files:
-                logger.error(f"❌ [FAIL] Parquet dosyaları bulunamadı!")
+                logger.error("❌ [FAIL] Parquet dosyaları bulunamadı!")
                 logger.error(f"   🔍 Test path: {test_path}")
                 # Mevcut dosyaları göster
                 all_files = list(self.lake.BASE_DIR.rglob("*.parquet"))
@@ -259,7 +259,7 @@ class ParquetPipelineTest:
             logger.info(f"   🔍 Path: {test_path}")
             
             # 5. Parquet'ten oku
-            logger.info(f"📖 [TEST] Parquet'ten okunuyor...")
+            logger.info("📖 [TEST] Parquet'ten okunuyor...")
             loaded_df = await self.lake.load_datasets(
                 self.test_symbol,
                 self.test_timeframe,
@@ -268,7 +268,7 @@ class ParquetPipelineTest:
             )
             
             if loaded_df is None or loaded_df.empty:
-                logger.error(f"❌ [FAIL] Parquet'ten veri okunamadı!")
+                logger.error("❌ [FAIL] Parquet'ten veri okunamadı!")
                 return False
             
             loaded_count = len(loaded_df)
@@ -277,7 +277,7 @@ class ParquetPipelineTest:
             logger.info(f"   Son mum: {loaded_df.index[-1]}")
             
             # 6. Gap detection
-            logger.info(f"🔍 [TEST] Gap detection...")
+            logger.info("🔍 [TEST] Gap detection...")
             
             # Satır sayısı kontrolü
             if loaded_count != expected_count:
@@ -301,24 +301,24 @@ class ParquetPipelineTest:
             last_match = (df.iloc[-1] == loaded_df.iloc[-1]).all()
             
             if not first_match:
-                logger.error(f"❌ [FAIL] İlk satır eşleşmiyor!")
+                logger.error("❌ [FAIL] İlk satır eşleşmiyor!")
                 return False
             
             if not last_match:
-                logger.error(f"❌ [FAIL] Son satır eşleşmiyor!")
+                logger.error("❌ [FAIL] Son satır eşleşmiyor!")
                 return False
             
-            logger.info(f"✅ [TEST] İlk satır: ✅ Eşleşti")
-            logger.info(f"✅ [TEST] Son satır: ✅ Eşleşti")
+            logger.info("✅ [TEST] İlk satır: ✅ Eşleşti")
+            logger.info("✅ [TEST] Son satır: ✅ Eşleşti")
             
             # 8. Temizlik (test dosyasını sil)
-            logger.info(f"🗑️ [TEST] Test dosyaları temizleniyor...")
+            logger.info("🗑️ [TEST] Test dosyaları temizleniyor...")
             await self._cleanup_test_data()
             
-            logger.info(f"✅ [PASS] Dummy data pipeline BAŞARILI!")
-            logger.info(f"   ✅ Veri kaybı YOK (0 mum eksik)")
-            logger.info(f"   ✅ Timestamp süreklilik OK")
-            logger.info(f"   ✅ İlk/Son satır eşleşmesi OK")
+            logger.info("✅ [PASS] Dummy data pipeline BAŞARILI!")
+            logger.info("   ✅ Veri kaybı YOK (0 mum eksik)")
+            logger.info("   ✅ Timestamp süreklilik OK")
+            logger.info("   ✅ İlk/Son satır eşleşmesi OK")
             
             return True
             
@@ -368,12 +368,12 @@ class ParquetPipelineTest:
         logger.info(f"\n📈 TOPLAM: {passed}/{total} test başarılı")
         
         if passed == total:
-            logger.info(f"\n🎉 TÜM TESTLER BAŞARILI! Data Integrity doğrulandı.")
-            logger.info(f"   ✅ Timezone: UTC (offset-aware)")
-            logger.info(f"   ✅ Async I/O: to_thread() ile sarılmış")
-            logger.info(f"   ✅ Data Pipeline: Gap YOK")
+            logger.info("\n🎉 TÜM TESTLER BAŞARILI! Data Integrity doğrulandı.")
+            logger.info("   ✅ Timezone: UTC (offset-aware)")
+            logger.info("   ✅ Async I/O: to_thread() ile sarılmış")
+            logger.info("   ✅ Data Pipeline: Gap YOK")
         else:
-            logger.error(f"\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
+            logger.error("\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
         
         return passed == total
 

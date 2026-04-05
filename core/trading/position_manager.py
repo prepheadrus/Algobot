@@ -34,16 +34,13 @@ Usage:
 
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from shared.events.event_bus import event_bus, Event
-from decimal import Decimal
+from shared.events.event_bus import event_bus
 import asyncio
 
 from core.logger import logger
 from core.trading.entities.position import Position, PositionDirection
 from shared.events.events import PositionPartialClosedEvent, StopLossUpdatedEvent
 from core.trading.entities.trade import Trade, TradeHistory
-from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
-from strategy.risk import RiskManagement
 
 
 class PositionManager:

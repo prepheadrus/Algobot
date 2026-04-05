@@ -4,7 +4,7 @@ Bot Service
 Business logic for bot operations.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 import asyncio
 
 from core.logger import logger

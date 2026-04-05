@@ -7,7 +7,6 @@ Sorun: Browser response'u cache'liyor → UI eski veriyi gösteriyor.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
@@ -76,7 +75,7 @@ async def test_cache_busting_with_timestamp():
     assert response1.headers["Cache-Control"] == "no-cache, no-store, must-revalidate"
     assert response2.headers["Cache-Control"] == "no-cache, no-store, must-revalidate"
     
-    print(f"✅ Cache-busting successful: 2 unique timestamps, 2 real API calls")
+    print("✅ Cache-busting successful: 2 unique timestamps, 2 real API calls")
 
 
 @pytest.mark.asyncio
@@ -114,7 +113,6 @@ async def test_api_client_cache_busting_integration():
     """
     Frontend API client ?_t=timestamp gönderiyor.
     """
-    from unittest.mock import MagicMock
     import sys
     sys.path.append('frontend')
     

@@ -24,7 +24,7 @@ async def test():
 
     # Hangi semboller var?
     symbols = await db_manager.get_symbols_with_data()
-    print(f"\n=== DB'deki Semboller ===")
+    print("\n=== DB'deki Semboller ===")
     for s in symbols[:10]:
         print(f'  - {s}')
 

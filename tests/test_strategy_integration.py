@@ -6,12 +6,9 @@ Backend + Frontend + Bot entegrasyon testleri
 import unittest
 import pandas as pd
 import numpy as np
-import json
 import os
-from datetime import datetime, timedelta
 
 from strategy.builder import StrategyBuilder, StrategyExecutor, StrategyValidator
-from strategy.manager import StrategyManager
 from core.paper import PaperTrader
 
 
@@ -59,7 +56,7 @@ class TestStrategyBuilderIntegration(unittest.TestCase):
         is_valid, errors = StrategyValidator.validate(self.builder.strategy)
         
         self.assertTrue(is_valid, f"Strateji valid olmalı: {errors}")
-        print(f"  [OK] Strateji oluşturuldu ve valid")
+        print("  [OK] Strateji oluşturuldu ve valid")
     
     def test_02_executor_signal_generation(self):
         """Executor sinyal üretme testi"""
@@ -107,7 +104,7 @@ class TestStrategyBuilderIntegration(unittest.TestCase):
         
         # Temizle
         os.remove(filename)
-        print(f"  [OK] Dosya kaydedildi ve yüklendi")
+        print("  [OK] Dosya kaydedildi ve yüklendi")
     
     def test_04_paper_trader_integration(self):
         """Paper trader entegrasyon testi"""
@@ -163,7 +160,7 @@ class TestStrategyBuilderIntegration(unittest.TestCase):
             signals = executor.generate_signals(df)
             self.assertEqual(len(signals), len(df))
         
-        print(f"  [OK] Multi-timeframe testleri geçti")
+        print("  [OK] Multi-timeframe testleri geçti")
     
     def test_06_complex_conditions(self):
         """Kompleks koşul kombinasyonları testi"""
@@ -189,7 +186,7 @@ class TestStrategyBuilderIntegration(unittest.TestCase):
         is_valid, errors = StrategyValidator.validate(builder_or.strategy)
         self.assertTrue(is_valid)
         
-        print(f"  [OK] AND/OR koşulları çalışıyor")
+        print("  [OK] AND/OR koşulları çalışıyor")
     
     def test_07_edge_cases(self):
         """Edge case testleri"""
@@ -215,7 +212,7 @@ class TestStrategyBuilderIntegration(unittest.TestCase):
         is_valid, errors = StrategyValidator.validate(invalid_builder.strategy)
         self.assertFalse(is_valid)  # Invalid olmalı
         
-        print(f"  [OK] Edge case'ler yakalandı")
+        print("  [OK] Edge case'ler yakalandı")
 
 
 class TestBacktestIntegration(unittest.TestCase):

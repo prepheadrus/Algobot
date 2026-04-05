@@ -25,7 +25,6 @@ Usage:
 
 from typing import Dict, Any, List, Union
 from core.logger import logger
-import numpy as np
 
 
 class AutoGridGenerator:

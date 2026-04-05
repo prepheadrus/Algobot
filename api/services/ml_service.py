@@ -154,6 +154,9 @@ class MLService:
                 f"n_estimators={request.n_estimators}, max_depth={request.max_depth}"
             )
             
+            # KESİN LOG - API DEĞERLERİ
+            logger.info(f"API ALDI: TP={request.tp}, SL={request.sl}, Horizon={request.time_horizon}, Est={request.n_estimators}, Depth={request.max_depth}")
+
             # 1.5 İndikatörleri ve özelliklerini ekle
             logger.info("📊 [ML] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
             from data.indicators import StrategyIndicators
@@ -167,11 +170,17 @@ class MLService:
 
             # 2-3. Feature engineering + Triple Barrier + Train/test split (hepsi bir arada)
             from ml.data_prep import prepare_ml_data
+
+            # Argümanları explicitly olarak bir değişkene atayalım ve öyle gönderelim (zincirleme garantisi)
+            tp_val = float(request.tp)
+            sl_val = float(request.sl)
+            hz_val = int(request.time_horizon)
+
             X_train, X_test, y_train, y_test, scaler = prepare_ml_data(
                 df,
-                tp_multiplier=request.tp,
-                sl_multiplier=request.sl,
-                time_horizon=request.time_horizon,
+                tp_multiplier=tp_val,
+                sl_multiplier=sl_val,
+                time_horizon=hz_val,
                 skip_barrier=False  # Triple Barrier uygula
             )
             

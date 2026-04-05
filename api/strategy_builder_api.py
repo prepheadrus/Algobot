@@ -10,7 +10,6 @@ import json
 import os
 from datetime import datetime
 from cachetools import TTLCache
-import asyncio
 import traceback
 
 from strategy.builder import StrategyBuilder, StrategyExecutor, StrategyValidator
@@ -168,7 +167,7 @@ async def list_strategies():
                         "indicators_count": len(strategy.get('indicators', [])),
                         "created_at": strategy.get('created_at', '')
                     })
-                except Exception as e:
+                except Exception:
                     continue
         
         return {
@@ -232,7 +231,6 @@ async def get_available_indicators():
     """
     Mevcut indikatörleri listele
     """
-    from strategy.builder import StrategyBuilder
     
     builder = StrategyBuilder()
     

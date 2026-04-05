@@ -11,7 +11,6 @@ def generate_dummy_data(rows=1000):
     current_price = 60000.0 # Örn: BTC Fiyatı
     
     import random
-    import numpy as np
     
     for _ in range(rows):
         volatility = current_price * 0.005 # %0.5 Volatilite

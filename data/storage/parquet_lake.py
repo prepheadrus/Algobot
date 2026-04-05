@@ -38,7 +38,6 @@ Dosya Yapısı:
 - Pandas DatetimeIndex → Hızlı zaman bazlı sorgulama
 """
 
-import os
 import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -94,7 +93,7 @@ class ParquetDataLake:
 
         # Base directory oluştur
         self.BASE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"🏗️ [PARQUET LAKE] Superalgos MTF Mimarisi Devrede")
+        logger.info("🏗️ [PARQUET LAKE] Superalgos MTF Mimarisi Devrede")
         logger.info(f"📁 [PARQUET LAKE] Base: {self.BASE_DIR.absolute()}")
         logger.info(f"🏢 [PARQUET LAKE] Exchange: {self.exchange}")
         logger.info(f"💾 [PARQUET LAKE] Compression: {self.COMPRESSION}")
@@ -370,7 +369,7 @@ class ParquetDataLake:
                         except ImportError as ie:
                             # PyArrow/fastparquet eksik, uyarı ver ama devam et
                             logger.warning(f"⚠️ [PARQUET] PyArrow/fastparquet eksik, parquet kaydedilemedi: {ie}")
-                            logger.warning(f"⚠️ [PARQUET] ML eğitimi SQLite'dan devam edecek")
+                            logger.warning("⚠️ [PARQUET] ML eğitimi SQLite'dan devam edecek")
                             # Parquet kaydedilemedi ama işlem devam etsin
                             pass
                         except Exception as e:

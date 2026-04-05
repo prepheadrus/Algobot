@@ -5,7 +5,7 @@ FastAPI router for trade history and analytics.
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from core.logger import logger

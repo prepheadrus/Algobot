@@ -5,7 +5,6 @@ Veritabanındaki duplicate trade kayıtlarını temizler.
 """
 
 import sqlite3
-from datetime import datetime
 
 DB_PATH = "cryptobot.db"
 

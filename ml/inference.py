@@ -5,7 +5,6 @@ Ensemble model (XGBoost + Random Forest) üzerinden canlı tahmin üretir.
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import numpy as np
@@ -127,6 +126,7 @@ def get_ml_prediction(symbol: str, timeframe: str, indicators: Dict[str, float])
     xgb_pred = None
     xgb_confidence = None
     if xgb_model:
+        import xgboost as xgb
         xgb_pred_proba = xgb_model.predict(xgb.DMatrix(X))
         xgb_pred = int(np.argmax(xgb_pred_proba[0]))
         xgb_confidence = float(np.max(xgb_pred_proba[0]))

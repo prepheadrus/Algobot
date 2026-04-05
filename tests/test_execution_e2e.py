@@ -13,10 +13,7 @@ Kullanım:
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
-import pandas as pd
-import numpy as np
-from dataclasses import dataclass
+from datetime import datetime
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -25,7 +22,6 @@ from core.logger import logger
 from core.risk.risk_engine import RiskEngine, RiskConfig
 from core.trading.position_manager import PositionManager
 from core.trading.entities.position import Position, PositionDirection
-from core.trading.entities.trade import Trade
 
 
 class ExecutionE2ETest:
@@ -61,7 +57,7 @@ class ExecutionE2ETest:
             price_distance = abs(entry_price - stop_loss_price)  # $1000
             expected_size_by_risk = risk_amount / price_distance  # 0.1 BTC
 
-            logger.info(f"📊 [TEST] Parametreler:")
+            logger.info("📊 [TEST] Parametreler:")
             logger.info(f"   Hesap Bakiyesi: ${account_balance:,.2f}")
             logger.info(f"   Risk: %{risk_percentage}")
             logger.info(f"   Giriş Fiyatı: ${entry_price:,.2f}")
@@ -84,19 +80,19 @@ class ExecutionE2ETest:
             # 4. Doğrulama - Risk engine birden fazla limit uyguladığı için
             # calculated_size <= expected_size_by_risk olmalı (asla aşmamalı)
             if calculated_size <= expected_size_by_risk:
-                logger.info(f"✅ [TEST] Risk limiti KORUNDU!")
+                logger.info("✅ [TEST] Risk limiti KORUNDU!")
                 logger.info(f"   Beklenen (max): {expected_size_by_risk:.4f}, Hesaplanan: {calculated_size:.4f}")
 
                 # 5. Risk Amount doğrulama
                 actual_risk = calculated_size * price_distance
                 logger.info(f"✅ [TEST] Risk Amount: ${actual_risk:,.2f} (Max: ${risk_amount:,.2f})")
 
-                logger.info(f"✅ [PASS] Risk-Based Position Sizing DOĞRU")
-                logger.info(f"   ✅ Formül: (Bakiye × Risk%) / |Giriş - Stop|")
-                logger.info(f"   ✅ Risk Amount <= İşlem başına maksimum kayıp")
+                logger.info("✅ [PASS] Risk-Based Position Sizing DOĞRU")
+                logger.info("   ✅ Formül: (Bakiye × Risk%) / |Giriş - Stop|")
+                logger.info("   ✅ Risk Amount <= İşlem başına maksimum kayıp")
                 return True
             else:
-                logger.error(f"❌ [FAIL] Risk limiti aşıldı!")
+                logger.error("❌ [FAIL] Risk limiti aşıldı!")
                 logger.error(f"   Beklenen (max): {expected_size_by_risk:.4f}, Hesaplanan: {calculated_size:.4f}")
                 return False
 
@@ -118,7 +114,7 @@ class ExecutionE2ETest:
             from datetime import datetime
 
             # 1. LONG pozisyon test
-            logger.info(f"📊 [TEST] LONG Pozisyon Testi")
+            logger.info("📊 [TEST] LONG Pozisyon Testi")
 
             initial_price = 50000.0
             atr = 500.0
@@ -155,7 +151,7 @@ class ExecutionE2ETest:
             initial_sl = long_position.stop_loss
             previous_sl = initial_sl
 
-            logger.info(f"\n   Fiyat Akışı:")
+            logger.info("\n   Fiyat Akışı:")
 
             for i, (high, low) in enumerate(price_sequence):
                 # Trailing stop güncelle
@@ -185,7 +181,7 @@ class ExecutionE2ETest:
                 logger.warning(f"⚠️ [TEST] LONG SL değişmedi: ${initial_sl:,.2f}")
 
             # 4. SHORT pozisyon test
-            logger.info(f"\n📊 [TEST] SHORT Pozisyon Testi")
+            logger.info("\n📊 [TEST] SHORT Pozisyon Testi")
 
             short_position = Position(
                 bot_id="test_short_1",
@@ -215,7 +211,7 @@ class ExecutionE2ETest:
             initial_sl_short = short_position.stop_loss
             previous_sl_short = initial_sl_short
 
-            logger.info(f"\n   Fiyat Akışı:")
+            logger.info("\n   Fiyat Akışı:")
 
             for i, (high, low) in enumerate(price_sequence_short):
                 updated_position = await self.position_manager.update_trailing_stop(
@@ -243,10 +239,10 @@ class ExecutionE2ETest:
             else:
                 logger.warning(f"⚠️ [TEST] SHORT SL değişmedi: ${initial_sl_short:,.2f}")
 
-            logger.info(f"\n✅ [PASS] Asenkron Trailing Stop DOĞRU")
-            logger.info(f"   ✅ LONG: SL SADECE YUKARI taşındı")
-            logger.info(f"   ✅ SHORT: SL SADECE AŞAĞI taşındı")
-            logger.info(f"   ✅ ATR × Çarpan mesafesi korundu")
+            logger.info("\n✅ [PASS] Asenkron Trailing Stop DOĞRU")
+            logger.info("   ✅ LONG: SL SADECE YUKARI taşındı")
+            logger.info("   ✅ SHORT: SL SADECE AŞAĞI taşındı")
+            logger.info("   ✅ ATR × Çarpan mesafesi korundu")
 
             return True
 
@@ -275,7 +271,7 @@ class ExecutionE2ETest:
             TAKER_FEE = 0.0004  # %0.04
             SLIPPAGE = 0.0001   # %0.01
 
-            logger.info(f"📊 [TEST] Parametreler:")
+            logger.info("📊 [TEST] Parametreler:")
             logger.info(f"   Giriş Fiyatı: ${entry_price:,.2f}")
             logger.info(f"   Çıkış Fiyatı: ${exit_price:,.2f}")
             logger.info(f"   Pozisyon Boyutu: {position_size:.4f} BTC")
@@ -311,7 +307,7 @@ class ExecutionE2ETest:
             exit_fee = exit_notional * TAKER_FEE
             total_fee = entry_fee + exit_fee
 
-            logger.info(f"\n📊 [TEST] Komisyon:")
+            logger.info("\n📊 [TEST] Komisyon:")
             logger.info(f"   Giriş Komisyonu: ${entry_fee:,.2f}")
             logger.info(f"   Çıkış Komisyonu: ${exit_fee:,.2f}")
             logger.info(f"   Toplam Komisyon: ${total_fee:,.2f}")
@@ -329,7 +325,7 @@ class ExecutionE2ETest:
             expected_total_fee = (entry_notional + exit_notional) * TAKER_FEE
             fee_diff = abs(total_fee - expected_total_fee)
 
-            logger.info(f"\n📊 [TEST] Doğrulama:")
+            logger.info("\n📊 [TEST] Doğrulama:")
             logger.info(f"   Slippage formülü: ${adjusted_exit_price:,.2f} vs ${expected_slippage_adjusted_price:,.2f} (Fark: ${price_diff:.4f})")
             logger.info(f"   Komisyon formülü: ${total_fee:,.2f} vs ${expected_total_fee:,.2f} (Fark: ${fee_diff:.4f})")
 
@@ -337,15 +333,15 @@ class ExecutionE2ETest:
             tolerance = 0.01
 
             if price_diff < tolerance and fee_diff < tolerance:
-                logger.info(f"\n✅ [PASS] Gerçekçi Çıkış Simülasyonu DOĞRU")
-                logger.info(f"   ✅ Market emir simülasyonu kullanıldı")
-                logger.info(f"   ✅ LONG çıkış: exit_price / 1.0001 (aşağı kayma)")
-                logger.info(f"   ✅ SHORT çıkış: exit_price * 1.0001 (yukarı kayma)")
-                logger.info(f"   ✅ %0.04 Taker komisyonu kesildi")
+                logger.info("\n✅ [PASS] Gerçekçi Çıkış Simülasyonu DOĞRU")
+                logger.info("   ✅ Market emir simülasyonu kullanıldı")
+                logger.info("   ✅ LONG çıkış: exit_price / 1.0001 (aşağı kayma)")
+                logger.info("   ✅ SHORT çıkış: exit_price * 1.0001 (yukarı kayma)")
+                logger.info("   ✅ %0.04 Taker komisyonu kesildi")
                 logger.info(f"   ✅ Net PnL doğru hesaplandı: ${net_pnl:,.2f}")
                 return True
             else:
-                logger.error(f"❌ [FAIL] Hesaplama hatalı!")
+                logger.error("❌ [FAIL] Hesaplama hatalı!")
                 logger.error(f"   Slippage fark: ${price_diff:.4f}, Komisyon fark: ${fee_diff:.4f}")
                 return False
 
@@ -384,17 +380,17 @@ class ExecutionE2ETest:
         logger.info(f"\n📈 TOPLAM: {passed}/{total} test başarılı")
         
         if passed == total:
-            logger.info(f"\n🎉 TÜM TESTLER BAŞARILI!")
-            logger.info(f"   ✅ Risk-Based Position Sizing: Formül DOĞRU")
-            logger.info(f"   ✅ Asenkron Trailing Stop: Tek yönlü mandal ÇALIŞIYOR")
-            logger.info(f"   ✅ Gerçekçi Çıkış Simülasyonu: Slippage + Fee DOĞRU")
+            logger.info("\n🎉 TÜM TESTLER BAŞARILI!")
+            logger.info("   ✅ Risk-Based Position Sizing: Formül DOĞRU")
+            logger.info("   ✅ Asenkron Trailing Stop: Tek yönlü mandal ÇALIŞIYOR")
+            logger.info("   ✅ Gerçekçi Çıkış Simülasyonu: Slippage + Fee DOĞRU")
             
             # Final log
             logger.info("\n" + "="*80)
             logger.info("✅ [EXECUTION] Adım 4: Risk Motoru ve Kağıt Ticareti İcrası Doğrulandı")
             logger.info("="*80)
         else:
-            logger.error(f"\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
+            logger.error("\n❌ BAZI TESTLER BAŞARISIZ! Lütfen hataları inceleyin.")
         
         # Rapor oluştur
         self._generate_report(results)

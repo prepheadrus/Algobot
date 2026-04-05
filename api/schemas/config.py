@@ -5,7 +5,7 @@ Pydantic models for configuration updates.
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Optional
 
 
 # ============================================================================

@@ -152,7 +152,6 @@ async def test_finally_block_resets_lock():
     finally bloğunun her durumda is_closing'i sıfırladığını doğrula.
     """
     from core.paper import paper_engine
-    from core.trading.position_manager import PositionManager
     
     bot_id = "BNB/USDT_test_finally_1m"
 

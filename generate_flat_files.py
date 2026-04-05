@@ -13,7 +13,6 @@ import pandas as pd
 from data.database import db_manager
 from data.ohlcv_storage import get_storage
 from data.indicators import StrategyIndicators
-from core.logger import logger
 import sys
 
 
@@ -154,7 +153,7 @@ async def main():
     
     # İstatistikler
     stats = storage.get_storage_stats()
-    print(f"📊 TOPLAM İSTATİSTİKLER:")
+    print("📊 TOPLAM İSTATİSTİKLER:")
     print(f"   Toplam sembol:    {stats['total_symbols']}")
     print(f"   Toplam timeframe: {stats['total_timeframes']}")
     print(f"   Toplam dosya:     {stats['total_files']}")

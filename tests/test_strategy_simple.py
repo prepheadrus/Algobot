@@ -21,12 +21,12 @@ def test_basic():
     # Koşul ekle
     builder.add_condition('long', rsi_id, '<', 30)
     builder.add_condition('short', rsi_id, '>', 70)
-    print(f"  [OK] Koşullar eklendi")
+    print("  [OK] Koşullar eklendi")
     
     # Validate
     is_valid, errors = StrategyValidator.validate(builder.strategy)
     assert is_valid, f"Valid olmalı: {errors}"
-    print(f"  [OK] Strateji valid")
+    print("  [OK] Strateji valid")
     
     return builder
 
@@ -61,7 +61,7 @@ def test_save_load(builder):
     import os
     os.remove(filename)
     
-    print(f"  [OK] Dosya kaydedildi ve yüklendi")
+    print("  [OK] Dosya kaydedildi ve yüklendi")
 
 
 def test_multi_tf(df):
@@ -81,7 +81,7 @@ def test_multi_tf(df):
         signals = executor.generate_signals(df)
         assert len(signals) == len(df)
     
-    print(f"  [OK] Multi-timeframe çalışıyor")
+    print("  [OK] Multi-timeframe çalışıyor")
 
 
 def test_validation():
@@ -92,7 +92,7 @@ def test_validation():
     empty = {'name': 'Empty', 'indicators': [], 'conditions': {'long': {}, 'short': {}}}
     is_valid, errors = StrategyValidator.validate(empty)
     assert not is_valid, "Invalid olmalı"
-    print(f"  [OK] Boş indikatör yakalandı")
+    print("  [OK] Boş indikatör yakalandı")
     
     # Geçersiz operatör
     try:
@@ -101,7 +101,7 @@ def test_validation():
         builder.add_condition('long', rsi_id, 'INVALID', 30)
         assert False, "Exception fırlatmalı"
     except ValueError:
-        print(f"  [OK] Geçersiz operatör yakalandı")
+        print("  [OK] Geçersiz operatör yakalandı")
 
 
 def main():

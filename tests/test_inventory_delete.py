@@ -34,7 +34,7 @@ async def test():
                         files = list(tf_dir.glob("*.json"))
                         print(f"        {tf_dir.name}: {len(files)} dosya")
     else:
-        print(f"    Flat files: Dizin yok")
+        print("    Flat files: Dizin yok")
     
     # 2. UI'dan gelen format ile sil (örn: "ETH/USDT")
     print("\n[2] Silme işlemi (UI formatı: ETH/USDT)...")
@@ -60,14 +60,14 @@ async def test():
         print(f"    Flat files: {total_files} dosya")
         
         if total_files > 0:
-            print(f"      HATA: Flat files hala var!")
+            print("      HATA: Flat files hala var!")
             for symbol_dir in base_dir.iterdir():
                 if symbol_dir.is_dir():
                     print(f"      {symbol_dir.name}: VAR")
         else:
-            print(f"      OK: Flat files temizlendi")
+            print("      OK: Flat files temizlendi")
     else:
-        print(f"    Flat files: Dizin yok (TAMAMEN TEMİZ)")
+        print("    Flat files: Dizin yok (TAMAMEN TEMİZ)")
     
     # 4. Sonuç
     print("\n" + "="*60)

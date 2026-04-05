@@ -1,12 +1,11 @@
 import timeit
 import gc
 from datetime import datetime
-from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
 
 def setup_code():
     now = datetime.utcnow()
     # Dummy creation parameters
-    return f"""
+    return """
 from datetime import datetime
 from core.trading.entities.order import Order, OrderType, OrderSide, OrderStatus
 

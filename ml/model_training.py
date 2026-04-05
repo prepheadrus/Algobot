@@ -106,9 +106,9 @@ class ModelTrainer:
 
     def __init__(
         self,
-        n_estimators: int = 500,
-        max_depth: int = 6,
-        learning_rate: float = 0.1,
+        n_estimators: int,
+        max_depth: int,
+        learning_rate: float,
         subsample: float = 0.8,
         colsample_bytree: float = 0.8,
         min_child_weight: int = 3,
@@ -797,7 +797,7 @@ def run_training_pipeline(
     time_horizon: int = 10,
     train_ratio: float = 0.8,
     timeframe: str = "1h",
-    n_estimators: int = 500,
+    n_estimators: int = 500,  # Default olarak burada bulunabilir ancak dışarıdan ne gelirse o kullanılacak.
     max_depth: int = 6,
     learning_rate: float = 0.1,
     enable_auto_regularization: bool = True
@@ -839,7 +839,7 @@ def run_training_pipeline(
     )
 
     # 2. Model eğitimi
-    logger.info("\n[2/3] Model eğitiliyor...")
+    logger.info(f"\n[2/3] Model eğitiliyor... (Parametreler: Est={n_estimators}, Depth={max_depth}, LR={learning_rate})")
     trainer = ModelTrainer(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -911,6 +911,9 @@ if __name__ == "__main__":
             sl_multiplier=2.0,
             time_horizon=10,
             train_ratio=0.8,
+            n_estimators=500,
+            max_depth=6,
+            learning_rate=0.1,
             enable_auto_regularization=False
         )
 

@@ -30,7 +30,7 @@ async def test_wfo_hot_reload():
         }
     }
     
-    print(f"\n📋 Payload:")
+    print("\n📋 Payload:")
     print(f"   wfo.enabled: {payload['wfo']['enabled']}")
     print(f"   wfo.train_days: {payload['wfo']['train_days']}")
     print(f"   wfo.test_days: {payload['wfo']['test_days']}")
@@ -39,7 +39,7 @@ async def test_wfo_hot_reload():
     
     try:
         # 1. API Request gönder
-        print(f"\n🌐 API Request gönderiliyor...")
+        print("\n🌐 API Request gönderiliyor...")
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 "http://localhost:8000/api/v1/config/advanced",
@@ -58,7 +58,7 @@ async def test_wfo_hot_reload():
             return False
         
         # 2. config.yaml dosyasını kontrol et (safe_dump ile yazıldı mı?)
-        print(f"\n📄 config.yaml dosyası kontrol ediliyor...")
+        print("\n📄 config.yaml dosyası kontrol ediliyor...")
         config_path = Path("config.yaml")
         
         if config_path.exists():
@@ -66,7 +66,7 @@ async def test_wfo_hot_reload():
                 config = yaml.safe_load(f)
             
             wfo_config = config.get('wfo', {})
-            print(f"   ✅ config.yaml bulundu")
+            print("   ✅ config.yaml bulundu")
             print(f"   wfo.enabled: {wfo_config.get('enabled', False)}")
             print(f"   wfo.train_days: {wfo_config.get('train_days', 0)}")
             print(f"   wfo.test_days: {wfo_config.get('test_days', 0)}")
@@ -79,15 +79,15 @@ async def test_wfo_hot_reload():
                 wfo_config.get('test_days') == payload['wfo']['test_days'] and
                 wfo_config.get('optimization_metric') == payload['wfo']['optimization_metric'] and
                 wfo_config.get('n_trials') == payload['wfo']['n_trials']):
-                print(f"   ✅ Tüm değerler doğru yazıldı!")
+                print("   ✅ Tüm değerler doğru yazıldı!")
             else:
-                print(f"   ⚠️ Değerler eşleşmiyor!")
+                print("   ⚠️ Değerler eşleşmiyor!")
                 return False
         else:
-            print(f"   ⚠️ config.yaml dosyası bulunamadı")
+            print("   ⚠️ config.yaml dosyası bulunamadı")
         
         # 3. core/config.py RAM CONFIG nesnesini kontrol et (Hot-Reload)
-        print(f"\n🧠 RAM CONFIG nesnesi kontrol ediliyor (Hot-Reload)...")
+        print("\n🧠 RAM CONFIG nesnesi kontrol ediliyor (Hot-Reload)...")
         from core.config import CONFIG
         
         wfo_ram = CONFIG.get('wfo', {})
@@ -103,12 +103,12 @@ async def test_wfo_hot_reload():
             wfo_ram.get('test_days') == payload['wfo']['test_days'] and
             wfo_ram.get('optimization_metric') == payload['wfo']['optimization_metric'] and
             wfo_ram.get('n_trials') == payload['wfo']['n_trials']):
-            print(f"   ✅ RAM CONFIG güncellendi (Hot-Reload başarılı)!")
+            print("   ✅ RAM CONFIG güncellendi (Hot-Reload başarılı)!")
         else:
-            print(f"   ⚠️ RAM CONFIG değerleri eşleşmiyor!")
+            print("   ⚠️ RAM CONFIG değerleri eşleşmiyor!")
             return False
         
-        print(f"\n" + "=" * 70)
+        print("\n" + "=" * 70)
         print("[SİSTEM] Yamalar Uygulandı ve WFO Ayarları API Üzerinden (Hot-Reload)")
         print("         Otonom Olarak Yapılandırıldı.")
         print("=" * 70)
@@ -117,8 +117,8 @@ async def test_wfo_hot_reload():
         
     except httpx.ConnectError as e:
         print(f"\n❌ Bağlantı hatası: {e}")
-        print(f"   Sunucu çalışıyor mu? (http://localhost:8000)")
-        print(f"   Test script'i çalıştırmadan önce sunucuyu başlatın.")
+        print("   Sunucu çalışıyor mu? (http://localhost:8000)")
+        print("   Test script'i çalıştırmadan önce sunucuyu başlatın.")
         return False
     
     except Exception as e:
@@ -133,8 +133,8 @@ if __name__ == "__main__":
     success = asyncio.run(test_wfo_hot_reload())
     
     if success:
-        print(f"\n✅ TEST BAŞARILI")
+        print("\n✅ TEST BAŞARILI")
     else:
-        print(f"\n❌ TEST BAŞARISIZ")
-        print(f"\nNOT: Sunucu çalışmıyorsa, bu test başarısız olacaktır.")
-        print(f"     Ancak yamalar (patches) başarıyla uygulandı.")
+        print("\n❌ TEST BAŞARISIZ")
+        print("\nNOT: Sunucu çalışmıyorsa, bu test başarısız olacaktır.")
+        print("     Ancak yamalar (patches) başarıyla uygulandı.")

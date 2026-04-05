@@ -9,7 +9,6 @@ async def test():
     
     # Mevcut sembolleri kontrol et
     print("\nMevcut flat file'lar:")
-    import os
     from pathlib import Path
     
     base_dir = Path("data/ohlcv")

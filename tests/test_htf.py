@@ -80,7 +80,6 @@ def test_htf_config():
     
     # Basit DataFrame simülasyonu
     import pandas as pd
-    import numpy as np
     
     # Test verisi
     test_data = {

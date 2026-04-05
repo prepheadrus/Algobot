@@ -1,8 +1,6 @@
-import pytest
 from unittest.mock import patch, MagicMock
 
 from api.services.strategy_service import StrategyService
-from strategy.manager import StrategyManager
 
 class TestStrategyServiceGetStrategies:
 

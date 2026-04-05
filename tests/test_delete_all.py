@@ -31,7 +31,7 @@ async def test_delete():
         total_files = sum(1 for f in base_dir.rglob("*.json"))
         print(f"    Flat files: {total_files} dosya")
     else:
-        print(f"    Flat files: Dizin yok")
+        print("    Flat files: Dizin yok")
 
     # 2. Silme işlemi
     print("\n[2] Silme işlemi başlatılıyor...")
@@ -57,7 +57,7 @@ async def test_delete():
         total_files = sum(1 for f in base_dir.rglob("*.json"))
         print(f"    Flat files: {total_files} dosya")
     else:
-        print(f"    Flat files: Dizin yok")
+        print("    Flat files: Dizin yok")
 
     # 4. Sonuç
     print("\n" + "="*60)

@@ -8,9 +8,8 @@ grid search yaparak en iyi performans gösteren kombinasyonu bulur.
 
 import itertools
 import pandas as pd
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from core.logger import logger
-from datetime import timedelta
 
 
 class WalkForwardOptimizer:
