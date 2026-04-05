@@ -209,14 +209,20 @@
 
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size:0.75rem; color:var(--text-muted);">TP Çarpan</label>
-                            <input type="number" id="ml-train-tp" value="2.0" step="0.5" min="1.0" max="5.0"
+                            <input type="text" id="ml-train-tp" value="2.0"
                                 style="width:70px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size:0.75rem; color:var(--text-muted);">SL Çarpan</label>
-                            <input type="number" id="ml-train-sl" value="2.0" step="0.5" min="1.0" max="5.0"
+                            <input type="text" id="ml-train-sl" value="2.0"
                                 style="width:70px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size:0.75rem; color:var(--text-muted);">Horizon (Mum)</label>
+                            <input type="number" id="ml-train-horizon" value="10" min="5" max="200" step="1"
+                                style="width:90px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
                         </div>
 
                         <button class="btn btn-primary" onclick="startMLTraining()"
@@ -224,6 +230,30 @@
                             🚀 Modeli Eğit
                         </button>
                     </div>
+
+                    <!-- Gelişmiş Ayarlar (Advanced Settings) -->
+                    <details style="margin-top: 10px; margin-bottom: 15px;">
+                        <summary style="cursor: pointer; color: var(--neon-blue); font-size: 0.85rem; font-weight: 600;">
+                            ⚙️ Gelişmiş Ayarlar (Hiperparametreler)
+                        </summary>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size:0.75rem; color:var(--text-muted);">Ağaç Sayısı (n_estimators)</label>
+                                <input type="number" id="ml-train-estimators" value="500" min="50" max="2000" step="50"
+                                    style="width:120px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size:0.75rem; color:var(--text-muted);">Ağaç Derinliği (max_depth)</label>
+                                <input type="number" id="ml-train-depth" value="6" min="1" max="20" step="1"
+                                    style="width:120px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size:0.75rem; color:var(--text-muted);">Öğrenme Hızı (learning_rate)</label>
+                                <input type="text" id="ml-train-lr" value="0.1"
+                                    style="width:120px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
+                            </div>
+                        </div>
+                    </details>
 
                     <!-- İlerleme Çubuğu -->
                     <div id="ml-training-progress" style="display: none; margin-top: 15px;">

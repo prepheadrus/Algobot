@@ -1800,12 +1800,26 @@ window.startMLTraining = async function() {
     const limitInput = document.getElementById('ml-train-limit');
     const tpInput = document.getElementById('ml-train-tp');
     const slInput = document.getElementById('ml-train-sl');
+    const horizonInput = document.getElementById('ml-train-horizon');
+    const estimatorsInput = document.getElementById('ml-train-estimators');
+    const depthInput = document.getElementById('ml-train-depth');
+    const lrInput = document.getElementById('ml-train-lr');
 
     const symbol = symbolSelect?.value;
     const timeframe = timeframeSelect?.value;
     const limit = parseInt(limitInput?.value) || 5000;
-    const tpMultiplier = parseFloat(tpInput?.value) || 2.0;
-    const slMultiplier = parseFloat(slInput?.value) || 2.0;
+
+    // Değerleri alıp virgülleri noktaya çevir (Defense in depth)
+    const tpValue = tpInput?.value ? tpInput.value.replace(',', '.') : "2.0";
+    const slValue = slInput?.value ? slInput.value.replace(',', '.') : "2.0";
+    const lrValue = lrInput?.value ? lrInput.value.replace(',', '.') : "0.1";
+
+    const tpMultiplier = parseFloat(tpValue);
+    const slMultiplier = parseFloat(slValue);
+    const horizon = parseInt(horizonInput?.value) || 10;
+    const nEstimators = parseInt(estimatorsInput?.value) || 500;
+    const maxDepth = parseInt(depthInput?.value) || 6;
+    const learningRate = parseFloat(lrValue);
 
     // Validation
     if (!symbol || !timeframe) {
@@ -1818,13 +1832,18 @@ window.startMLTraining = async function() {
         return;
     }
 
-    if (tpMultiplier < 0.5 || tpMultiplier > 10) {
+    if (isNaN(tpMultiplier) || tpMultiplier < 0.5 || tpMultiplier > 10) {
         showToast('❌ TP çarpanı 0.5 - 10 arasında olmalı!', 'error');
         return;
     }
 
-    if (slMultiplier < 0.5 || slMultiplier > 10) {
+    if (isNaN(slMultiplier) || slMultiplier < 0.5 || slMultiplier > 10) {
         showToast('❌ SL çarpanı 0.5 - 10 arasında olmalı!', 'error');
+        return;
+    }
+
+    if (isNaN(horizon) || horizon < 5 || horizon > 200) {
+        showToast('❌ Horizon 5 ile 200 arasında olmalı!', 'error');
         return;
     }
 
@@ -1868,7 +1887,7 @@ window.startMLTraining = async function() {
     }
 
     // Confirm
-    if (!confirm(`🧠 ${symbol} (${timeframe}) için ML modeli eğitilecek.\n\nParametreler:\n- Mum Sayısı: ${limit}${dbCount > 0 ? ` (Mevcut: ${(dbCount / 1000).toFixed(1)}K)` : ''}\n- TP Çarpan: ${tpMultiplier}\n- SL Çarpan: ${slMultiplier}\n\nDevam etmek istiyor musunuz?`)) {
+    if (!confirm(`🧠 ${symbol} (${timeframe}) için ML modeli eğitilecek.\n\nParametreler:\n- Mum Sayısı: ${limit}${dbCount > 0 ? ` (Mevcut: ${(dbCount / 1000).toFixed(1)}K)` : ''}\n- TP Çarpan: ${tpMultiplier}\n- SL Çarpan: ${slMultiplier}\n- Horizon: ${horizon}\n- Ağaç Sayısı: ${nEstimators}\n- Ağaç Derinliği: ${maxDepth}\n- Öğrenme Hızı: ${learningRate}\n\nDevam etmek istiyor musunuz?`)) {
         return;
     }
 
@@ -1889,8 +1908,12 @@ window.startMLTraining = async function() {
             symbol: symbol,
             timeframe: timeframe,
             limit: limit,
-            tp_multiplier: tpMultiplier,
-            sl_multiplier: slMultiplier
+            tp: tpMultiplier,
+            sl: slMultiplier,
+            time_horizon: horizon,
+            n_estimators: nEstimators,
+            max_depth: maxDepth,
+            learning_rate: learningRate
         };
 
         console.log('🧠 [ML] Eğitim başlatılıyor...', data);
