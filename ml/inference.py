@@ -13,18 +13,32 @@ import numpy as np
 _model_cache = {}
 
 
+import os
+
 def get_model_paths(symbol: str, timeframe: str, model_id: str = None) -> dict:
     """Model dosya yollarını döner."""
     # Symbol formatını temizle (BTC/USDT:USDT → btcusdtusdt)
     symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
-    base_path = Path("artifacts/models")
+    base_path = "artifacts/models"
     
     suffix = f"_{model_id}" if model_id else ""
 
+    base_name = f"xgb_model_{symbol_clean}_{timeframe}{suffix}"
+
     return {
-        'xgboost': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}.json",
-        'random_forest': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}_rf.joblib",
-        'metadata': base_path / f"xgb_model_{symbol_clean}_{timeframe}{suffix}_metadata.json"
+        # ml_service.py'nin beklediği Legacy Anahtarlar (API Kontrat Kalkanı)
+        "xgboost_path": f"{base_path}/{base_name}.json",
+        "rf_path": f"{base_path}/{base_name}_rf.joblib",
+        "metadata_path": f"{base_path}/{base_name}_metadata.json",
+
+        # Inference ve diğer asenkron modüller için Kısa Anahtarlar
+        "xgb": f"{base_path}/{base_name}.json",
+        "rf": f"{base_path}/{base_name}_rf.joblib",
+        "meta": f"{base_path}/{base_name}_metadata.json",
+
+        # Geriye dönük uyumluluk için ek anahtarlar
+        "xgboost": f"{base_path}/{base_name}.json",
+        "random_forest": f"{base_path}/{base_name}_rf.joblib"
     }
 
 
@@ -44,20 +58,20 @@ def load_model(symbol: str, timeframe: str):
         # XGBoost model
         import xgboost as xgb
         xgb_model = None
-        if model_paths['xgboost'].exists():
+        if os.path.exists(model_paths['xgb']):
             xgb_model = xgb.Booster()
-            xgb_model.load_model(str(model_paths['xgboost']))
+            xgb_model.load_model(model_paths['xgb'])
         
         # Random Forest model
         import joblib
         rf_model = None
-        if model_paths['random_forest'].exists():
-            rf_model = joblib.load(str(model_paths['random_forest']))
+        if os.path.exists(model_paths['rf']):
+            rf_model = joblib.load(model_paths['rf'])
         
         # Metadata
         metadata = {}
-        if model_paths['metadata'].exists():
-            with open(model_paths['metadata'], 'r') as f:
+        if os.path.exists(model_paths['meta']):
+            with open(model_paths['meta'], 'r') as f:
                 metadata = json.load(f)
         
         feature_names = metadata.get('feature_names', ['open', 'high', 'low', 'close', 'volume'])
@@ -74,12 +88,14 @@ def load_model(symbol: str, timeframe: str):
             import os
             print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eski model dosyaları siliniyor: {symbol} {timeframe}")
 
-            for path_key, path_val in model_paths.items():
-                if path_val.exists():
+            # Benzersiz dosya yollarını al
+            unique_paths = list(set(model_paths.values()))
+            for path_val in unique_paths:
+                if os.path.exists(path_val):
                     try:
                         os.remove(path_val)
                     except Exception as clean_e:
-                        print(f"❌ [ML] Eski model dosyası silinemedi ({path_key}): {clean_e}")
+                        print(f"❌ [ML] Eski model dosyası silinemedi ({path_val}): {clean_e}")
 
             return None
 
