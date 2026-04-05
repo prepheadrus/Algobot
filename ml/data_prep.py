@@ -442,6 +442,27 @@ def prepare_ml_data(
         normalize=normalize,
     )
 
+    # Hardcoded İzolasyon Kalkanı (Ghost Feature Sızıntısını Önlemek ve Target'ı Korumak için)
+    allowed_features = [
+        'kalman_ret', 'frac_diff_04', 'dist_to_vwap', 'dist_to_ema50',
+        'MACDh_12_26_9', 'RSI_14', 'BTC_VIX', 'ROC_10', 'OBV_EMA',
+        'KONKORDE_AZUL', 'KONKORDE_VERDE', 'ATR_14'
+    ]
+
+    # DataFrame'de mevcut olanları seç
+    cols_to_keep = [col for col in allowed_features if col in df_processed.columns]
+
+    # HEDEF KOLONU (TARGET) KESİNLİKLE KORUNMALIDIR
+    if target_col in df_processed.columns:
+        cols_to_keep.append(target_col)
+
+    # Hantal ve istenmeyen indikatörleri bellekten sil
+    df_processed = df_processed[cols_to_keep].copy()
+
+    # NaN ve Inf kalkanını SADECE özellik (feature) kolonlarına uygula, target bozulmasın
+    feature_cols_only = [col for col in cols_to_keep if col != target_col]
+    df_processed[feature_cols_only] = df_processed[feature_cols_only].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
     # 3. Train/Test split
     train_df, test_df = create_train_test_split(
         df_processed,
