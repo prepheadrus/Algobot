@@ -17,6 +17,10 @@ from pandas import Series
 from typing import Tuple, Dict, Any, List
 from datetime import datetime
 import xgboost as xgb
+try:
+    import optuna
+except ImportError:
+    optuna = None
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import (
@@ -294,16 +298,74 @@ class ModelTrainer:
             f"reg_alpha={self.reg_alpha}, reg_lambda={self.reg_lambda}"
         )
 
+    def _objective(
+        self,
+        trial,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
+        ret_test: pd.Series
+    ) -> float:
+        """
+        Optuna için Sharpe Oranı Optimizasyon Hedef Fonksiyonu
+        """
+        params = {
+            'n_estimators': self.n_estimators, # Statik tutuyoruz
+            'max_depth': trial.suggest_int('max_depth', 3, 9),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2, log=True),
+            'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+            'objective': 'multi:softmax',
+            'eval_metric': 'mlogloss',
+            'num_class': 3,
+            'random_state': self.random_state,
+            'n_jobs': self.n_jobs
+        }
+
+        model = xgb.XGBClassifier(**params)
+
+        sample_weights = compute_sample_weight('balanced', y_train)
+
+        model.fit(
+            X_train,
+            y_train,
+            sample_weight=sample_weights,
+            verbose=False
+        )
+
+        preds = model.predict(X_test)
+
+        # Event-Bus uyumlu: 2=LONG, 0=SHORT, 1=NEUTRAL
+        signal_multipliers = np.select([preds == 2, preds == 0, preds == 1], [1.0, -1.0, 0.0], default=0.0)
+
+        strategy_returns = signal_multipliers * ret_test.values
+
+        # Yıllıklandırma çarpanı (Örn: 15m için sqrt(35040), 1h için sqrt(8760), vs.)
+        # Default olarak 1h üzerinden hesaplıyoruz: 365 * 24 = 8760
+        # Ancak dinamik timeframe bilgisi gelmediği için güvenli bir oran alıyoruz:
+        ann_factor = np.sqrt(35040)  # 15m için standart
+
+        mean_ret = np.mean(strategy_returns)
+        std_ret = np.std(strategy_returns)
+
+        if std_ret < 1e-9:
+            return 0.0
+
+        sharpe_ratio = (mean_ret / std_ret) * ann_factor
+        return sharpe_ratio
+
     def train(
         self,
         X_train: pd.DataFrame,
         y_train: pd.Series,
         X_test: pd.DataFrame,
         y_test: Series,
+        ret_test: pd.Series = None,
         verbose: bool = True
     ) -> Dict[str, Any]:
         """
-        XGBoost + Random Forest Ensemble modellerini eğitir ve değerlendirir.
+        XGBoost (Optuna ile) + Random Forest Ensemble modellerini eğitir ve değerlendirir.
 
         Args:
             X_train: Eğitim özellikleri
@@ -333,17 +395,55 @@ class ModelTrainer:
         # Sınıf Ağırlıklandırması (Class Imbalance) hesapla
         sample_weights = compute_sample_weight('balanced', y_train)
 
-        # 1. XGBoost modelini eğit
-        logger.info("📊 XGBoost eğitiliyor...")
-        eval_set = [(X_train, y_train), (X_test, y_test)]
-        self.xgb_model.fit(
-            X_train,
-            y_train,
-            sample_weight=sample_weights,
-            eval_set=eval_set,
-            verbose=verbose
-        )
-        logger.info("✅ XGBoost eğitimi tamamlandı.")
+        # 1. XGBoost modelini eğit (Optuna ile Optimizasyon)
+        if optuna is not None and ret_test is not None:
+            logger.info("📊 XGBoost eğitiliyor (Optuna TPE Optimizasyonu Başlıyor)...")
+            study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=self.random_state))
+
+            # Objective fonksiyonunu lambda ile wrap ediyoruz
+            objective_wrapper = lambda trial: self._objective(trial, X_train, y_train, X_test, y_test, ret_test)
+
+            # n_trials=50 sabiti
+            study.optimize(objective_wrapper, n_trials=50)
+
+            best_params = study.best_params
+            logger.info(f"🏆 Optuna En İyi Parametreler: {best_params}")
+            logger.info(f"🏆 En İyi Sharpe Oranı: {study.best_value:.4f}")
+
+            # Best parametreleri set et
+            self._apply_params({
+                'n_estimators': self.n_estimators,
+                'max_depth': best_params['max_depth'],
+                'rf_max_depth': self.rf_max_depth,
+                'rf_n_estimators': self.rf_n_estimators,
+                'learning_rate': best_params['learning_rate'],
+                'subsample': best_params['subsample'],
+                'colsample_bytree': best_params['colsample_bytree'],
+            })
+            self._update_models()
+
+            # Final modeli en iyi parametrelerle eğit
+            logger.info("🔄 En iyi parametrelerle final XGBoost modeli eğitiliyor...")
+            eval_set = [(X_train, y_train), (X_test, y_test)]
+            self.xgb_model.fit(
+                X_train,
+                y_train,
+                sample_weight=sample_weights,
+                eval_set=eval_set,
+                verbose=verbose
+            )
+            logger.info("✅ Optuna + XGBoost eğitimi tamamlandı.")
+        else:
+            logger.info("📊 XGBoost eğitiliyor (Statik)...")
+            eval_set = [(X_train, y_train), (X_test, y_test)]
+            self.xgb_model.fit(
+                X_train,
+                y_train,
+                sample_weight=sample_weights,
+                eval_set=eval_set,
+                verbose=verbose
+            )
+            logger.info("✅ XGBoost eğitimi tamamlandı.")
 
         # 2. Random Forest modelini eğit
         logger.info("🌲 Random Forest eğitiliyor...")
@@ -789,7 +889,7 @@ def run_training_pipeline(
 
     # 1. Veri hazırlama
     logger.info("\n[1/3] Veri hazırlanıyor...")
-    X_train, X_test, y_train, y_test, scaler = prepare_ml_data(
+    X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
         df,
         tp_multiplier=tp_multiplier,
         sl_multiplier=sl_multiplier,
@@ -810,7 +910,7 @@ def run_training_pipeline(
         enable_auto_regularization=enable_auto_regularization
     )
 
-    trainer.train(X_train, y_train, X_test, y_test)
+    trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
 
     # 3. Model kaydetme
     logger.info("\n[3/3] Model kaydediliyor...")
