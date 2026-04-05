@@ -176,7 +176,7 @@ class MLService:
             sl_val = float(request.sl)
             hz_val = int(request.time_horizon)
 
-            X_train, X_test, y_train, y_test, scaler = prepare_ml_data(
+            X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
                 df,
                 tp_multiplier=tp_val,
                 sl_multiplier=sl_val,
@@ -201,8 +201,16 @@ class MLService:
                 enable_auto_regularization=False # UI'dan gelen değerleri ezmemesi için auto reg'i kapatıyoruz
             )
             
-            # Modeli eğit (train metodu kullan)
-            training_metrics = trainer.train(X_train, y_train, X_test, y_test)
+            # Modeli eğit (Event-Loop bloklanmasını engellemek için asyncio.to_thread kullanılır)
+            import asyncio
+            training_metrics = await asyncio.to_thread(
+                trainer.train,
+                X_train,
+                y_train,
+                X_test,
+                y_test,
+                ret_test
+            )
             
             logger.info("✅ [ML] Model eğitildi")
             logger.info(f"📊 [ML] Eğitim metrikleri: {training_metrics}")

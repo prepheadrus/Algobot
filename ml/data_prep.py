@@ -457,6 +457,9 @@ def prepare_ml_data(
         df_labeled = df
         logger.info("⏭️ [ML] Triple Barrier atlandı (zaten yapılmış)")
 
+    # 1.5 Getiri Serisi (Forward Returns) - Optimizasyon için (Data Leakage'a dikkat!)
+    df_labeled['forward_return'] = df_labeled['close'].pct_change().shift(-1).fillna(0)
+
     # 2. Özellik mühendisliği ve ölçeklendirme
     df_processed, scaler = engineer_features(
         df_labeled,
@@ -464,6 +467,10 @@ def prepare_ml_data(
         scaler_type=scaler_type,
         normalize=normalize,
     )
+
+    # Forward Return değerlerini df_processed'a ekle (ölçeklendirmeden etkilenmez)
+    if 'forward_return' in df_labeled.columns:
+        df_processed['forward_return'] = df_labeled['forward_return']
 
     # Hardcoded İzolasyon Kalkanı (Ghost Feature Sızıntısını Önlemek ve Target'ı Korumak için)
     allowed_features = [
@@ -478,6 +485,9 @@ def prepare_ml_data(
     # HEDEF KOLONU (TARGET) KESİNLİKLE KORUNMALIDIR
     if target_col in df_processed.columns:
         cols_to_keep.append(target_col)
+
+    if 'forward_return' in df_processed.columns:
+        cols_to_keep.append('forward_return')
 
     # Hantal ve istenmeyen indikatörleri bellekten sil
     df_processed = df_processed[cols_to_keep].copy()
@@ -527,7 +537,19 @@ def prepare_ml_data(
     y_train = train_df[target_col].copy()
     y_test = test_df[target_col].copy()
 
+    # Optimizasyon için getirileri ayır (forward returns)
+    if 'forward_return' in train_df.columns:
+        ret_train = train_df['forward_return'].copy()
+        ret_test = test_df['forward_return'].copy()
+    else:
+        # Fallback (eğer df'te yoksa)
+        ret_train = pd.Series(np.zeros(len(train_df)), index=train_df.index)
+        ret_test = pd.Series(np.zeros(len(test_df)), index=test_df.index)
+
     # SONRA X'i oluştur (leakage kolonları olmadan)
+    # feature_cols içinde 'forward_return' olmamasına DİKKAT! Data Leakage yaratır.
+    feature_cols = [col for col in feature_cols if col != 'forward_return']
+
     X_train = train_df[feature_cols].copy()
     X_test = test_df[feature_cols].copy()
 
@@ -540,7 +562,7 @@ def prepare_ml_data(
     logger.info(f"  Feature sayısı: {len(feature_cols)}")
     logger.info(f"  X kolonları: {feature_cols[:10]}... (ilk 10)")
 
-    return X_train, X_test, y_train, y_test, scaler
+    return X_train, X_test, y_train, y_test, ret_train, ret_test, scaler
 
 
 def get_feature_importance_df(
