@@ -58,12 +58,35 @@ def load_model(symbol: str, timeframe: str):
             with open(model_paths['metadata'], 'r') as f:
                 metadata = json.load(f)
         
+        feature_names = metadata.get('feature_names', ['open', 'high', 'low', 'close', 'volume'])
+
+        # Geriye dönük uyumluluk ve migrasyon (Feature uyuşmazlığı kontrolü)
+        expected_features = [
+            "kalman_ret", "frac_diff_04", "dist_to_vwap", "dist_to_ema50",
+            "MACDh_12_26_9", "RSI_14", "BTC_VIX", "ROC_10", "OBV_EMA",
+            "KONKORDE_AZUL", "KONKORDE_VERDE", "ATR_14"
+        ]
+
+        # Eğer beklenen özellikler (veya sayısı) eşleşmiyorsa eski modelleri sil
+        if len(feature_names) != len(expected_features) or set(feature_names) != set(expected_features):
+            import os
+            print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eski model dosyaları siliniyor: {symbol} {timeframe}")
+
+            for path_key, path_val in model_paths.items():
+                if path_val.exists():
+                    try:
+                        os.remove(path_val)
+                    except Exception as clean_e:
+                        print(f"❌ [ML] Eski model dosyası silinemedi ({path_key}): {clean_e}")
+
+            return None
+
         # Cache'e kaydet
         _model_cache[cache_key] = {
             'xgboost': xgb_model,
             'random_forest': rf_model,
             'metadata': metadata,
-            'feature_names': metadata.get('feature_names', ['open', 'high', 'low', 'close', 'volume'])
+            'feature_names': feature_names
         }
         
         return _model_cache[cache_key]

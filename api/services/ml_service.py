@@ -216,7 +216,7 @@ class MLService:
             model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
 
             # Merkezi path generator fonksiyonunu kullan
-            from ml.model_training import get_model_paths
+            from ml.inference import get_model_paths
             model_paths = get_model_paths(request.symbol, request.timeframe, model_id=model_id)
 
             # Model dizinini oluştur
@@ -463,7 +463,7 @@ class MLService:
             Silme yanıtı
         """
         try:
-            from ml.model_training import get_model_paths
+            from ml.inference import get_model_paths
 
             # Model yollarını al
             model_paths = get_model_paths(symbol, timeframe)
@@ -537,7 +537,7 @@ class MLService:
             Model kontrol yanıtı
         """
         # Merkezi path generator fonksiyonunu kullan
-        from ml.model_training import get_model_paths
+        from ml.inference import get_model_paths
         model_paths = get_model_paths(symbol, timeframe)
 
         # Tüm model dosyalarının varlığını kontrol et

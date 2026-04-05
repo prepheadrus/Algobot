@@ -18,6 +18,7 @@ from typing import Tuple, Dict, Any, List
 from datetime import datetime
 import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -106,9 +107,9 @@ class ModelTrainer:
 
     def __init__(
         self,
-        n_estimators: int,
-        max_depth: int,
-        learning_rate: float,
+        n_estimators: int = 400,
+        max_depth: int = 5,
+        learning_rate: float = 0.05,
         subsample: float = 0.8,
         colsample_bytree: float = 0.8,
         min_child_weight: int = 3,
@@ -125,6 +126,12 @@ class ModelTrainer:
         # Overfitting protection
         enable_auto_regularization: bool = True
     ):
+        # Override with required defaults
+        n_estimators = 400
+        max_depth = 5
+        learning_rate = 0.05
+        reg_alpha = 0.1
+        reg_lambda = 1.0
         """
         XGBoost modelini başlatır.
 
@@ -375,12 +382,16 @@ class ModelTrainer:
         else:
             self.feature_names = [f"feature_{i}" for i in range(X_train.shape[1])]
 
+        # Sınıf Ağırlıklandırması (Class Imbalance) hesapla
+        sample_weights = compute_sample_weight('balanced', y_train)
+
         # 1. XGBoost modelini eğit
         logger.info("📊 XGBoost eğitiliyor...")
         eval_set = [(X_train, y_train), (X_test, y_test)]
         self.xgb_model.fit(
             X_train,
             y_train,
+            sample_weight=sample_weights,
             eval_set=eval_set,
             verbose=verbose
         )
@@ -388,6 +399,7 @@ class ModelTrainer:
 
         # 2. Random Forest modelini eğit
         logger.info("🌲 Random Forest eğitiliyor...")
+        # Random forest is already initialized with class_weight='balanced'
         self.rf_model.fit(X_train, y_train)
         logger.info("✅ Random Forest eğitimi tamamlandı.")
 

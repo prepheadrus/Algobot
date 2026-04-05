@@ -148,7 +148,7 @@ class TestMLServiceCheckModel:
         }
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.model_training.get_model_paths")
+    @patch("ml.inference.get_model_paths")
     def test_check_model_all_exist(self, mock_get_paths, mock_exists):
         """Test check_model when all model files exist."""
         # Setup
@@ -174,7 +174,7 @@ class TestMLServiceCheckModel:
         assert ensemble_status["full_ensemble"] is True
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.model_training.get_model_paths")
+    @patch("ml.inference.get_model_paths")
     def test_check_model_none_exist(self, mock_get_paths, mock_exists):
         """Test check_model when no model files exist."""
         # Setup
@@ -200,7 +200,7 @@ class TestMLServiceCheckModel:
         assert ensemble_status["full_ensemble"] is False
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.model_training.get_model_paths")
+    @patch("ml.inference.get_model_paths")
     def test_check_model_partial_exist(self, mock_get_paths, mock_exists):
         """Test check_model when only some model files exist."""
         # Setup
