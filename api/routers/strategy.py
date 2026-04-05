@@ -4,11 +4,10 @@ Strategy Router
 FastAPI router for strategy operations.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, List, Optional
+from fastapi import APIRouter
+from typing import Dict, Any, Optional
 
 from core.logger import logger
-from api.schemas.strategy import StrategySelectRequest
 from api.services.strategy_service import StrategyService
 
 router = APIRouter(prefix="/api/v1", tags=["Strategy"])

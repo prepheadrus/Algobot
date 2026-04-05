@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime
-from core.trading.entities.trade import Trade, TradeResult
+from core.trading.entities.trade import Trade
 from core.trading.entities.position import PositionDirection
 
 def test_trade_return_on_margin_normal():

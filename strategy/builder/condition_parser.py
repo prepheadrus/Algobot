@@ -26,7 +26,7 @@ Bu JSON, aşağıdaki Python ifadesine dönüştürülür:
 """
 
 from dataclasses import dataclass, field
-from typing import Union, List, Literal, Optional, Any
+from typing import Union, List
 from enum import Enum
 import pandas as pd
 
@@ -406,7 +406,7 @@ if __name__ == "__main__":
 
     # Dictionary'e çevir
     rule_dict = rule_group.to_dict()
-    print(f"\n[OK] Dictionary'e çevrildi:")
+    print("\n[OK] Dictionary'e çevrildi:")
     print(f"   {rule_dict}")
 
     # Test DataFrame oluştur

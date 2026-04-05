@@ -1,8 +1,6 @@
 
-import pytest
-import asyncio
 from datetime import datetime
-from core.diagnostics.event_tracer import EventTracer, EventCategory
+from core.diagnostics.event_tracer import EventTracer
 from shared.events.events import Event
 
 def test_event_tracer_counting():

@@ -15,7 +15,6 @@ from pathlib import Path
 import json
 import importlib
 import inspect
-import pkgutil
 
 
 class StrategyManager:

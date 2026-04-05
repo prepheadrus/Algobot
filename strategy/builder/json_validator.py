@@ -3,7 +3,7 @@ JSON Validator - Strateji JSON validasyonu
 """
 
 import json
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 
 class StrategyValidator:

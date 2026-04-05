@@ -2,9 +2,6 @@ import asyncio
 import os
 import sys
 import pandas as pd
-import numpy as np
-import logging
-from datetime import datetime, timezone
 
 # Root directory ekle
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,7 +35,7 @@ async def fetch_real_data(symbol="BTC/USDT", timeframe="1m", limit=43000):
 
         return df
     else:
-        logger.error(f"Veritabanında yeterli veri yok. ML testi için lütfen önce veri indiriniz (Frontend üzerinden veya fetch_ohlcv ile).")
+        logger.error("Veritabanında yeterli veri yok. ML testi için lütfen önce veri indiriniz (Frontend üzerinden veya fetch_ohlcv ile).")
         return None
 
 async def main():
@@ -57,11 +54,11 @@ async def main():
         logger.error("Veri seti oluşturulamadı, test iptal edildi.")
         return
 
-    logger.info(f"\n[AŞAMA 1] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
+    logger.info("\n[AŞAMA 1] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
     # 2. İndikatörleri ekle
     df = StrategyIndicators.add_all_indicators(df)
 
-    logger.info(f"\n[AŞAMA 2] XGBoost Modeli Eğitiliyor (Alpha özellikleri devrede)...")
+    logger.info("\n[AŞAMA 2] XGBoost Modeli Eğitiliyor (Alpha özellikleri devrede)...")
     model_save_path = "artifacts/models/xgb_model_fast_test.json"
 
     try:
@@ -96,7 +93,7 @@ async def main():
 
         logger.info(f"Target Sembol: {symbol} ({timeframe})")
         logger.info(f"Veri Seti Boyutu: {len(df)} Mum")
-        logger.info(f"Model: XGBoost (Yeni Alpha Özellikleri ile)")
+        logger.info("Model: XGBoost (Yeni Alpha Özellikleri ile)")
         logger.info(f"Accuracy (Doğruluk): % {xgb_acc * 100:.2f}")
         logger.info(f"F1-Score: % {f1_score * 100:.2f}")
 

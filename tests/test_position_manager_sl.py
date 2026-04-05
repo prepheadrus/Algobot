@@ -1,7 +1,4 @@
-import pytest
 from core.trading.position_manager import PositionManager
-from core.trading.entities.position import Position, PositionDirection
-from datetime import datetime
 
 def test_sl_breakeven_logic():
     pm = PositionManager()

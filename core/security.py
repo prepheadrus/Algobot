@@ -83,7 +83,7 @@ class KeyManager:
             self.fernet = Fernet(key)
             
             logger.info("🔑 [SECURITY] Yeni şifreleme anahtarı oluşturuldu (.secret.key)")
-            logger.info(f"📁 [SECURITY] Dosya izinleri: 0o600 (sadece owner)")
+            logger.info("📁 [SECURITY] Dosya izinleri: 0o600 (sadece owner)")
             
         except Exception as e:
             logger.error(f"❌ [SECURITY] Anahtar oluşturma hatası: {e}")

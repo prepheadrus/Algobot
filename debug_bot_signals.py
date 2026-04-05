@@ -6,9 +6,7 @@ Kullanım: python debug_bot_signals.py
 """
 
 import asyncio
-import yaml
 from core.config import CONFIG
-from core.logger import logger
 from data.database import db_manager
 from data.storage.parquet_lake import get_parquet_lake
 
@@ -37,14 +35,14 @@ async def diagnose_bot_issues():
     
     if ml_threshold > 0.6:
         print(f"   ⚠️ UYARI: ML threshold çok yüksek ({ml_threshold}), işlem almayı zorlaştırıyor!")
-        print(f"   → Öneri: 0.5 veya 0.6'ya düşür")
+        print("   → Öneri: 0.5 veya 0.6'ya düşür")
     
     # HTF ayarları
     htf_enabled = CONFIG.get('htf', {}).get('enabled', True)
     print(f"   HTF Enabled: {htf_enabled}")
     
     if htf_enabled:
-        print(f"   ⚠️ HTF aktif - Major trend ters yöndeyse veto ediliyor")
+        print("   ⚠️ HTF aktif - Major trend ters yöndeyse veto ediliyor")
     
     # Risk ayarları
     risk_config = CONFIG.get('risk_management', {})
@@ -72,7 +70,7 @@ async def diagnose_bot_issues():
             print(f"   ✅ Parquet Lake: {stats['total_symbols']} sembol, {stats['total_files']} dosya")
             print(f"   Semboller: {list(stats['symbols'].keys())[:10]}{'...' if len(stats['symbols']) > 10 else ''}")
         else:
-            print(f"   ❌ Parquet Lake BOŞ - Veri Laboratuvarı'ndan veri indirin!")
+            print("   ❌ Parquet Lake BOŞ - Veri Laboratuvarı'ndan veri indirin!")
     except Exception as e:
         print(f"   ❌ Parquet Lake hatası: {e}")
     
@@ -84,7 +82,7 @@ async def diagnose_bot_issues():
         if db_symbols:
             print(f"   ✅ SQLite DB: {len(db_symbols)} sembol")
         else:
-            print(f"   ⚠️ SQLite DB boş")
+            print("   ⚠️ SQLite DB boş")
     except Exception as e:
         print(f"   ❌ SQLite DB hatası: {e}")
     
@@ -108,7 +106,7 @@ async def diagnose_bot_issues():
             print(f"      - {strat_id}: {name} (TF: {timeframe})")
         
         if len(all_strategies) == 0:
-            print(f"   ❌ HİÇ STRATEJİ BULUNAMADI! strategy/ klasörünü kontrol edin")
+            print("   ❌ HİÇ STRATEJİ BULUNAMADI! strategy/ klasörünü kontrol edin")
             
     except Exception as e:
         print(f"   ❌ Strateji yükleme hatası: {e}")
@@ -144,8 +142,8 @@ async def diagnose_bot_issues():
             print(f"      Test accuracy: {test_accuracy:.2%}")
     else:
         print(f"   ❌ ML model yok: {xgb_path}")
-        print(f"   → Dashboard → ML Training ile model eğitin")
-        print(f"   → Veya config.yaml → ml.enabled = false (sadece teknik sinyaller)")
+        print("   → Dashboard → ML Training ile model eğitin")
+        print("   → Veya config.yaml → ml.enabled = false (sadece teknik sinyaller)")
     
     # 5. ÖNERİLER
     print("\n5️⃣ ÖNERİLER VE ÇÖZÜMLER")

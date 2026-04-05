@@ -6,7 +6,6 @@ Pydantic models for data-related requests and responses.
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
-from datetime import datetime
 
 
 # ============================================================================

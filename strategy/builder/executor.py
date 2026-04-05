@@ -52,7 +52,7 @@ from dataclasses import dataclass
 try:
     from .condition_parser import RuleGroup, Condition, parse_condition_json, evaluate_strategy
 except ImportError:
-    from condition_parser import RuleGroup, Condition, parse_condition_json, evaluate_strategy
+    from condition_parser import RuleGroup, parse_condition_json
 
 # Bot'un indikatör modülü
 try:
@@ -472,7 +472,7 @@ if __name__ == "__main__":
     
     # Strateji bilgilerini al
     info = executor.get_strategy_info()
-    print(f"\n[OK] Strateji Bilgileri:")
+    print("\n[OK] Strateji Bilgileri:")
     print(f"     İsim: {info['name']}")
     print(f"     Açıklama: {info['description']}")
     print(f"     İndikatörler: {len(info['indicators'])}")
@@ -492,7 +492,7 @@ if __name__ == "__main__":
     
     # Son mumun verisini göster
     last_row = prepared_df.iloc[-1]
-    print(f"\n[OK] Son mum verisi:")
+    print("\n[OK] Son mum verisi:")
     print(f"     Close: {last_row['close']:.2f}")
     if 'RSI_14' in last_row:
         print(f"     RSI_14: {last_row['RSI_14']:.2f}")

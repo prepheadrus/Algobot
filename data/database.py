@@ -2,9 +2,8 @@ import asyncio
 import aiosqlite
 import asyncpg
 import pandas as pd
-import os
 from core.logger import logger
-from core.config import TIMESCALE_DB_URL, REDIS_URL
+from core.config import TIMESCALE_DB_URL
 
 class DatabaseManager:
     """Modüler Veritabanı Yöneticisi:
@@ -1237,5 +1236,4 @@ class DatabaseManager:
             logger.info("Veritabanı bağlantıları sonlandırıldı.")
 
 # Gereken Pandas importu (fonksiyon içinde)
-import pandas as pd
 db_manager = DatabaseManager()

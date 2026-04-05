@@ -1,4 +1,3 @@
-import asyncio
 from api.schemas.ml import MLTrainRequest
 from pydantic import ValidationError
 

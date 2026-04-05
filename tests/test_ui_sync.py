@@ -7,7 +7,6 @@ Sorun: Pozisyon kapandı ama open_positions güncellenmedi → UI'da hala görü
 """
 
 import pytest
-from unittest.mock import patch
 
 
 @pytest.mark.asyncio
@@ -167,7 +166,7 @@ async def test_ui_polling_gets_fresh_data():
     assert stats.get('open_positions', 0) == 0, \
         f"Stats not updated after close: {stats.get('open_positions')}"
     
-    print(f"✅ UI polling fresh data test successful")
+    print("✅ UI polling fresh data test successful")
 
 
 if __name__ == "__main__":

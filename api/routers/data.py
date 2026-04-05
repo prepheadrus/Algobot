@@ -4,8 +4,8 @@ Data Router
 FastAPI router for data operations.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Dict, Any, List
+from fastapi import APIRouter, BackgroundTasks
+from typing import Dict, Any
 
 from core.logger import logger
 from api.schemas.data import (

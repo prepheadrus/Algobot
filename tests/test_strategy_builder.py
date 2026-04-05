@@ -22,20 +22,20 @@ def test_strategy_builder():
     # Koşul ekle
     builder.add_condition('long', rsi_id, '<', 30)
     builder.add_condition('short', rsi_id, '>', 70)
-    print(f"  [OK] Kosullar eklendi")
+    print("  [OK] Kosullar eklendi")
 
     # Risk ayarla
     builder.set_risk_params(stop_loss=2.0, take_profit=3.0)
-    print(f"  [OK] Risk parametreleri ayarlandi")
+    print("  [OK] Risk parametreleri ayarlandi")
 
     # JSON'a çevir
     json_str = builder.get_strategy_json()
-    print(f"  [OK] JSON olusturuldu")
+    print("  [OK] JSON olusturuldu")
     print(f"  Strategy: {builder}")
 
     # Kaydet
     builder.save_strategy('test_strategy.json')
-    print(f"  [OK] Dosyaya kaydedildi: test_strategy.json")
+    print("  [OK] Dosyaya kaydedildi: test_strategy.json")
     
     return builder
 
@@ -91,7 +91,7 @@ def test_executor():
     # Executor oluştur
     executor = StrategyExecutor()
     executor.load_strategy('test_strategy.json')
-    print(f"  [OK] Strateji yuklendi")
+    print("  [OK] Strateji yuklendi")
 
     # Sinyal uret
     signals = executor.generate_signals(df)

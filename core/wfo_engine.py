@@ -29,7 +29,7 @@ import asyncio
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Callable, Type
+from typing import Dict, Any, Optional, Type
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
@@ -38,7 +38,6 @@ from optuna.samplers import TPESampler
 
 from core.logger import logger
 from core.auto_grid import auto_grid
-from data.storage.parquet_lake import get_parquet_lake
 
 
 @dataclass
@@ -112,7 +111,7 @@ class WFOEngine:
                 return {}
             
             # 2. In-Sample / Out-of-Sample böl
-            logger.info(f"📊 [WFO] Veri bölünüyor (In-Sample / Out-of-Sample)")
+            logger.info("📊 [WFO] Veri bölünüyor (In-Sample / Out-of-Sample)")
             train_data, test_data = self._split_data(data, in_sample_days, out_of_sample_days)
             
             if len(train_data) < 50 or len(test_data) < 10:
@@ -121,14 +120,14 @@ class WFOEngine:
             
             # 3. Auto-Grid ile parametre uzayı oluştur
             if param_grid is None:
-                logger.info(f"🔧 [WFO] Auto-Grid ile parametre uzayı oluşturuluyor")
+                logger.info("🔧 [WFO] Auto-Grid ile parametre uzayı oluşturuluyor")
                 strategy_instance = strategy_class()
                 param_grid = auto_grid.generate_from_strategy(strategy_instance)
             else:
-                logger.info(f"🔧 [WFO] Manuel param grid kullanılıyor")
+                logger.info("🔧 [WFO] Manuel param grid kullanılıyor")
             
             # 4. Bayesian Optimization (TPE)
-            logger.info(f"🧠 [WFO] Bayesian Optimization başlatılıyor (TPE Sampler)")
+            logger.info("🧠 [WFO] Bayesian Optimization başlatılıyor (TPE Sampler)")
             
             # Optuna study oluştur
             study = optuna.create_study(
@@ -158,12 +157,12 @@ class WFOEngine:
             best_params = study.best_params
             best_value = study.best_value
             
-            logger.info(f"✅ [WFO] Optimizasyon tamamlandı!")
+            logger.info("✅ [WFO] Optimizasyon tamamlandı!")
             logger.info(f"   🏆 Best {optimization_metric}: {best_value:.4f}")
             logger.info(f"   🎯 Best params: {best_params}")
             
             # 6. Out-of-Sample doğrulama
-            logger.info(f"🔍 [WFO] Out-of-Sample doğrulama")
+            logger.info("🔍 [WFO] Out-of-Sample doğrulama")
             oos_metrics = await self._validate_out_of_sample(
                 best_params,
                 test_data,
@@ -479,7 +478,7 @@ async def start_wfo_background_task(
             result = await wfo_engine.optimize(config)
 
             if not result:
-                logger.warning(f"⚠️ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
+                logger.warning("⚠️ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
                 await asyncio.sleep(60)
                 continue
 
@@ -492,7 +491,7 @@ async def start_wfo_background_task(
                 strategy = StrategyManager.get_strategy_by_symbol(config.symbol)
                 if strategy and hasattr(strategy, 'update_params'):
                     strategy.update_params(result['best_params'])
-                    logger.info(f"📝 [WFO] Strateji parametreleri canlı bota uygulandı")
+                    logger.info("📝 [WFO] Strateji parametreleri canlı bota uygulandı")
 
             # Bekle (reoptimize interval)
             logger.info(f"⏳ [WFO] Sonraki optimizasyon: {reoptimize_interval} saat")
@@ -503,7 +502,7 @@ async def start_wfo_background_task(
             break
         except Exception as e:
             logger.error(f"❌ [WFO] Arka plan hatası: {e}")
-            logger.info(f"⏳ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
+            logger.info("⏳ [WFO] Veriler hibrit servisten gelene kadar bekleniyor... (Retry 60s)")
             await asyncio.sleep(60)  # 60 saniye bekle ve tekrar dene
 
 

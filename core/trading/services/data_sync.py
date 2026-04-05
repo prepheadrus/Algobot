@@ -1,9 +1,7 @@
 import asyncio
 import pandas as pd
-from datetime import datetime, timedelta
 from typing import Any
 from core.logger import logger
-from data.database import db_manager
 # from data.ohlcv_storage import get_storage  # ❌ MODÜL YOK - KALDIRILDI
 from data.data_lake import get_data_lake
 

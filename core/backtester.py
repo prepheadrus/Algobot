@@ -13,7 +13,7 @@ Win-Rate, Max Drawdown, Net PnL gibi metrikleri hesaplar.
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 import logging
 
@@ -460,7 +460,7 @@ if __name__ == "__main__":
     
     # İşlem geçmişini göster
     if result.trades:
-        print(f"\n[OK] İlk 5 işlem:")
+        print("\n[OK] İlk 5 işlem:")
         for i, trade in enumerate(result.trades[:5]):
             print(f"  {i+1}. {trade.direction} | Entry: ${trade.entry_price:.2f} | Exit: ${trade.exit_price:.2f} | PnL: ${trade.pnl:.2f} ({trade.exit_reason})")
     

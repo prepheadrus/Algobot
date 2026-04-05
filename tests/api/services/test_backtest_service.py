@@ -3,7 +3,6 @@ import asyncio
 import uuid
 import sys
 from unittest.mock import MagicMock
-from typing import Dict
 
 # Re-enable mock for missing dependencies to avoid sandbox pytest environment issues
 sys.modules['colorlog'] = MagicMock()
@@ -20,7 +19,6 @@ sys.modules['ta'] = MagicMock()
 sys.modules['dotenv'] = MagicMock()
 
 # We avoid importing other layers to prevent logger magicmock issues in this constrained test environment.
-import uuid
 from typing import Optional, Any
 
 class TTLCache:

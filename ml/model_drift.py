@@ -132,7 +132,7 @@ class ModelDriftDetector:
                 return None
             
             # 2. Feature engineering
-            logger.info(f"🔧 [MLOps] Feature engineering")
+            logger.info("🔧 [MLOps] Feature engineering")
             features, labels = await self._prepare_features(data, strategy_class)
             
             if len(features) < self.RETRAIN_MIN_SAMPLES:
@@ -140,14 +140,14 @@ class ModelDriftDetector:
                 return None
             
             # 3. Model eğit
-            logger.info(f"🧠 [MLOps] Model eğitiliyor")
+            logger.info("🧠 [MLOps] Model eğitiliyor")
             from ml.model_training import ModelTrainer
             
             trainer = ModelTrainer()
             metrics = await trainer.train_async(features, labels)
             
             # 4. Modeli kaydet
-            logger.info(f"💾 [MLOps] Model kaydediliyor")
+            logger.info("💾 [MLOps] Model kaydediliyor")
             await trainer.save_model(symbol, timeframe)
             
             # 5. Event fırlat

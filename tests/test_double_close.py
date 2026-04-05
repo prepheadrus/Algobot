@@ -8,7 +8,7 @@ Sorun: WebSocket hızlı fiyat akışında aynı SL/TP seviyesi birden fazla tet
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import MagicMock
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,6 @@ async def test_no_duplicate_position_close():
     Aynı pozisyonun aynı anda 2 kez kapatılmadığını doğrula.
     """
     from core.paper import paper_engine
-    from core.trading.position_manager import PositionManager
     
     # Test bot ID
     bot_id = "BTC/USDT_test_double_close_1m"

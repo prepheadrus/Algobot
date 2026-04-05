@@ -6,7 +6,7 @@ Test bağımlılıkları, mock'lar ve ortak fixture'lar.
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 
 # ============================================================================
@@ -139,7 +139,6 @@ def builder():
     Sahte StrategyBuilder fixture'ı.
     """
     from strategy.builder.strategy_builder import StrategyBuilder
-    from strategy.builder.json_validator import StrategyValidator
     
     # Geçici bir strateji JSON'u oluştur
     import tempfile

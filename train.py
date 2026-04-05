@@ -2,7 +2,6 @@ import asyncio
 import pandas as pd
 import numpy as np
 import os
-import traceback
 
 from core.exchange import ExchangeManager
 from data.indicators import StrategyIndicators

@@ -54,7 +54,7 @@ async def test():
                 result = await data_service.delete_data(request)
                 print(f"      Silindi: {result.get('deleted_count', 0):,} mum")
             else:
-                print(f"      DB'de yok")
+                print("      DB'de yok")
     
     # 3. Son durum
     print("\n[3] Son durum:")
@@ -66,7 +66,7 @@ async def test():
         print(f"    Flat files: {total_files} dosya")
         
         # Detaylı liste
-        print(f"\n    Detay:")
+        print("\n    Detay:")
         for symbol_dir in base_dir.iterdir():
             if symbol_dir.is_dir():
                 for tf_dir in symbol_dir.iterdir():
@@ -74,7 +74,7 @@ async def test():
                         files = list(tf_dir.glob("*.json"))
                         print(f"      {symbol_dir.name}/{tf_dir.name}: {len(files)} dosya")
     else:
-        print(f"    Flat files: Dizin yok")
+        print("    Flat files: Dizin yok")
     
     print("\n" + "="*60)
 

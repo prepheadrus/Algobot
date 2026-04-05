@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from core.logger import logger
 from strategy.risk import RiskManagement
 from strategy.confluence import StrategyConfluence

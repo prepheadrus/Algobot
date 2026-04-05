@@ -5,9 +5,8 @@ FastAPI router for bot operations.
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-from core.logger import logger
 from api.schemas.bot import (
     BotStartRequest,
     BotStopRequest,

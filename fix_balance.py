@@ -5,7 +5,6 @@ Run this on Ubuntu machine to fix negative balance issue:
     python fix_balance.py
 """
 
-import asyncio
 import sqlite3
 from pathlib import Path
 
@@ -62,7 +61,7 @@ def check_database():
             
             # Check for absurd values
             if abs(pnl_usd) > 1000000:  # More than 1 million
-                print(f"    ⚠️  WARNING: Absurd PnL value detected!")
+                print("    ⚠️  WARNING: Absurd PnL value detected!")
     
     # Check for duplicate trades
     print("\n🔍 Checking for duplicate trades...")

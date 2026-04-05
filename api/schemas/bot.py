@@ -5,7 +5,7 @@ Pydantic models for bot-related requests and responses.
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 from enum import Enum
 
 

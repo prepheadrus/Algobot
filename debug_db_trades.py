@@ -3,7 +3,6 @@ Debug: Check trades in database
 """
 import asyncio
 from data.database import db_manager
-from core.logger import logger
 
 async def test():
     await db_manager.connect()

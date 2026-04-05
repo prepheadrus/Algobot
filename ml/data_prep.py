@@ -426,12 +426,12 @@ def prepare_ml_data(
     Returns:
         Tuple: (X_train, X_test, y_train, y_test, scaler)
     """
-    logger.info("ML veri hazırlama pipeline'ı başlatılıyor...")
+    logger.info(f"ML veri hazırlama pipeline'ı başlatılıyor... (Gelen Parametreler: TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon})")
 
     # 1. Triple Barrier etiketleme (skip_barrier=False ise)
     if not skip_barrier:
         df_labeled = apply_triple_barrier(
-            df,
+            df=df,
             target_col="close",
             tp_multiplier=tp_multiplier,
             sl_multiplier=sl_multiplier,
