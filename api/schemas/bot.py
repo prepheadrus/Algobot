@@ -50,6 +50,7 @@ class BotStartRequest(BaseModel):
     timeframe: str = Field(default="1m", description="Zaman dilimi")
     market_type: MarketType = Field(default=MarketType.SWAP, description="Piyasa tipi")
     margin_type: MarginType = Field(default=MarginType.ISOLATED, description="Marjin tipi")
+    model_id: Optional[str] = Field(default=None, description="Opsiyonel model ID (UUID/Timestamp). Verilmezse sistem en uygun (en son) modeli bulur.")
     
     class Config:
         json_schema_extra = {
@@ -58,7 +59,8 @@ class BotStartRequest(BaseModel):
                 "strategy_id": "trend_master",
                 "timeframe": "1m",
                 "market_type": "future",
-                "margin_type": "isolated"
+                "margin_type": "isolated",
+                "model_id": "20260405_1830"
             }
         }
 

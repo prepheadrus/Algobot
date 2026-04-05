@@ -32,6 +32,44 @@ const app = {
 // ============================================================================
 
 /**
+ * Belirli sembol ve timeframe için mevcut modelleri çekip select'i doldurur.
+ */
+async function loadMLModelsForBot() {
+    const symbol = document.getElementById('bot-symbol')?.value;
+    const timeframe = document.getElementById('bot-timeframe')?.value || '1m';
+    const select = document.getElementById('bot-model-id');
+
+    if (!select || !symbol) return;
+
+    try {
+        const response = await api.get(`/ml/models?symbol=${symbol}&timeframe=${timeframe}`);
+
+        // Önce mevcut seçenekleri temizle, varsayılanı tut
+        select.innerHTML = '<option value="">Otomatik (En güncel modeli bul)</option>';
+
+        if (response.status === 'success' && response.models && response.models.length > 0) {
+            response.models.forEach(model => {
+                const option = document.createElement('option');
+                // Value olarak model_id gönderilecek
+                option.value = model.model_id;
+
+                // Format: Model_1830 (%55.6 - 2.0/2.0)
+                const dateParts = model.model_id.split('_');
+                const displayName = dateParts.length > 1 ? `Model_${dateParts[dateParts.length-1]}` : `Model_${model.model_id}`;
+                const tpSl = model.tp_multiplier && model.sl_multiplier ? ` - ${model.tp_multiplier}/${model.sl_multiplier}` : '';
+                const legacyText = model.is_legacy ? ' (Legacy)' : '';
+
+                option.textContent = `${displayName} (%${model.accuracy}${tpSl})${legacyText}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('❌ Modeller yüklenirken hata:', error);
+        select.innerHTML = '<option value="">Otomatik (En güncel modeli bul)</option>';
+    }
+}
+
+/**
  * Initialize application
  */
 async function init() {
@@ -64,6 +102,9 @@ async function init() {
         await loadMLTrainingHistory();  // Load ML training history
         await loadSymbolsForML();  // Load symbols for ML training
         await loadTimeframesForML();  // Load timeframes for ML training
+
+        // Initial model dropdown load
+        await loadMLModelsForBot();
 
         // XAI: ML Strateji Karar Merkezi dropdown'larını yükle
         await loadMLStrategies();  // Stratejileri API'den yükle
@@ -1056,12 +1097,14 @@ async function handleBotSubmit(event) {
     event.preventDefault();
 
     const timeframeEl = document.getElementById('bot-timeframe');
+    const modelIdEl = document.getElementById('bot-model-id');
     const botData = {
         symbol: document.getElementById('bot-symbol').value,
         strategy_id: document.getElementById('bot-strategy').value,
         timeframe: timeframeEl?.value || '1m',  // Fallback to '1m' if empty
         market_type: document.getElementById('bot-market').value,
-        margin_type: document.getElementById('bot-margin-type').value
+        margin_type: document.getElementById('bot-margin-type').value,
+        model_id: modelIdEl?.value || null
     };
 
     // 🔥 DEBUG: Form değerlerini logla
@@ -1071,6 +1114,7 @@ async function handleBotSubmit(event) {
     console.log('   ⏱️ Timeframe:', botData.timeframe, `(element value: ${timeframeEl?.value})`);
     console.log('   🏛️ Market:', botData.market_type);
     console.log('   🛡️ Margin:', botData.margin_type);
+    console.log('   🧠 Model ID:', botData.model_id);
 
     if (!botData.symbol || !botData.strategy_id) {
         showToast('❌ Lütfen sembol ve strateji seçin!', 'error');
@@ -1417,6 +1461,8 @@ async function loadSymbolsForBot() {
         });
 
         console.log(`📊 [SYMBOLS] ${symbols.length} sembol yüklendi`);
+        // Symbol listesi yüklendikten sonra (eğer değer seçiliyse veya form doldurulmuşsa) model listesini güncelle
+        loadMLModelsForBot();
     } catch (error) {
         console.error('❌ [SYMBOLS] Load error:', error);
     }
@@ -2635,6 +2681,12 @@ function setupEventListeners() {
             window.chartRenderer.resize();
         }
     });
+
+    // Update models dropdown when symbol or timeframe changes
+    const symbolInput = document.getElementById('bot-symbol');
+    const timeframeInput = document.getElementById('bot-timeframe');
+    if (symbolInput) symbolInput.addEventListener('change', loadMLModelsForBot);
+    if (timeframeInput) timeframeInput.addEventListener('change', loadMLModelsForBot);
 
     // Before unload
     window.addEventListener('beforeunload', () => {

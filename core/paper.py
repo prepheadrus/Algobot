@@ -272,7 +272,7 @@ class PaperTrader:
 
             ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = (
                 await self.signal_validator.validate_signal_with_ml(
-                    symbol, timeframe, indicators, signal
+                    symbol, timeframe, indicators, signal, model_id=self.bots[bot_id]['config'].model_id
                 )
             )
 

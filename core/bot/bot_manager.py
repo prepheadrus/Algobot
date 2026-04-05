@@ -91,6 +91,7 @@ class BotConfig:
     margin_type: MarginType = MarginType.ISOLATED
     leverage: float = 1.0
     risk_per_trade: float = 0.01
+    model_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Dict'e çevir"""
