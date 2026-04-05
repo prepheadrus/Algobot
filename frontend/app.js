@@ -1810,40 +1810,61 @@ window.startMLTraining = async function() {
     const limit = parseInt(limitInput?.value) || 5000;
 
     // Değerleri alıp virgülleri noktaya çevir (Defense in depth)
-    const tpValue = tpInput?.value ? tpInput.value.replace(',', '.') : "2.0";
-    const slValue = slInput?.value ? slInput.value.replace(',', '.') : "2.0";
-    const lrValue = lrInput?.value ? lrInput.value.replace(',', '.') : "0.1";
+    const tpValue = tpInput?.value ? tpInput.value.replace(',', '.') : "";
+    const slValue = slInput?.value ? slInput.value.replace(',', '.') : "";
+    const lrValue = lrInput?.value ? lrInput.value.replace(',', '.') : "";
+
+    // Değerler boş string ("") olarak geliyorsa formdan düzgün okunamıyor demektir.
+    if (!tpValue || !slValue || !lrValue || !horizonInput?.value || !estimatorsInput?.value || !depthInput?.value) {
+        showToast('❌ Tüm parametre alanlarının doldurulduğundan emin olun!', 'error');
+        return;
+    }
 
     const tpMultiplier = parseFloat(tpValue);
     const slMultiplier = parseFloat(slValue);
-    const horizon = parseInt(horizonInput?.value) || 10;
-    const nEstimators = parseInt(estimatorsInput?.value) || 500;
-    const maxDepth = parseInt(depthInput?.value) || 6;
+    const horizon = parseInt(horizonInput?.value);
+    const nEstimators = parseInt(estimatorsInput?.value);
+    const maxDepth = parseInt(depthInput?.value);
     const learningRate = parseFloat(lrValue);
 
-    // Validation
+    // Validation - NaN kontrolleri eklendi, varsayılanlara geçilmedi.
     if (!symbol || !timeframe) {
         showToast('❌ Sembol ve zaman dilimi seçin!', 'error');
         return;
     }
 
-    if (limit < 100) {
+    if (isNaN(limit) || limit < 100) {
         showToast('❌ Mum sayısı en az 100 olmalı!', 'error');
         return;
     }
 
     if (isNaN(tpMultiplier) || tpMultiplier < 0.5 || tpMultiplier > 10) {
-        showToast('❌ TP çarpanı 0.5 - 10 arasında olmalı!', 'error');
+        showToast('❌ TP çarpanı 0.5 - 10 arasında geçerli bir sayı olmalı!', 'error');
         return;
     }
 
     if (isNaN(slMultiplier) || slMultiplier < 0.5 || slMultiplier > 10) {
-        showToast('❌ SL çarpanı 0.5 - 10 arasında olmalı!', 'error');
+        showToast('❌ SL çarpanı 0.5 - 10 arasında geçerli bir sayı olmalı!', 'error');
         return;
     }
 
     if (isNaN(horizon) || horizon < 5 || horizon > 200) {
-        showToast('❌ Horizon 5 ile 200 arasında olmalı!', 'error');
+        showToast('❌ Horizon 5 ile 200 arasında geçerli bir tam sayı olmalı!', 'error');
+        return;
+    }
+
+    if (isNaN(nEstimators) || nEstimators < 50) {
+        showToast('❌ Ağaç Sayısı en az 50 olmalı!', 'error');
+        return;
+    }
+
+    if (isNaN(maxDepth) || maxDepth < 1) {
+        showToast('❌ Ağaç Derinliği en az 1 olmalı!', 'error');
+        return;
+    }
+
+    if (isNaN(learningRate) || learningRate <= 0) {
+        showToast('❌ Öğrenme Hızı geçerli bir pozitif sayı olmalı!', 'error');
         return;
     }
 
@@ -1927,6 +1948,8 @@ window.startMLTraining = async function() {
             },
             FINAL_DATA: data
         });
+
+        console.log("TARAYICIDAN ÇIKAN PAYLOAD:", data);
 
         const result = await api.trainModel(data);
 
