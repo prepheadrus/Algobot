@@ -4,8 +4,7 @@ ML Service
 Business logic for ML operations.
 """
 
-from typing import Dict, Any, List, Optional
-import asyncio
+from typing import Dict, Any
 import os
 import json
 import traceback
@@ -120,7 +119,7 @@ class MLService:
                     logger.info(f"🔄 [ML] Index DatetimeIndex değil ({type(df.index)}), 'timestamp' kolonu index yapılıyor...")
                     df.set_index('timestamp', inplace=True)
                 else:
-                    logger.warning(f"⚠️ [ML] Index DatetimeIndex değil ve 'timestamp' kolonu bulunamadı!")
+                    logger.warning("⚠️ [ML] Index DatetimeIndex değil ve 'timestamp' kolonu bulunamadı!")
 
             # UTC timezone kontrolü (leakage koruması)
             if df.index.tz is None:
@@ -140,7 +139,7 @@ class MLService:
 
             logger.info(f"✅ [PARQUET LAKE] {request.symbol} {request.timeframe} → {len(df)} mum yüklendi (limit: {request.limit})")
             logger.info(f"📊 [PARQUET LAKE] İlk: {df.index[0]}, Son: {df.index[-1]}")
-            logger.info(f"🛡️ [ML] NaN temizliği: UTC sync + ffill + dropna uygulandı")
+            logger.info("🛡️ [ML] NaN temizliği: UTC sync + ffill + dropna uygulandı")
 
             # Final log
             logger.info("🎉 [DATA LAKE] Parquet Engine'e Tam Geçiş Sağlandı ve Risk Kalkanları Aktif")
@@ -149,10 +148,10 @@ class MLService:
             self.training_state["message"] = "Feature engineering ve etiketleme yapılıyor..."
             self.training_state["current_step"] = "ML pipeline"
             
-            logger.info(f"📊 [ML] ML pipeline başlatılıyor...")
+            logger.info("📊 [ML] ML pipeline başlatılıyor...")
             
             # 1.5 İndikatörleri ve özelliklerini ekle
-            logger.info(f"📊 [ML] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
+            logger.info("📊 [ML] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")
             from data.indicators import StrategyIndicators
             df = StrategyIndicators.add_all_indicators(df)
 
@@ -185,13 +184,14 @@ class MLService:
                 max_depth=request.max_depth,
                 learning_rate=request.learning_rate,
                 subsample=0.8,
-                colsample_bytree=0.8
+                colsample_bytree=0.8,
+                enable_auto_regularization=False # UI'dan gelen değerleri ezmemesi için auto reg'i kapatıyoruz
             )
             
             # Modeli eğit (train metodu kullan)
             training_metrics = trainer.train(X_train, y_train, X_test, y_test)
             
-            logger.info(f"✅ [ML] Model eğitildi")
+            logger.info("✅ [ML] Model eğitildi")
             logger.info(f"📊 [ML] Eğitim metrikleri: {training_metrics}")
             
             # 6. Modeli kaydet
@@ -215,7 +215,7 @@ class MLService:
                 time_horizon=request.time_horizon
             )
 
-            logger.info(f"💾 [ML] Ensemble modeller kaydedildi:")
+            logger.info("💾 [ML] Ensemble modeller kaydedildi:")
             logger.info(f"   XGBoost: {model_paths['xgboost_path']}")
             logger.info(f"   RF:      {model_paths['rf_path']}")
             logger.info(f"   Meta:    {model_paths['metadata_path']}")

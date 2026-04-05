@@ -14,7 +14,7 @@ import json
 import numpy as np
 import pandas as pd
 from pandas import Series
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, List
 from datetime import datetime
 import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier
@@ -356,7 +356,7 @@ class ModelTrainer:
         Returns:
             Dict[str, Any]: Eğitim metrikleri
         """
-        logger.info(f"🧠 Ensemble (XGBoost + RF) eğitimi başlatılıyor...")
+        logger.info("🧠 Ensemble (XGBoost + RF) eğitimi başlatılıyor...")
         logger.info(f"  Eğitim seti: {X_train.shape}")
         logger.info(f"  Test seti: {X_test.shape}")
         logger.info(f"  Sınıf dağılımı (train): {y_train.value_counts().to_dict()}")
@@ -785,21 +785,6 @@ class ModelTrainer:
 
         return self
 
-    def get_feature_importance_df(self, top_n: int = 20) -> pd.DataFrame:
-        """
-        Özellik önemlerini DataFrame olarak döner.
-
-        Args:
-            top_n: İlk N özelliği göster
-
-        Returns:
-            pd.DataFrame: Özellik önemleri
-        """
-        importance = self._calculate_feature_importance()
-        df = pd.DataFrame(importance, columns=['feature', 'importance'])
-        return df.head(top_n)
-
-
 def run_training_pipeline(
     df: pd.DataFrame,
     model_save_path: str = "artifacts/models/xgb_model.json",
@@ -807,7 +792,11 @@ def run_training_pipeline(
     sl_multiplier: float = 2.0,
     time_horizon: int = 10,
     train_ratio: float = 0.8,
-    timeframe: str = "1h"
+    timeframe: str = "1h",
+    n_estimators: int = 500,
+    max_depth: int = 6,
+    learning_rate: float = 0.1,
+    enable_auto_regularization: bool = True
 ) -> ModelTrainer:
     """
     End-to-end eğitim pipeline'ı.
@@ -820,6 +809,10 @@ def run_training_pipeline(
         time_horizon: Dikey bariyer mum sayısı
         train_ratio: Eğitim oranı
         timeframe: Eğitim timeframe'i (metadata için)
+        n_estimators: Ağaç sayısı
+        max_depth: Maksimum derinlik
+        learning_rate: Öğrenme oranı
+        enable_auto_regularization: Otomatik regularization aktif mi
 
     Returns:
         ModelTrainer: Eğitilmiş model
@@ -844,12 +837,13 @@ def run_training_pipeline(
     # 2. Model eğitimi
     logger.info("\n[2/3] Model eğitiliyor...")
     trainer = ModelTrainer(
-        n_estimators=500,
-        max_depth=6,
-        learning_rate=0.1,
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate,
         subsample=0.8,
         colsample_bytree=0.8,
-        num_class=3
+        num_class=3,
+        enable_auto_regularization=enable_auto_regularization
     )
 
     trainer.train(X_train, y_train, X_test, y_test)
@@ -912,7 +906,8 @@ if __name__ == "__main__":
             tp_multiplier=2.0,
             sl_multiplier=2.0,
             time_horizon=10,
-            train_ratio=0.8
+            train_ratio=0.8,
+            enable_auto_regularization=False
         )
 
         # 4. Test tahmini
@@ -926,7 +921,7 @@ if __name__ == "__main__":
 
         predictions, confidence, probs = trainer.predict_with_confidence(X_test_sample)
 
-        logger.info(f"\nSon 10 mum tahmini:")
+        logger.info("\nSon 10 mum tahmini:")
         for i, (pred, conf) in enumerate(zip(predictions, confidence)):
             label = trainer.class_mapping.get(pred, f'Class_{pred}')
             logger.info(f"  Mum {i+1}: {label} (Güven: {conf*100:.1f}%)")
