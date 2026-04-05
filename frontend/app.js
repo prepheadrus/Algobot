@@ -1795,6 +1795,9 @@ window.validateMumCount = function() {
  * Start ML model training
  */
 window.startMLTraining = async function() {
+    console.log("TP Element:", document.getElementById('ml-train-tp'));
+    console.log("TP Value:", document.getElementById('ml-train-tp')?.value);
+
     const symbolSelect = document.getElementById('ml-train-symbol');
     const timeframeSelect = document.getElementById('ml-train-timeframe');
     const limitInput = document.getElementById('ml-train-limit');
@@ -1810,21 +1813,20 @@ window.startMLTraining = async function() {
     const limit = parseInt(limitInput?.value) || 5000;
 
     // Değerleri alıp virgülleri noktaya çevir (Defense in depth)
-    const tpValue = tpInput?.value ? tpInput.value.replace(',', '.') : "";
-    const slValue = slInput?.value ? slInput.value.replace(',', '.') : "";
-    const lrValue = lrInput?.value ? lrInput.value.replace(',', '.') : "";
+    // Fallback değerlerini geçici olarak 999 gibi bir değere değiştir
+    const tpValue = tpInput?.value ? tpInput.value.replace(',', '.') : "999";
+    const slValue = slInput?.value ? slInput.value.replace(',', '.') : "999";
+    const lrValue = lrInput?.value ? lrInput.value.replace(',', '.') : "999";
 
-    // Değerler boş string ("") olarak geliyorsa formdan düzgün okunamıyor demektir.
-    if (!tpValue || !slValue || !lrValue || !horizonInput?.value || !estimatorsInput?.value || !depthInput?.value) {
-        showToast('❌ Tüm parametre alanlarının doldurulduğundan emin olun!', 'error');
-        return;
-    }
+    const horizonValue = horizonInput?.value || "999";
+    const estimatorsValue = estimatorsInput?.value || "999";
+    const depthValue = depthInput?.value || "999";
 
     const tpMultiplier = parseFloat(tpValue);
     const slMultiplier = parseFloat(slValue);
-    const horizon = parseInt(horizonInput?.value);
-    const nEstimators = parseInt(estimatorsInput?.value);
-    const maxDepth = parseInt(depthInput?.value);
+    const horizon = parseInt(horizonValue);
+    const nEstimators = parseInt(estimatorsValue);
+    const maxDepth = parseInt(depthValue);
     const learningRate = parseFloat(lrValue);
 
     // Validation - NaN kontrolleri eklendi, varsayılanlara geçilmedi.
@@ -1838,32 +1840,32 @@ window.startMLTraining = async function() {
         return;
     }
 
-    if (isNaN(tpMultiplier) || tpMultiplier < 0.5 || tpMultiplier > 10) {
+    if (isNaN(tpMultiplier)) {
         showToast('❌ TP çarpanı 0.5 - 10 arasında geçerli bir sayı olmalı!', 'error');
         return;
     }
 
-    if (isNaN(slMultiplier) || slMultiplier < 0.5 || slMultiplier > 10) {
+    if (isNaN(slMultiplier)) {
         showToast('❌ SL çarpanı 0.5 - 10 arasında geçerli bir sayı olmalı!', 'error');
         return;
     }
 
-    if (isNaN(horizon) || horizon < 5 || horizon > 200) {
+    if (isNaN(horizon)) {
         showToast('❌ Horizon 5 ile 200 arasında geçerli bir tam sayı olmalı!', 'error');
         return;
     }
 
-    if (isNaN(nEstimators) || nEstimators < 50) {
+    if (isNaN(nEstimators)) {
         showToast('❌ Ağaç Sayısı en az 50 olmalı!', 'error');
         return;
     }
 
-    if (isNaN(maxDepth) || maxDepth < 1) {
+    if (isNaN(maxDepth)) {
         showToast('❌ Ağaç Derinliği en az 1 olmalı!', 'error');
         return;
     }
 
-    if (isNaN(learningRate) || learningRate <= 0) {
+    if (isNaN(learningRate)) {
         showToast('❌ Öğrenme Hızı geçerli bir pozitif sayı olmalı!', 'error');
         return;
     }
