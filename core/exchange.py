@@ -170,7 +170,9 @@ class ExchangeManager:
         self.exchange_class = getattr(ccxtpro, self.exchange_id)
         self.download_stops = {}  # {symbol: bool} - İndirmeyi durdurmak için
         self.download_pauses = {}  # {symbol: bool} - Duraklatmak için
-        self.active_downloads = {}  # {symbol: metadata} - Aktif görevleri takip etmek için
+        self.active_downloads = (
+            {}
+        )  # {symbol: metadata} - Aktif görevleri takip etmek için
 
         # YENİ: Aktif poller'ları takip et (1-to-N mimarisi)
         self.active_pollers = {}  # {symbol: asyncio.Task} - Her sembol için 1 poller
@@ -217,6 +219,9 @@ class ExchangeManager:
 
         # Asenkron borsayı başlat
         self.exchange = self.exchange_class(exchange_args)
+
+        # CCXT Rate Limit kesinlikle aktif olduğundan emin ol (Anonim modda bile)
+        self.exchange.enableRateLimit = True
 
         # Binance public streamleri api key gerektirmiyor. Ancak watch_ticker api key var ise public kanalları kullanırken de
         # hatalı api-key id hatası veriyor. Bunun için eğer watch_ticker vb. public kanallar kullanılacaksa
@@ -469,6 +474,9 @@ class ExchangeManager:
                         )
                         self.exchange.apiKey = None
                         self.exchange.secret = None
+                        self.exchange.enableRateLimit = (
+                            True  # Anonim modda da rate limit kesinlikle açık kalsın
+                        )
                         # Tekrar dene (Bu sefer şifresiz)
                         await self.exchange.load_markets({"type": "future"})
                         await self.exchange.load_markets({"type": "spot"})
@@ -690,6 +698,9 @@ class ExchangeManager:
                     )
                     self.exchange.apiKey = None
                     self.exchange.secret = None
+                    self.exchange.enableRateLimit = (
+                        True  # Anonim modda da rate limit kesinlikle açık kalsın
+                    )
                     # Hemen ardından tekrar denemek üzere beklemeye gerek yok veya kısa bekle
                     await asyncio.sleep(1)
                 else:
@@ -746,6 +757,9 @@ class ExchangeManager:
                     )
                     self.exchange.apiKey = None
                     self.exchange.secret = None
+                    self.exchange.enableRateLimit = (
+                        True  # Anonim modda da rate limit kesinlikle açık kalsın
+                    )
                     await self.exchange.load_markets({"type": market_type})
                 else:
                     raise auth_err
@@ -1074,15 +1088,34 @@ class ExchangeManager:
                 if key in self.active_downloads:
                     self.active_downloads[key]["current_ts"] = since
 
-                # Dinamik sleep: Her 5000 mumda bir daha uzun bekle (rate limit ve DB locked önleme)
-                if all_downloaded % 5000 == 0:
-                    await asyncio.sleep(2)  # Her 5000 mumda bir 2 saniye bekle
+                # Dinamik sleep: Sayfalama (Pagination) Beklemesi
+                # Anonim modda (API key yoksa) limitler çok daha kısıtlıdır.
+                is_anonymous = not (self.exchange.apiKey and self.exchange.secret)
+
+                if is_anonymous:
+                    # Anonim modda banlanmamak için her sayfada 1 saniye kibarca bekle
+                    await asyncio.sleep(1.0)
                 else:
-                    await asyncio.sleep(0.1)  # Normalde 100ms yeterli
+                    # API key varsa hızlandır, ama yine de her 5000 mumda bir DB locked koruması yap
+                    if all_downloaded % 5000 == 0:
+                        await asyncio.sleep(2)  # Her 5000 mumda bir 2 saniye bekle
+                    else:
+                        await asyncio.sleep(0.1)  # Normalde 100ms yeterli
 
             except Exception as e:
-                logger.error(f"⚠️ {symbol} Veri İndirme Döngüsünde Hata: {e}")
-                await asyncio.sleep(5)
+                # EĞER HATA RATE LIMIT (429 vb.) veya Borsa hatası ise, devreyi açık bırakmak yerine bekle
+                if (
+                    "RateLimitExceeded" in str(type(e))
+                    or "429" in str(e)
+                    or "CircuitBreakerError" in str(type(e))
+                ):
+                    logger.warning(
+                        f"⚠️ {symbol} Rate Limit veya Circuit Breaker devrede! 10 saniye bekleniyor ve kalındığı yerden devam edilecek... Hata: {e}"
+                    )
+                    await asyncio.sleep(10)
+                else:
+                    logger.error(f"⚠️ {symbol} Veri İndirme Döngüsünde Hata: {e}")
+                    await asyncio.sleep(5)
 
         is_stopped = self.download_stops.get(key, False)
 
@@ -1543,9 +1576,26 @@ class ExchangeManager:
                         )
 
                         # Bu sayfanın mumlarını çek
-                        page_ohlcv = await self.fetch_ohlcv(
-                            symbol, timeframe="1m", since=gap_start_ms, limit=limit
-                        )
+                        try:
+                            # Use exchange directly to bypass custom circuit breaker wrapper for gap fill retry logic
+                            page_ohlcv = await self.exchange.fetch_ohlcv(
+                                symbol, timeframe="1m", since=gap_start_ms, limit=limit
+                            )
+                        except Exception as fetch_err:
+                            if "RateLimitExceeded" in str(
+                                type(fetch_err)
+                            ) or "429" in str(fetch_err):
+                                logger.warning(
+                                    f"⚠️ [PAGINATION] {symbol} Rate Limit devrede! 10 saniye bekleniyor ve devam edilecek..."
+                                )
+                                await asyncio.sleep(10)
+                                page -= 1  # retry this page
+                                continue
+                            else:
+                                logger.error(
+                                    f"⚠️ [PAGINATION] {symbol} Hata: {fetch_err}"
+                                )
+                                break
 
                         if not page_ohlcv or len(page_ohlcv) == 0:
                             logger.warning(
@@ -1584,7 +1634,13 @@ class ExchangeManager:
                         gap_start_ms = last_fetched_ms
 
                         # Rate limit koruması (Binance: 1200 istek/dakika)
-                        await asyncio.sleep(0.1)
+                        is_anonymous = not (
+                            self.exchange.apiKey and self.exchange.secret
+                        )
+                        if is_anonymous:
+                            await asyncio.sleep(1.0)
+                        else:
+                            await asyncio.sleep(0.1)
 
                     # TÜM gap mumlarını SQLite'a kaydet
                     if all_gap_ohlcv and len(all_gap_ohlcv) > 0:
@@ -1768,9 +1824,22 @@ class ExchangeManager:
                 )
 
                 # Veritabanı boşsa, REST API'den çek
-                historical_ohlcv = await self.fetch_ohlcv(
-                    symbol, timeframe="1m", limit=1500
-                )
+                try:
+                    historical_ohlcv = await self.exchange.fetch_ohlcv(
+                        symbol, timeframe="1m", limit=1500
+                    )
+                except Exception as rest_err:
+                    if "RateLimitExceeded" in str(type(rest_err)) or "429" in str(
+                        rest_err
+                    ):
+                        logger.warning(
+                            f"⚠️ [REST] {symbol} Rate Limit devrede! 10 saniye bekleniyor..."
+                        )
+                        await asyncio.sleep(10)
+                        historical_ohlcv = []
+                    else:
+                        logger.error(f"⚠️ [REST] {symbol} Hata: {rest_err}")
+                        historical_ohlcv = []
 
                 if historical_ohlcv and len(historical_ohlcv) > 0:
                     ohlcv_df = pd.DataFrame(
