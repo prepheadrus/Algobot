@@ -4,8 +4,8 @@ ML Schemas
 Pydantic models for ML-related requests and responses.
 """
 
-from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Dict, List, Optional, Any
 
 
 # ============================================================================
@@ -44,8 +44,19 @@ class MLTrainRequest(BaseModel):
     timeframe: str = Field(default="1h", description="Zaman dilimi")
     limit: int = Field(default=5000, description="Mum sayısı (DB'deki veriye göre otomatik ayarlanır)", ge=100)
     model_type: str = Field(default="xgboost", description="Model tipi")
-    tp: float = Field(default=2.0, description="Take profit multiplier", ge=1.0, le=5.0)
-    sl: float = Field(default=2.0, description="Stop loss multiplier", ge=1.0, le=5.0)
+    tp: float = Field(default=2.0, description="Take profit multiplier", ge=0.5, le=10.0)
+    sl: float = Field(default=2.0, description="Stop loss multiplier", ge=0.5, le=10.0)
+    time_horizon: int = Field(default=10, description="Dikey bariyer mum sayısı (Horizon)", ge=5, le=200)
+    n_estimators: int = Field(default=500, description="Ağaç sayısı", ge=50, le=2000)
+    max_depth: int = Field(default=6, description="Maksimum ağaç derinliği", ge=1, le=20)
+    learning_rate: float = Field(default=0.1, description="Öğrenme hızı", ge=0.001, le=1.0)
+
+    @field_validator('tp', 'sl', 'learning_rate', mode='before')
+    @classmethod
+    def convert_comma_to_dot(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.replace(',', '.')
+        return v
 
 
 class MLStatusRequest(BaseModel):

@@ -168,7 +168,7 @@ class MLService:
                 df,
                 tp_multiplier=request.tp,
                 sl_multiplier=request.sl,
-                time_horizon=10,
+                time_horizon=request.time_horizon,
                 skip_barrier=False  # Triple Barrier uygula
             )
             
@@ -181,9 +181,9 @@ class MLService:
             
             from ml.model_training import ModelTrainer
             trainer = ModelTrainer(
-                n_estimators=500,
-                max_depth=6,
-                learning_rate=0.1,
+                n_estimators=request.n_estimators,
+                max_depth=request.max_depth,
+                learning_rate=request.learning_rate,
                 subsample=0.8,
                 colsample_bytree=0.8
             )
@@ -320,8 +320,12 @@ class MLService:
                 "model_type": request.model_type,
                 "dataset_size": dataset_size,
                 "feature_count": feature_count,
-                "tp_multiplier": float(getattr(request, 'tp_multiplier', 2.0)),
-                "sl_multiplier": float(getattr(request, 'sl_multiplier', 2.0)),
+                "tp_multiplier": float(getattr(request, 'tp', 2.0)),
+                "sl_multiplier": float(getattr(request, 'sl', 2.0)),
+                "time_horizon": int(getattr(request, 'time_horizon', 10)),
+                "n_estimators": int(getattr(request, 'n_estimators', 500)),
+                "max_depth": int(getattr(request, 'max_depth', 6)),
+                "learning_rate": float(getattr(request, 'learning_rate', 0.1)),
                 "started_at": started_at.isoformat(),
                 "completed_at": completed_at.isoformat(),
                 "duration_seconds": duration_seconds,

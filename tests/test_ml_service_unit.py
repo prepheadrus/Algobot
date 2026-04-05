@@ -43,7 +43,7 @@ mock_yaml.safe_load.return_value = {
 for module in [
     'colorlog', 'ccxt', 'ccxt.pro', 'pandas', 'numpy', 'pytz', 'xgboost',
     'sklearn', 'sklearn.ensemble', 'sklearn.preprocessing', 'sklearn.metrics',
-    'joblib', 'torch', 'optuna', 'optuna.samplers', 'aiosqlite', 'dotenv', 'pydantic',
+    'joblib', 'torch', 'optuna', 'optuna.samplers', 'aiosqlite', 'dotenv',
     'fastapi', 'fastapi.routing', 'fastapi.responses', 'starlette', 'uvicorn',
     'watchdog', 'watchdog.observers', 'watchdog.events'
 ]:
