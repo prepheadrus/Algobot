@@ -1916,7 +1916,17 @@ window.startMLTraining = async function() {
             learning_rate: learningRate
         };
 
-        console.log('🧠 [ML] Eğitim başlatılıyor...', data);
+        console.log('🧠 [ML] Eğitim başlatılıyor... Parametreler DOM üzerinden okundu:', {
+            RAW_INPUTS: {
+                tp: tpInput?.value,
+                sl: slInput?.value,
+                horizon: horizonInput?.value,
+                estimators: estimatorsInput?.value,
+                depth: depthInput?.value,
+                lr: lrInput?.value
+            },
+            FINAL_DATA: data
+        });
 
         const result = await api.trainModel(data);
 
@@ -2050,7 +2060,7 @@ window.loadMLTrainingHistory = async function() {
                                             <div>Precision: <strong style="color: var(--neon-blue);">${(precision * 100).toFixed(1)}%</strong></div>
                                             <div>Recall: <strong style="color: var(--neon-purple);">${(recall * 100).toFixed(1)}%</strong></div>
                                             <div>F1-Score: <strong style="color: var(--neon-green);">${(f1 * 100).toFixed(1)}%</strong></div>
-                                            <div>TP: <strong>${(metrics.tp_multiplier || 2.0).toFixed(1)}x</strong></div>
+                                            <div>TP: <strong>${(item.tp_multiplier || 2.0).toFixed(1)}x</strong></div>
                                         </div>
                                     </td>
                                     <td>

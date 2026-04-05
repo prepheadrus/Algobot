@@ -1,30 +1,14 @@
-import asyncio
-from api.strategy_builder_api import test_strategy, StrategySchema
+from api.schemas.ml import MLTrainRequest
 
-strategy = StrategySchema(
-    name="Test API",
-    indicators=[{"name": "RSI", "length": 14, "type": "RSI", "id": "RSI_14"}],
-    conditions={
-        "LONG": {
-            "logic": "AND",
-            "conditions": [
-                {"indicator": "RSI_14", "operator": "<", "value": 30}
-            ]
-        },
-        "SHORT": {
-            "logic": "AND",
-            "conditions": [
-                {"indicator": "RSI_14", "operator": ">", "value": 70}
-            ]
-        }
-    }
+req = MLTrainRequest(
+        symbol="BTC/USDT",
+        timeframe="1h",
+        limit=100,
+        tp=1.5,
+        sl=1.5,
+        time_horizon=12,
+        n_estimators=800,
+        max_depth=6,
+        learning_rate=0.01
 )
-
-async def run():
-    try:
-        res = await test_strategy(strategy)
-        print("Success:", res)
-    except Exception as e:
-        print("Error:", e)
-
-asyncio.run(run())
+print("Pydantic objesi yaratıldı:", req.model_dump())

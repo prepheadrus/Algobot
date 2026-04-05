@@ -148,7 +148,11 @@ class MLService:
             self.training_state["message"] = "Feature engineering ve etiketleme yapılıyor..."
             self.training_state["current_step"] = "ML pipeline"
             
-            logger.info("📊 [ML] ML pipeline başlatılıyor...")
+            logger.info(
+                f"📊 [ML] ML pipeline başlatılıyor... | "
+                f"TP={request.tp}, SL={request.sl}, Horizon={request.time_horizon}, "
+                f"n_estimators={request.n_estimators}, max_depth={request.max_depth}"
+            )
             
             # 1.5 İndikatörleri ve özelliklerini ekle
             logger.info("📊 [ML] İndikatörler ve Alpha Faktörleri Hesaplanıyor...")

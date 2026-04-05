@@ -222,7 +222,11 @@ class ModelTrainer:
             data_size: Eğitim veri seti boyutu (satır sayısı)
         """
         if not self.enable_auto_regularization:
-            logger.info("ℹ️ [ML] Auto regularization kapalı, varsayılan parametreler kullanılıyor")
+            logger.info(
+                f"ℹ️ [ML] Auto regularization kapalı, kullanıcı/UI parametreleri kullanılıyor | "
+                f"n_estimators={self.n_estimators}, max_depth={self.max_depth}, "
+                f"lr={self.learning_rate}"
+            )
             return
         
         logger.info(f"📊 [ML] Veri boyutu: {data_size} satır")
