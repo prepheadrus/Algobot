@@ -30,58 +30,7 @@ from sklearn.metrics import (
 from core.logger import logger
 
 
-def _clean_symbol(symbol: str) -> str:
-    """
-    Sembol isimlerini standart formata temizler.
-    Tüm özel karakterleri kaldırır ve lowercase yapar.
-
-    Örnekler:
-        'DOGE/USDT:USDT' → 'dogeusdtusdt'
-        'BTC/USDT' → 'btcusdt'
-        'ETH/USDT:USDT' → 'ethusdtusdt'
-
-    Args:
-        symbol: Temizlenecek sembol (örn: 'DOGE/USDT:USDT')
-
-    Returns:
-        str: Temizlenmiş sembol
-    """
-    return symbol.replace('/', '').replace(':', '').replace('-', '').lower()
-
-
-def get_model_paths(symbol: str, timeframe: str, model_id: str = None, base_dir: str = "artifacts/models") -> dict:
-    """
-    ML model dosyaları için standartlaştırılmış dosya yollarını üretir.
-    Eğer model_id (timestamp veya UUID) verilmezse, eski "legacy" dosya yollarını döner.
-    Verilirse model_id sonuna eklenir.
-
-    Bu fonksiyon, eğitim (save) ve yükleme (load) işlemlerinde
-    tutarlı dosya isimlendirmesi sağlar.
-
-    Args:
-        symbol: Sembol (örn: 'DOGE/USDT:USDT', 'BTC/USDT')
-        timeframe: Zaman dilimi (örn: '1m', '1h')
-        model_id: Modelin benzersiz kimliği, genellikle bir timestamp (örn: '20260405_1830').
-        base_dir: Model dosyalarının kaydedileceği temel dizin
-
-    Returns:
-        dict: 3 dosya yolunu içeren dictionary
-            - xgboost_path: XGBoost model dosyası (.json)
-            - rf_path: Random Forest model dosyası (.joblib)
-            - metadata_path: Metadata dosyası (.json)
-    """
-    symbol_clean = _clean_symbol(symbol)
-
-    if model_id:
-        suffix = f"_{model_id}"
-    else:
-        suffix = ""
-
-    return {
-        'xgboost_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}.json",
-        'rf_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}_rf.joblib",
-        'metadata_path': f"{base_dir}/xgb_model_{symbol_clean}_{timeframe}{suffix}_metadata.json"
-    }
+from ml.inference import get_model_paths
 
 
 class ModelTrainer:

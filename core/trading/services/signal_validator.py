@@ -62,7 +62,8 @@ class SignalValidatorService:
 
     async def _get_ml_confirmation(self, symbol: str, timeframe: str, indicators: Dict[str, float], model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         try:
-            from ml.model_training import ModelTrainer, get_model_paths
+            from ml.model_training import ModelTrainer
+            from ml.inference import get_model_paths
             import json
 
             cache_key = f"{symbol}_{timeframe}_{model_id}" if model_id else f"{symbol}_{timeframe}"
