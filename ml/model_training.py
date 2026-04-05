@@ -664,7 +664,7 @@ class ModelTrainer:
         else:  # NEUTRAL (class_mapping: 2='NEUTRAL')
             return "HOLD"
 
-    def save_model(self, model_path: str = "artifacts/models/xgb_model.json", timeframe: str = "1h") -> str:
+    def save_model(self, model_path: str = "artifacts/models/xgb_model.json", timeframe: str = "1h", tp_multiplier: float = 2.0, sl_multiplier: float = 2.0, time_horizon: int = 10) -> str:
         """
         Ensemble modelleri diske kaydeder.
         XGBoost: JSON formatında
@@ -673,6 +673,9 @@ class ModelTrainer:
         Args:
             model_path: Kayıt yolu (XGBoost için)
             timeframe: Eğitim timeframe'i (metadata için)
+            tp_multiplier: Eğitimde kullanılan Take Profit çarpanı
+            sl_multiplier: Eğitimde kullanılan Stop Loss çarpanı
+            time_horizon: Eğitimde kullanılan Dikey bariyer mum sayısı
 
         Returns:
             str: Kaydedilen dosya yolu
@@ -714,7 +717,10 @@ class ModelTrainer:
                 'num_class': self.num_class,
                 'rf_n_estimators': self.rf_n_estimators,
                 'rf_max_depth': self.rf_max_depth,
-                'rf_min_samples_split': self.rf_min_samples_split
+                'rf_min_samples_split': self.rf_min_samples_split,
+                'tp_multiplier': tp_multiplier,
+                'sl_multiplier': sl_multiplier,
+                'time_horizon': time_horizon
             },
             'model_paths': {
                 'xgb': model_path,
@@ -850,7 +856,13 @@ def run_training_pipeline(
 
     # 3. Model kaydetme
     logger.info("\n[3/3] Model kaydediliyor...")
-    trainer.save_model(model_save_path, timeframe=timeframe)
+    trainer.save_model(
+        model_save_path,
+        timeframe=timeframe,
+        tp_multiplier=tp_multiplier,
+        sl_multiplier=sl_multiplier,
+        time_horizon=time_horizon
+    )
 
     logger.info("\n" + "=" * 60)
     logger.info("EĞİTİM TAMAMLANDI")

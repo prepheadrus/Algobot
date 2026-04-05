@@ -209,7 +209,10 @@ class MLService:
             # Ensemble modelleri kaydet (XGBoost + RF + Metadata)
             trainer.save_model(
                 model_path=model_paths['xgboost_path'],
-                timeframe=request.timeframe
+                timeframe=request.timeframe,
+                tp_multiplier=request.tp,
+                sl_multiplier=request.sl,
+                time_horizon=request.time_horizon
             )
 
             logger.info(f"💾 [ML] Ensemble modeller kaydedildi:")
@@ -320,12 +323,12 @@ class MLService:
                 "model_type": request.model_type,
                 "dataset_size": dataset_size,
                 "feature_count": feature_count,
-                "tp_multiplier": float(getattr(request, 'tp', 2.0)),
-                "sl_multiplier": float(getattr(request, 'sl', 2.0)),
-                "time_horizon": int(getattr(request, 'time_horizon', 10)),
-                "n_estimators": int(getattr(request, 'n_estimators', 500)),
-                "max_depth": int(getattr(request, 'max_depth', 6)),
-                "learning_rate": float(getattr(request, 'learning_rate', 0.1)),
+                "tp_multiplier": float(request.tp),
+                "sl_multiplier": float(request.sl),
+                "time_horizon": int(request.time_horizon),
+                "n_estimators": int(request.n_estimators),
+                "max_depth": int(request.max_depth),
+                "learning_rate": float(request.learning_rate),
                 "started_at": started_at.isoformat(),
                 "completed_at": completed_at.isoformat(),
                 "duration_seconds": duration_seconds,

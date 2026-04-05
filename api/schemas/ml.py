@@ -116,6 +116,12 @@ class MLTrainingHistoryItem(BaseModel):
     duration_seconds: float
     metrics: Dict[str, float]
     model_path: str
+    tp_multiplier: Optional[float] = None
+    sl_multiplier: Optional[float] = None
+    time_horizon: Optional[int] = None
+    n_estimators: Optional[int] = None
+    max_depth: Optional[int] = None
+    learning_rate: Optional[float] = None
 
 
 class MLTrainingHistoryResponse(BaseModel):
