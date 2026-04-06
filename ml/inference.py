@@ -4,18 +4,19 @@ ML Inference Engine
 Ensemble model (XGBoost + Random Forest) üzerinden canlı tahmin üretir.
 """
 
+import os
 import json
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, Optional
 import numpy as np
+import pandas as pd
+import joblib
+import xgboost as xgb
 
 # Model cache
 _model_cache = {}
 
-
-import os
-import joblib
-import xgboost as xgb
 
 def get_model_paths(symbol: str, timeframe: str, direction: str, model_id: str = None) -> dict:
     """Model dosya yollarını döner (Yön bazlı Asimetrik Modeller için)."""

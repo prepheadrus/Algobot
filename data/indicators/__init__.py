@@ -388,6 +388,12 @@ class StrategyIndicators:
         df['BBM_20_2.0_2.0'] = middle
         df['BBL_20_2.0_2.0'] = lower
         
+        # Market Regime Detector (Faz 1) için gerekli Bollinger Bantları ve SMA
+        df['SMA_20'] = df['close'].rolling(window=20).mean()
+        std_20 = df['close'].rolling(window=20).std()
+        df['BBU_20_2.0'] = df['SMA_20'] + (2.0 * std_20)
+        df['BBL_20_2.0'] = df['SMA_20'] - (2.0 * std_20)
+
         # BTC VIX (Dinamik Volatilite)
         df['BTC_VIX'] = VolatilityIndicators.btc_vix(df['close'])
         
@@ -446,8 +452,7 @@ class StrategyIndicators:
             logger.warning(f"⚠️ [IND] SMC hesaplama hatası: {e}")
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.fillna(0, inplace=True)
+        df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
         
         return df
 
