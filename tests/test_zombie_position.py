@@ -156,7 +156,7 @@ async def test_finally_block_resets_lock():
     bot_id = "BNB/USDT_test_finally_1m"
 
     # 1. Pozisyon aç (open_position senkron)
-    position = paper_engine.position_manager.open_position(
+    await paper_engine.position_manager.open_position(
         bot_id=bot_id,
         symbol="BNB/USDT",
         direction="LONG",
@@ -169,9 +169,12 @@ async def test_finally_block_resets_lock():
     # (Bu test position_manager.py'deki finally bloğunu test eder)
     
     # Manuel olarak close_position akışını simüle et
-    position.metadata['is_closing'] = True
+    # "position" burada Value Object olduğu için metadata'ya doğrudan atama yapılamaz (frozen dataclass)
+    # Biz bunu Dictionary gibi paper_engine.position_manager.positions[bot_id].metadata şeklinde manipüle edelim:
+    pos_obj = paper_engine.position_manager.positions[bot_id]
+    pos_obj.metadata['is_closing'] = True
     close_success = False
-    
+
     # finally bloğu simülasyonu
     try:
         # Normal akışta burada trade kapatma var
@@ -183,10 +186,10 @@ async def test_finally_block_resets_lock():
     finally:
         # finally bloğu - is_closing sıfırlanmalı
         if not close_success:
-            position.metadata['is_closing'] = False
-    
+            pos_obj.metadata['is_closing'] = False
+
     # 3. is_closing'in FALSE olduğunu doğrula
-    assert position.metadata['is_closing'] == False, \
+    assert not pos_obj.metadata['is_closing'], \
         "finally block didn't reset is_closing!"
     
     print("✅ finally block lock reset successful")

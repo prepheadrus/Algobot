@@ -544,11 +544,11 @@ class PositionManager:
         current_price = current_high if position.direction == PositionDirection.LONG else current_low
 
         # ========================================================================
-        # AŞAMA 1: KISMI KÂR ALMA (50% TP)
+        # AŞAMA 1: KISMI KÂR ALMA (50% TP) & BREAKEVEN KORUMASI
         # ========================================================================
         if position.should_take_partial_profit(current_price):
             logger.info(
-                f"[RISK] 3 Aşamalı Kâr Koruma ve Throttle Aktif - AŞAMA 1: "
+                f"[RISK] 3 Aşamalı Kâr Koruma ve Throttle Aktif - AŞAMA 1 & 2: "
                 f"{position.symbol} Kısmi kâr alma tetiklendi! "
                 f"Fiyat: ${current_price:.2f}, TP: ${position.take_profit:.2f}"
             )
@@ -561,14 +561,20 @@ class PositionManager:
             pnl = position.unrealized_pnl(current_price) * 0.5
             pnl_percent = position.unrealized_pnl_percent(current_price)
 
-            # Bayrağı ve boyutu güncelle (immutable)
-            # Not: margin de yarıya inmeli (size ile orantılı)
+            # Bayrağı, boyutu, marjini ve Breakeven'i güncelle (immutable)
+            # Not: Kısmi kâr alınınca doğrudan Breakeven (Giriş Fiyatı) uygulanır (Risk = 0)
+            breakeven_price = position.entry_price
             position = dataclasses.replace(
                 position,
                 size=remaining_size,
                 margin=position.margin * 0.5,
-                partial_profit_taken=True
+                stop_loss=breakeven_price,
+                partial_profit_taken=True,
+                breakeven_activated=True
             )
+
+            # Self dictionary'yi güncelle
+            self.positions[position.bot_id] = position
 
             # Event fırlat
             partial_event = PositionPartialClosedEvent(
@@ -584,22 +590,19 @@ class PositionManager:
             await event_bus.publish(partial_event.to_event())
 
         # ========================================================================
-        # AŞAMA 2: BAŞA BAŞ (BREAKEVEN) KORUMASI
+        # AŞAMA 2: BAŞA BAŞ (BREAKEVEN) KORUMASI (Kısmi kar alınmamışsa)
         # ========================================================================
         atr = position.metadata.get('atr', 0.0)
-        if atr > 0 and position.should_activate_breakeven(current_price, atr):
+        if atr > 0 and position.should_activate_breakeven(current_price, atr) and not position.breakeven_activated:
             logger.info(
                 f"[RISK] 3 Aşamalı Kâr Koruma ve Throttle Aktif - AŞAMA 2: "
                 f"{position.symbol} Breakeven koruması aktif edildi! "
                 f"Fiyat: ${current_price:.2f}, Entry: ${position.entry_price:.2f}"
             )
-            # Eski stop loss
-            old_stop = position.stop_loss
 
             # Breakeven aktif et (immutable)
-            old_stop_loss = position.stop_loss
             position = position.activate_breakeven(commission_buffer=0.001)
-
+            self.positions[position.bot_id] = position
 
 
         # ========================================================================
@@ -618,6 +621,9 @@ class PositionManager:
                 f"[RISK] 3 Aşamalı Kâr Koruma - AŞAMA 3: "
                 f"{position.symbol} Trailing stop güncellendi: ${position.stop_loss:.2f} → ${updated_position.stop_loss:.2f}"
             )
+
+            # Self dictionary'yi güncelle
+            self.positions[updated_position.bot_id] = updated_position
 
             # Event fırlat
             sl_event = StopLossUpdatedEvent(
@@ -659,6 +665,11 @@ class PositionManager:
         if current_price is None:
             current_price = (current_high + current_low) / 2
 
+        # DİKKAT: Partial Close ve Breakeven işlemleri artık yalnızca Event-Driven Architecture (EDA)
+        # üzerinden PositionManager.update_trailing_stop içinde hesaplanır ve yönetilir.
+        # core/paper.py (Legacy) bu olayları dinleyerek pos dict'ini otomatik senkronize eder.
+        # KOD TEKRARI (Code Duplication) YASAKTIR. Bu nedenle legacy kısımda yalnızca basit Trailing Stop bırakıldı.
+
         if pos['direction'] == "LONG":
             # LONG: Yeni zirve kontrolü
             if current_high > pos['highest_seen']:
@@ -671,14 +682,6 @@ class PositionManager:
                     pos['stop_loss'] = new_stop
                     logger.debug(f"[TRAILING STOP] {pos['symbol']} LONG stop yukarı: {pos['stop_loss']:.2f}")
 
-            # Break-even: Fiyat 1.0x ATR kadar kâra geçtiğinde SL'yi giriş seviyesine taşı (komisyon buffer'ı ile)
-            min_profit_distance = pos.get('atr', 0.0) * 1.0
-            if pos['stop_loss'] is not None and pos['stop_loss'] < entry_price:
-                if current_price >= entry_price + min_profit_distance:
-                    old_sl = pos['stop_loss']
-                    pos['stop_loss'] = min(current_price * 0.999, entry_price * 1.001)  # Komisyonu kurtarmak için %0.1 buffer, current_price'ı geçmesini engelle
-                    logger.debug(f"[BREAK-EVEN] {pos['symbol']} LONG SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
-
         else:  # SHORT
             # SHORT: Yeni dip kontrolü
             if current_low < pos['lowest_seen']:
@@ -690,14 +693,6 @@ class PositionManager:
                 if pos['stop_loss'] is None or new_stop < pos['stop_loss']:
                     pos['stop_loss'] = new_stop
                     logger.debug(f"[TRAILING STOP] {pos['symbol']} SHORT stop aşağı: {pos['stop_loss']:.2f}")
-
-            # Break-even: Fiyat 1.0x ATR kadar kâra geçtiğinde SL'yi giriş seviyesine taşı (komisyon buffer'ı ile)
-            min_profit_distance = pos.get('atr', 0.0) * 1.0
-            if pos['stop_loss'] is not None and pos['stop_loss'] > entry_price:
-                if current_price <= entry_price - min_profit_distance:
-                    old_sl = pos['stop_loss']
-                    pos['stop_loss'] = max(current_price * 1.001, entry_price * 0.999)  # Komisyonu kurtarmak için %0.1 buffer, current_price'ı geçmesini engelle
-                    logger.debug(f"[BREAK-EVEN] {pos['symbol']} SHORT SL giriş seviyesine taşındı: {old_sl:.2f} → {pos['stop_loss']:.2f}")
     
     # ========================================================================
     # PnL HESAPLAMA
