@@ -14,7 +14,7 @@ class SignalValidatorService:
         self.ml_models = ml_models_cache
         self.ml_enabled = True
 
-    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int, model_id: Optional[str] = None) -> Tuple[bool, float, str, str]:
+    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int, model_id: Optional[str] = None, direction: str = 'long') -> Tuple[bool, float, str, str]:
         """
         ML modeline danışarak mevcut sinyali onaylar veya reddeder.
 
@@ -31,24 +31,21 @@ class SignalValidatorService:
         if not self.ml_enabled:
             return True, ml_confidence, ml_rec, ml_rec_norm
 
-        ml_data = await self._get_ml_confirmation(symbol, timeframe, indicators, model_id)
+        ml_data = await self._get_ml_confirmation(symbol, timeframe, direction, indicators, model_id)
         if ml_data:
-            ml_rec = ml_data.get('recommendation', 'HOLD')
+            # inference_engine binary döndürüyor: 'prediction': 'LONG'/'SHORT' veya 'HOLD'
+            ml_rec = ml_data.get('prediction', 'HOLD')
             ml_confidence = ml_data.get('confidence', 0.5)
 
             # Normalize recommendation
             ml_rec_norm = str(ml_rec).upper()
-            if "AL" in ml_rec_norm or "BUY" in ml_rec_norm:
-                ml_rec_norm = "LONG"
-            elif "SAT" in ml_rec_norm or "SELL" in ml_rec_norm:
-                ml_rec_norm = "SHORT"
 
             # Conflict Resolution
-            if signal == 2 and ml_rec_norm == "SHORT":
-                logger.info(f"🛡️ [ML FILTER] {symbol} LONG reddedildi: ML zıt yön gösteriyor ({ml_rec_norm}) | Conf: {ml_confidence:.2f}")
+            if signal == 2 and ml_rec_norm != "LONG":
+                logger.info(f"🛡️ [ML FILTER] {symbol} LONG reddedildi: ML onay vermedi ({ml_rec_norm}) | Conf: {ml_confidence:.2f}")
                 ml_confirmed = False
-            elif signal == 0 and ml_rec_norm == "LONG":
-                logger.info(f"🛡️ [ML FILTER] {symbol} SHORT reddedildi: ML zıt yön gösteriyor ({ml_rec_norm}) | Conf: {ml_confidence:.2f}")
+            elif signal == 0 and ml_rec_norm != "SHORT":
+                logger.info(f"🛡️ [ML FILTER] {symbol} SHORT reddedildi: ML onay vermedi ({ml_rec_norm}) | Conf: {ml_confidence:.2f}")
                 ml_confirmed = False
             elif ml_confidence < ml_threshold:
                 logger.info(f"🛡️ [ML FILTER] {symbol} reddedildi: ML confidence {ml_confidence:.2f} < threshold {ml_threshold:.2f}")
@@ -60,80 +57,19 @@ class SignalValidatorService:
 
         return ml_confirmed, ml_confidence, ml_rec, ml_rec_norm
 
-    async def _get_ml_confirmation(self, symbol: str, timeframe: str, indicators: Dict[str, float], model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def _get_ml_confirmation(self, symbol: str, timeframe: str, direction: str, indicators: Dict[str, float], model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         try:
-            from ml.model_training import ModelTrainer
-            from ml.inference import get_model_paths
-            import json
+            from ml.inference import get_ml_prediction
 
-            cache_key = f"{symbol}_{timeframe}_{model_id}" if model_id else f"{symbol}_{timeframe}"
+            # Cache key yönetimi get_ml_prediction içindeki load_model'e devredildi.
+            # get_ml_prediction Asimetrik yapıya uygun parametreleri alıyor.
+            prediction = get_ml_prediction(symbol, timeframe, direction, indicators)
 
-            # Eğer model_id varsa doğrudan onu kullan
-            if model_id:
-                model_paths = get_model_paths(symbol, timeframe, model_id=model_id)
-                model_path = model_paths['xgboost_path']
-            else:
-                # 1. Önce eski sistem (legacy) modeli ara (model_id=None)
-                legacy_paths = get_model_paths(symbol, timeframe)
-                if os.path.exists(legacy_paths['xgboost_path']):
-                    model_path = legacy_paths['xgboost_path']
-                    logger.debug(f"🧠 [ML] Legacy model bulundu: {model_path}")
-                else:
-                    # 2. Legacy yoksa, history'den bu sembol ve tf için son başarılı modeli bul
-                    history_file = "artifacts/ml_training_history.json"
-                    last_model_id = None
-                    if os.path.exists(history_file):
-                        with open(history_file, 'r') as f:
-                            history = json.load(f)
-
-                        # Bu sembol/tf için olanları filtrele ve tarihe göre sırala
-                        symbol_history = [
-                            h for h in history
-                            if h.get("symbol") == symbol and h.get("timeframe") == timeframe and h.get("model_id")
-                        ]
-
-                        if symbol_history:
-                            # En son eğitileni (listenin sonuncusu veya tarihe göre en yeni)
-                            symbol_history.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
-                            last_model_id = symbol_history[0].get("model_id")
-
-                    if last_model_id:
-                        model_paths = get_model_paths(symbol, timeframe, model_id=last_model_id)
-                        model_path = model_paths['xgboost_path']
-                        cache_key = f"{symbol}_{timeframe}_{last_model_id}"
-                        logger.debug(f"🧠 [ML] Fallback olarak en son model seçildi: {model_path}")
-                    else:
-                        # Hiçbir şey bulunamadı
-                        model_path = legacy_paths['xgboost_path']
-
-            if not os.path.exists(model_path):
-                logger.debug(f"🧠 [ML] XGBoost model bulunamadı: {model_path}")
-                return None
-
-            if cache_key in self.ml_models:
-                trainer = self.ml_models[cache_key]
-            else:
-                trainer = ModelTrainer()
-                trainer.load_model(model_path)
-                self.ml_models[cache_key] = trainer
-                logger.info(f"🧠 [ML] Model belleğe yüklendi: {model_path}")
-
-            if not trainer.is_trained or not trainer.feature_names:
-                return None
-
-            features = []
-            for feat in trainer.feature_names:
-                val = indicators.get(feat, None)
-                if val is None:
-                    val = 0.0
-                features.append(float(val))
-
-            X = pd.DataFrame([features], columns=trainer.feature_names)
-            prediction = trainer.predict_single(X)
             return prediction
-        except Exception:
-            logger.warning(f"⚠️ [ML] {symbol}: Model feature uyumsuzluğu - sadece teknik sinyaller kullanılıyor")
+        except Exception as e:
+            logger.warning(f"⚠️ [ML] {symbol}: Tahmin sırasında hata - sadece teknik sinyaller kullanılıyor: {e}")
             return None
+
 
     def validate_htf_trend(self, symbol: str, htf_trends: dict, signal: int) -> bool:
         """

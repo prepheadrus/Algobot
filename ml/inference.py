@@ -17,15 +17,21 @@ import os
 import joblib
 import xgboost as xgb
 
-def get_model_paths(symbol: str, timeframe: str, model_id: str = None) -> dict:
-    """Model dosya yollarını döner."""
+def get_model_paths(symbol: str, timeframe: str, direction: str, model_id: str = None) -> dict:
+    """Model dosya yollarını döner (Yön bazlı Asimetrik Modeller için)."""
+    if direction not in ['long', 'short']:
+        raise ValueError(f"Geçersiz direction parametresi: '{direction}'.")
+
     # Symbol formatını temizle (BTC/USDT:USDT → btcusdtusdt)
     symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
     base_path = "artifacts/models"
     
-    suffix = f"_{model_id}" if model_id else ""
+    # Yeni isimlendirme kuralı: xgb_model_{symbol}_{tf}_{date}_{direction}.json
+    # Eğer model_id varsa (date olarak kullanılır), format: xgb_model_{symbol}_{tf}_{model_id}_{direction}.json
+    # Eğer model_id yoksa fallback (eski yapı için veya genel okuma): xgb_model_{symbol}_{tf}_{direction}.json
+    date_part = f"_{model_id}" if model_id else ""
 
-    base_name = f"xgb_model_{symbol_clean}_{timeframe}{suffix}"
+    base_name = f"xgb_model_{symbol_clean}_{timeframe}{date_part}_{direction}"
 
     return {
         # ml_service.py'nin beklediği Legacy Anahtarlar (API Kontrat Kalkanı)
@@ -44,18 +50,42 @@ def get_model_paths(symbol: str, timeframe: str, model_id: str = None) -> dict:
     }
 
 
-def load_model(symbol: str, timeframe: str):
+def load_model(symbol: str, timeframe: str, direction: str):
     """
-    Ensemble model'i yükle (XGBoost + Random Forest).
+    Ensemble model'i yükle (XGBoost + Random Forest). Yön spesifiktir.
     Cache kullanarak performansı optimize et.
     """
-    cache_key = f"{symbol}_{timeframe}"
+    cache_key = f"{symbol}_{timeframe}_{direction}"
     
     if cache_key in _model_cache:
         return _model_cache[cache_key]
     
     try:
-        model_paths = get_model_paths(symbol, timeframe)
+        # Inference anında spesifik date bilinmediği için, en güncel model dosyası bulunmalıdır.
+        # Basitçe klasörü tarayıp en güncel dosyayı bulalım:
+        import glob
+        symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
+        search_pattern = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_*_{direction}.json"
+        matching_files = glob.glob(search_pattern)
+
+        model_id = None
+        if matching_files:
+            # İsme göre sırala (tarih sonda olduğu için en yenisi en sonda olacaktır)
+            latest_file = sorted(matching_files)[-1]
+            # Dosya isminden model_id (tarih) kısmını çıkaralım:
+            # format: xgb_model_{symbol}_{tf}_{date}_{direction}.json
+            parts = latest_file.split('_')
+            # xgb_model_btcusdtusdt_15m_20260406_143415_long.json
+            # idx -2 = 143415, idx -3 = 20260406
+            if len(parts) >= 6:
+                # 20260406_143415 formatındaki date kısmını al (sondaki '_long.json' vs silip birleştirerek)
+                basename = os.path.basename(latest_file)
+                base_no_ext = basename.replace(f"_{direction}.json", "")
+                prefix = f"xgb_model_{symbol_clean}_{timeframe}_"
+                if base_no_ext.startswith(prefix):
+                    model_id = base_no_ext[len(prefix):]
+
+        model_paths = get_model_paths(symbol, timeframe, direction, model_id=model_id)
         
         # XGBoost model
         xgb_model = None
@@ -128,26 +158,30 @@ def prepare_features(indicators: Dict[str, float], feature_names: list) -> np.nd
     return np.array(features).reshape(1, -1)
 
 
-def get_ml_prediction(symbol: str, timeframe: str, indicators: Dict[str, float]) -> Optional[Dict[str, Any]]:
+def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: Dict[str, float]) -> Optional[Dict[str, Any]]:
     """
-    Ensemble model ile tahmin üret.
+    Ensemble model ile belirli bir yön ('long' veya 'short') için tahmin üret.
     
     Args:
         symbol: Sembol (örn: BTC/USDT)
         timeframe: Zaman dilimi (örn: 1m)
+        direction: Tahmin edilecek yön ('long' veya 'short')
         indicators: Teknik indikatörler (dict)
     
     Returns:
         {
-            'prediction': 'LONG' | 'SHORT' | 'HOLD',
+            'prediction': 'TRADE' | 'HOLD',
             'confidence': float (0-1),
             'xgb_prediction': int,
             'rf_prediction': int,
             'ensemble_vote': str
         }
     """
+    if direction not in ['long', 'short']:
+        return None
+
     # Model yükle
-    model_data = load_model(symbol, timeframe)
+    model_data = load_model(symbol, timeframe, direction)
     
     if not model_data:
         return None
@@ -162,16 +196,18 @@ def get_ml_prediction(symbol: str, timeframe: str, indicators: Dict[str, float])
     # Feature vektörü hazırla
     X = prepare_features(indicators, feature_names)
     
-    # XGBoost tahmini
+    # XGBoost tahmini (Binary Classification)
     xgb_pred = None
     xgb_confidence = None
     if xgb_model:
         import xgboost as xgb
-        xgb_pred_proba = xgb_model.predict(xgb.DMatrix(X))
-        xgb_pred = int(np.argmax(xgb_pred_proba[0]))
-        xgb_confidence = float(np.max(xgb_pred_proba[0]))
+        # XGBoost binary:logistic output probabilities for class 1
+        dmatrix = xgb.DMatrix(X, feature_names=feature_names)
+        prob = xgb_model.predict(dmatrix)[0]
+        xgb_pred = 1 if prob >= 0.5 else 0
+        xgb_confidence = float(prob if xgb_pred == 1 else 1.0 - prob)
     
-    # Random Forest tahmini
+    # Random Forest tahmini (Binary Classification)
     rf_pred = None
     rf_confidence = None
     if rf_model:
@@ -179,7 +215,7 @@ def get_ml_prediction(symbol: str, timeframe: str, indicators: Dict[str, float])
         rf_pred = int(np.argmax(rf_pred_proba))
         rf_confidence = float(np.max(rf_pred_proba))
     
-    # Ensemble voting (Soft Voting - confidence ağırlıklı)
+    # Ensemble voting (Soft Voting - confidence ağırlıklı - Binary)
     predictions = []
     confidences = []
     
@@ -197,27 +233,31 @@ def get_ml_prediction(symbol: str, timeframe: str, indicators: Dict[str, float])
     # Confidence-ağırlıklı ortalama
     total_confidence = sum(confidences)
     if total_confidence > 0:
-        # Her tahmini confidence ile ağırla
-        weighted_votes = [0.0, 0.0, 0.0]  # [SHORT, NEUTRAL, LONG]
+        # Her tahmini confidence ile ağırla (Binary: 0 veya 1)
+        weighted_votes = [0.0, 0.0]
         for pred, conf in zip(predictions, confidences):
-            if 0 <= pred < 3:
+            if 0 <= pred <= 1:
                 weighted_votes[pred] += conf
         
         ensemble_pred = int(np.argmax(weighted_votes))
         ensemble_confidence = weighted_votes[ensemble_pred] / sum(weighted_votes)
     else:
-        ensemble_pred = int(np.mean(predictions))
+        ensemble_pred = int(np.round(np.mean(predictions)))
         ensemble_confidence = np.mean(confidences) if confidences else 0.0
     
-    # Label mapping
-    label_map = {0: 'SHORT', 1: 'NEUTRAL', 2: 'LONG'}
+    # Label mapping (Binary)
+    label_map = {0: 'HOLD', 1: 'TRADE'}
     
+    # İşlem yönü de döndürülerek ek bilgi sağlanır
+    direction_upper = direction.upper()
+
     return {
-        'prediction': label_map.get(ensemble_pred, 'HOLD'),
+        'prediction': direction_upper if ensemble_pred == 1 else 'HOLD',
         'confidence': ensemble_confidence,
         'xgb_prediction': label_map.get(xgb_pred, 'N/A') if xgb_pred is not None else None,
         'rf_prediction': label_map.get(rf_pred, 'N/A') if rf_pred is not None else None,
-        'ensemble_vote': f"{ensemble_pred} ({ensemble_confidence:.2%})"
+        'ensemble_vote': f"{ensemble_pred} ({ensemble_confidence:.2%})",
+        'direction': direction
     }
 
 
