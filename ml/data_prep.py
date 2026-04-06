@@ -358,6 +358,7 @@ def create_train_test_split(
     target_col: str = "target",
     shuffle: bool = False,
     random_state: int = 42,
+    embargo_size: int = 0,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Zaman serisi bütünlüğünü koruyarak Train/Test ayrımı yapar.
@@ -371,6 +372,7 @@ def create_train_test_split(
         target_col: Hedef kolon adı
         shuffle: Karıştırma yapılacak mı? (Zaman serisi için False önerilir)
         random_state: Random seed (shuffle=True ise kullanılır)
+        embargo_size: Look-ahead bias'ı önlemek için eğitim verisinin sonundan silinecek mum sayısı.
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: (train_df, test_df)
@@ -386,6 +388,15 @@ def create_train_test_split(
 
         train_df = df.iloc[:split_idx].copy()
         test_df = df.iloc[split_idx:].copy()
+
+        # Embargoing Kalkanı (Look-ahead bias önleme)
+        if embargo_size > 0:
+            if embargo_size >= len(train_df):
+                raise ValueError(
+                    f"embargo_size ({embargo_size}) train_df boyutundan ({len(train_df)}) büyük olamaz!"
+                )
+            train_df = train_df.iloc[:-embargo_size].copy()
+            logger.info(f"🛡️ EMBARGO AKTİF: Train setinin sonundan {embargo_size} mum çöpe atıldı.")
 
         logger.info(
             f"Kronolojik split: Train={len(train_df)} satır, Test={len(test_df)} satır"
@@ -505,6 +516,7 @@ def prepare_ml_data(
         train_ratio=train_ratio,
         target_col=target_col,
         shuffle=False,  # Zaman serisi için kronolojik split
+        embargo_size=time_horizon,
     )
 
     # 4. Özellik ve hedef ayrıştırma - DOĞRU SIRALAMA!
