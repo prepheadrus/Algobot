@@ -327,6 +327,27 @@ class ModelTrainer:
 
         sample_weights = compute_sample_weight('balanced', y_train)
 
+        # [MİMARİ ZIRH: EKSİK SINIF (MISSING CLASS) ENJEKSİYONU]
+        expected_classes = {0, 1, 2}
+        existing_classes = set(np.unique(y_train))
+        missing_classes = expected_classes - existing_classes
+
+        if missing_classes:
+            from core.logger import logger
+            logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
+            for mc in missing_classes:
+                if isinstance(X_train, pd.DataFrame):
+                    dummy_x = X_train.iloc[[-1]].copy()
+                    X_train = pd.concat([X_train, dummy_x], ignore_index=True)
+                else:
+                    dummy_x = X_train[-1:]
+                    X_train = np.vstack([X_train, dummy_x])
+
+                y_train = np.append(y_train, mc)
+                sample_weights = np.append(sample_weights, 1.0)
+
+            assert len(X_train) == len(y_train) == len(sample_weights), "Data shape mismatch after missing class injection!"
+
         model.fit(
             X_train,
             y_train,
@@ -394,6 +415,27 @@ class ModelTrainer:
 
         # Sınıf Ağırlıklandırması (Class Imbalance) hesapla
         sample_weights = compute_sample_weight('balanced', y_train)
+
+        # [MİMARİ ZIRH: EKSİK SINIF (MISSING CLASS) ENJEKSİYONU]
+        expected_classes = {0, 1, 2}
+        existing_classes = set(np.unique(y_train))
+        missing_classes = expected_classes - existing_classes
+
+        if missing_classes:
+            from core.logger import logger
+            logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
+            for mc in missing_classes:
+                if isinstance(X_train, pd.DataFrame):
+                    dummy_x = X_train.iloc[[-1]].copy()
+                    X_train = pd.concat([X_train, dummy_x], ignore_index=True)
+                else:
+                    dummy_x = X_train[-1:]
+                    X_train = np.vstack([X_train, dummy_x])
+
+                y_train = np.append(y_train, mc)
+                sample_weights = np.append(sample_weights, 1.0)
+
+            assert len(X_train) == len(y_train) == len(sample_weights), "Data shape mismatch after missing class injection!"
 
         # 1. XGBoost modelini eğit (Optuna ile Optimizasyon)
         if optuna is not None and ret_test is not None:
