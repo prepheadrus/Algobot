@@ -14,6 +14,8 @@ _model_cache = {}
 
 
 import os
+import joblib
+import xgboost as xgb
 
 def get_model_paths(symbol: str, timeframe: str, model_id: str = None) -> dict:
     """Model dosya yollarını döner."""
@@ -56,14 +58,12 @@ def load_model(symbol: str, timeframe: str):
         model_paths = get_model_paths(symbol, timeframe)
         
         # XGBoost model
-        import xgboost as xgb
         xgb_model = None
         if os.path.exists(model_paths['xgb']):
             xgb_model = xgb.Booster()
             xgb_model.load_model(model_paths['xgb'])
         
         # Random Forest model
-        import joblib
         rf_model = None
         if os.path.exists(model_paths['rf']):
             rf_model = joblib.load(model_paths['rf'])
@@ -85,7 +85,6 @@ def load_model(symbol: str, timeframe: str):
 
         # Eğer beklenen özellikler (veya sayısı) eşleşmiyorsa eski modelleri sil
         if len(feature_names) != len(expected_features) or set(feature_names) != set(expected_features):
-            import os
             print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eski model dosyaları siliniyor: {symbol} {timeframe}")
 
             # Benzersiz dosya yollarını al
