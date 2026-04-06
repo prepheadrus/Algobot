@@ -438,6 +438,10 @@ class StrategyIndicators:
             df['SWING_LOW'] = smc['swing_low']
             df['SWEEP_BULLISH'] = smc['sweep_bullish']
             df['SWEEP_BEARISH'] = smc['sweep_bearish']
+
+            # Yeni Alpha Faktörleri (Liquidity Sweep ve Synthetic Imbalance)
+            df['liquidity_sweep'] = AdvancedIndicators.liquidity_sweep(df)
+            df['synthetic_imbalance'] = AdvancedIndicators.synthetic_imbalance(df)
         except Exception as e:
             logger.warning(f"⚠️ [IND] SMC hesaplama hatası: {e}")
 

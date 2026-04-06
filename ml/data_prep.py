@@ -283,6 +283,8 @@ def engineer_features(
         "KONKORDE_AZUL",
         "KONKORDE_VERDE",
         "ATR_14",
+        "liquidity_sweep",
+        "synthetic_imbalance",
     ]
 
     # Otomatik özellik kolonları seç (eğer belirtilmemişse)
@@ -476,7 +478,8 @@ def prepare_ml_data(
     allowed_features = [
         'kalman_ret', 'frac_diff_04', 'dist_to_vwap', 'dist_to_ema50',
         'MACDh_12_26_9', 'RSI_14', 'BTC_VIX', 'ROC_10', 'OBV_EMA',
-        'KONKORDE_AZUL', 'KONKORDE_VERDE', 'ATR_14'
+        'KONKORDE_AZUL', 'KONKORDE_VERDE', 'ATR_14', 'liquidity_sweep',
+        'synthetic_imbalance'
     ]
 
     # DataFrame'de mevcut olanları seç

@@ -236,6 +236,41 @@ class AdvancedIndicators:
         return fvg
     
     @staticmethod
+    def liquidity_sweep(df: pd.DataFrame) -> pd.Series:
+        """
+        Liquidity Sweep (Stop Hunting) - SMC Faktörü
+
+        Args:
+            df: OHLCV DataFrame
+
+        Returns:
+            Liquidity sweep serisi (+1: Bullish Sweep, -1: Bearish Sweep, 0: Nötr)
+        """
+        rolling_min = df['low'].rolling(20).min().shift(1)
+        rolling_max = df['high'].rolling(20).max().shift(1)
+        hl2 = (df['high'] + df['low']) / 2
+
+        bullish_sweep = (df['low'] < rolling_min) & (df['close'] > hl2)
+        bearish_sweep = (df['high'] > rolling_max) & (df['close'] < hl2)
+
+        return pd.Series(np.select([bullish_sweep, bearish_sweep], [1, -1], default=0), index=df.index)
+
+    @staticmethod
+    def synthetic_imbalance(df: pd.DataFrame) -> pd.Series:
+        """
+        Synthetic Order Imbalance - Mikro-yapı Faktörü
+
+        Args:
+            df: OHLCV DataFrame
+
+        Returns:
+            Sentetik emir dengesizliği serisi (Synthetic CVD)
+        """
+        buy_pressure = (df['close'] - df['low']) / (df['high'] - df['low'] + 1e-9) * df['volume']
+        sell_pressure = (df['high'] - df['close']) / (df['high'] - df['low'] + 1e-9) * df['volume']
+        return (buy_pressure - sell_pressure) / (df['volume'] + 1e-9)
+
+    @staticmethod
     def market_structure(
         high: pd.Series,
         low: pd.Series,
