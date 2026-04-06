@@ -7,6 +7,7 @@ Business logic for ML operations.
 from typing import Dict, Any
 import os
 import json
+import asyncio
 import traceback
 from datetime import datetime, timedelta
 
@@ -202,7 +203,6 @@ class MLService:
             )
             
             # Modeli eğit (Event-Loop bloklanmasını engellemek için asyncio.to_thread kullanılır)
-            import asyncio
             training_metrics = await asyncio.to_thread(
                 trainer.train,
                 X_train,
@@ -249,7 +249,7 @@ class MLService:
             self.training_state["message"] = "Geçmiş güncelleniyor..."
             self.training_state["current_step"] = "Update history"
 
-            self._save_training_history(
+            await self._save_training_history(
                 request,
                 model_paths['xgboost_path'],  # XGBoost ana model yolunu kaydet
                 X_train.shape[0] + X_test.shape[0],  # Toplam örnek sayısı
@@ -309,11 +309,22 @@ class MLService:
                 "message": str(e)
             }
 
-    def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None):
+    async def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None):
         """Eğitim geçmişini kaydet."""
         try:
             history_file = "artifacts/ml_training_history.json"
-            os.makedirs("artifacts", exist_ok=True)
+
+            # Blocking I/O operations for reading/writing history
+            def _load_history():
+                if os.path.exists(history_file):
+                    with open(history_file, 'r') as f:
+                        return json.load(f)
+                return []
+
+            def _save_history(data):
+                os.makedirs("artifacts", exist_ok=True)
+                with open(history_file, 'w') as f:
+                    json.dump(data, f, indent=2)
 
             # Training metrics'den TÜM metrikleri al
             accuracy = 0.0
@@ -371,11 +382,8 @@ class MLService:
                 "model_path": model_path
             }
 
-            # Mevcut geçmişi yükle
-            history = []
-            if os.path.exists(history_file):
-                with open(history_file, 'r') as f:
-                    history = json.load(f)
+            # Mevcut geçmişi yükle (Asyncio to thread ile bloklanmayı engelle)
+            history = await asyncio.to_thread(_load_history)
 
             # Yeni kaydı ekle
             history.append(new_entry)
@@ -383,9 +391,8 @@ class MLService:
             # Son 100 kaydı sakla
             history = history[-100:]
 
-            # Kaydet
-            with open(history_file, 'w') as f:
-                json.dump(history, f, indent=2)
+            # Kaydet (Asyncio to thread ile bloklanmayı engelle)
+            await asyncio.to_thread(_save_history, history)
 
             logger.info(f"📝 [ML] Eğitim geçmişi güncellendi: {len(history)} kayıt")
             logger.info(f"📊 [ML] Metrics kaydedildi: Acc={accuracy:.4f}, Prec={precision:.4f}, Rec={recall:.4f}, F1={f1_score:.4f}")
@@ -407,7 +414,7 @@ class MLService:
             **self.training_state
         }
 
-    def get_training_history(self, limit: int = 50) -> Dict[str, Any]:
+    async def get_training_history(self, limit: int = 50) -> Dict[str, Any]:
         """
         Eğitim geçmişini al.
 
@@ -420,9 +427,15 @@ class MLService:
         try:
             history_file = "artifacts/ml_training_history.json"
 
-            if os.path.exists(history_file):
-                with open(history_file, 'r') as f:
-                    history = json.load(f)
+            def _load_history():
+                if os.path.exists(history_file):
+                    with open(history_file, 'r') as f:
+                        return json.load(f)
+                return None
+
+            history = await asyncio.to_thread(_load_history)
+
+            if history is not None:
                 return {
                     "status": "success",
                     "history": history[-limit:],
@@ -439,7 +452,7 @@ class MLService:
             logger.error(f"Eğitim geçmişi hatası: {e}")
             return {"status": "error", "message": str(e)}
 
-    def delete_training_history(self) -> Dict[str, Any]:
+    async def delete_training_history(self) -> Dict[str, Any]:
         """
         Eğitim geçmişini sil.
 
@@ -449,8 +462,13 @@ class MLService:
         try:
             history_file = "artifacts/ml_training_history.json"
 
-            if os.path.exists(history_file):
-                os.remove(history_file)
+            def _delete_history():
+                if os.path.exists(history_file):
+                    os.remove(history_file)
+                    return True
+                return False
+
+            if await asyncio.to_thread(_delete_history):
                 self.training_history = []
 
             return {"status": "success", "message": "Geçmiş silindi"}
@@ -459,7 +477,7 @@ class MLService:
             logger.error(f"Geçmiş silme hatası: {e}")
             return {"status": "error", "message": str(e)}
 
-    def delete_model(self, symbol: str, timeframe: str) -> Dict[str, Any]:
+    async def delete_model(self, symbol: str, timeframe: str) -> Dict[str, Any]:
         """
         Belirli bir ML modelini sil.
 
@@ -476,23 +494,30 @@ class MLService:
             # Model yollarını al
             model_paths = get_model_paths(symbol, timeframe)
 
-            # Silinecek dosyalar
-            deleted_files = []
-            errors = []
+            def _delete_files_sync():
+                dfiles = []
+                errs = []
+                for file_path in [model_paths['xgboost_path'], model_paths['rf_path'], model_paths['metadata_path']]:
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            dfiles.append(file_path)
+                        except Exception as e:
+                            errs.append(f"{file_path}: {str(e)}")
+                return dfiles, errs
 
-            for file_path in [model_paths['xgboost_path'], model_paths['rf_path'], model_paths['metadata_path']]:
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        deleted_files.append(file_path)
-                        logger.info(f"✅ [ML] Model dosyası silindi: {file_path}")
-                    except Exception as e:
-                        errors.append(f"{file_path}: {str(e)}")
-                        logger.error(f"❌ [ML] Dosya silme hatası: {file_path} - {e}")
+            # Silinecek dosyalar (Asyncio to thread)
+            deleted_files, errors = await asyncio.to_thread(_delete_files_sync)
+            for df in deleted_files:
+                logger.info(f"✅ [ML] Model dosyası silindi: {df}")
+            for err in errors:
+                logger.error(f"❌ [ML] Dosya silme hatası: {err}")
 
             # Training history'den de sil (eğer varsa)
             history_deleted = False
-            try:
+
+            def _update_history_sync():
+                h_deleted = False
                 history_file = "artifacts/ml_training_history.json"
                 if os.path.exists(history_file):
                     with open(history_file, 'r') as f:
@@ -505,13 +530,17 @@ class MLService:
                         if not (h.get('symbol') == symbol and h.get('timeframe') == timeframe)
                     ]
 
-                    # Güncellenmiş history'yi kaydet
-                    with open(history_file, 'w') as f:
-                        json.dump(history, f, indent=2)
-
                     if len(history) < original_count:
-                        history_deleted = True
-                        logger.info(f"✅ [ML] Training history'den {original_count - len(history)} kayıt silindi")
+                        # Güncellenmiş history'yi kaydet
+                        with open(history_file, 'w') as f:
+                            json.dump(history, f, indent=2)
+                        h_deleted = True
+                return h_deleted
+
+            try:
+                history_deleted = await asyncio.to_thread(_update_history_sync)
+                if history_deleted:
+                    logger.info(f"✅ [ML] Training history güncellendi (ilgili kayıtlar silindi)")
             except Exception as e:
                 logger.warning(f"⚠️ [ML] Training history silme hatası: {e}")
 
