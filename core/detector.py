@@ -1,82 +1,100 @@
+import asyncio
 import pandas as pd
 import numpy as np
 
+from shared.events.event_bus import event_bus, Event
+
+
 class MarketRegimeDetector:
     """
-    Piyasa Rejimi Dedektörü (Trend mi? Yatay mı?)
+    Market Regime Detector (Phase 1)
     
-    Bu sınıf, piyasanın o anki yapısını analiz ederek botların hangi stratejiyle
-    daha verimli çalışabileceğine dair veri üretir.
+    Identifies the market regime ("BULL_TREND", "BEAR_TREND", "CHOPPY")
+    mathematically based on pre-calculated indicators in the DataFrame.
+    
+    Expected indicators in df:
+        - ADX_14
+        - EMA_50
+        - BBU_20_2.0
+        - BBL_20_2.0
+        - SMA_20
+        - close
     """
-    
-    @staticmethod
-    def detect_regime(df: pd.DataFrame) -> dict:
-        """
-        Verilen DataFrame üzerinden piyasa rejimini analiz eder.
-        """
-        if df.empty or len(df) < 30:
-            return {"regime": "UNKNOWN", "trend_strength": 0}
 
+    @staticmethod
+    def _calculate_regime(df: pd.DataFrame) -> dict:
+        """
+        Calculates the market regime vectorically using numpy and pandas.
+        This is a CPU-bound operation.
+        """
+        if df is None or df.empty:
+            raise ValueError("Empty or None DataFrame provided for market regime detection.")
+
+        # Required columns mapping based on typical indicator names
+        required_columns = ['ADX_14', 'EMA_50', 'BBU_20_2.0', 'BBL_20_2.0', 'SMA_20', 'close']
+
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required indicator columns for regime detection: {missing_cols}")
+
+        # Get the latest row
         latest = df.iloc[-1]
         
-        # 1. ADX (Trend Gücü)
-        # ADX > 25 ise trend var kabul edilir.
-        adx_val = latest.get('ADX_14', 0)
+        # Bollinger Squeeze calculation
+        # Formula: bbw = (BBU_20_2.0 - BBL_20_2.0) / SMA_20
+        bbw = (latest['BBU_20_2.0'] - latest['BBL_20_2.0']) / latest['SMA_20']
         
-        # 2. VHF (Vertical Horizontal Filter)
-        # VHF, fiyat hareketinin ne kadarının trende dayalı olduğunu ölçer.
-        # Yüksek değer = Güçlü Trend.
-        try:
-            # Saf Pandas VHF (Vertical Horizontal Filter) Hesaplaması
-            length = 28
-            close_s = df['close']
-            hcp = close_s.rolling(window=length).max()
-            lcp = close_s.rolling(window=length).min()
-
-            # Pay (Numerator)
-            numerator = abs(hcp - lcp)
-
-            # Payda (Denominator)
-            diff = abs(close_s.diff())
-            denominator = diff.rolling(window=length).sum()
-
-            # VHF
-            vhf_series = numerator / denominator
-            vhf = vhf_series.iloc[-1]
-            if pd.isna(vhf):
-                vhf = 0.5
-        except Exception:
-            vhf = 0.5 # Default orta değer
-            
-        # 3. Bollinger Band Width (Squeeze kontrolü)
-        # Bandlar daralmışsa patlama (Trend başlangıcı) yakındır, yatay piyasa sonudur.
-        bbw = 0
-        try:
-            val_u = latest.get('BBU_20_2.0_2.0')
-            val_l = latest.get('BBL_20_2.0_2.0')
-            
-            # Değerlerin hem mevcut hem de sayısal (NaN/None değil) olduğunu doğrula
-            if val_u is not None and val_l is not None and not np.isnan(val_u) and not np.isnan(val_l):
-                bbw = (val_u - val_l) / latest['close']
-        except Exception:
-            bbw = 0.05 # Hata durumunda nötr bir genişlik ata
-
-        # --- KARAR MANTIĞI ---
-        regime = "RANGING" # Varsayılan: Yatay / Testere
+        adx_val = latest['ADX_14']
+        close_price = latest['close']
+        ema_50 = latest['EMA_50']
         
-        # ADX ve VHF eşik değerleri (Literatürde genellikle 25 ve 0.40 civarıdır)
-        if adx_val > 23 and vhf > 0.35:
-            # Trend var, peki yön ne?
-            if latest['close'] > latest.get('EMA_50', latest['close']):
-                regime = "TRENDING_BULL"
-            else:
-                regime = "TRENDING_BEAR"
-        elif bbw < 0.02: # Çok dar bant (Squeeze)
-            regime = "SQUEEZE_PRE_TREND"
+        # Determine regime
+        if adx_val <= 25 or bbw < 0.04:
+            regime = "CHOPPY"
+        elif adx_val > 25 and close_price > ema_50:
+            regime = "BULL_TREND"
+        elif adx_val > 25 and close_price < ema_50:
+            regime = "BEAR_TREND"
+        else:
+            # Fallback, though logical conditions above should cover most
+            regime = "CHOPPY"
 
         return {
             "regime": regime,
-            "trend_strength": round(adx_val, 2),
-            "vhf": round(vhf, 3),
-            "bbw": round(bbw, 4)
+            "adx": float(adx_val),
+            "bbw": float(bbw),
+            "close": float(close_price),
+            "ema_50": float(ema_50)
         }
+
+    @classmethod
+    async def detect_and_publish(cls, symbol: str, timeframe: str, df: pd.DataFrame):
+        """
+        Detects the market regime asynchronously (offloading CPU-bound tasks)
+        and publishes the result via the event bus.
+        """
+        try:
+            # Offload CPU-bound calculation to thread pool
+            result = await asyncio.to_thread(cls._calculate_regime, df)
+
+            # Publish event directly via the event bus
+            event_payload = {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "regime": result["regime"],
+                "metrics": result
+            }
+
+            await event_bus.publish(
+                Event(
+                    type="regime.changed",
+                    payload=event_payload,
+                    source="market_regime_detector"
+                )
+            )
+
+        except Exception as e:
+            # Log the error but don't crash the event loop
+            import logging
+            logger = logging.getLogger("core.detector")
+            logger.error(f"Failed to detect and publish market regime for {symbol}: {e}")
