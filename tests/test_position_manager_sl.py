@@ -24,11 +24,12 @@ def test_sl_breakeven_logic():
     pm.update_trailing_stop_legacy(pos_long, 101.0, 101.0, 101.0)
     assert pos_long['stop_loss'] == 98.0
 
-    # Enough profit (102.5 >= 100 + 2), should move to breakeven + buffer
+    # DİKKAT: Eski legacy metodda breakeven mantığı kaldırıldı, artık yapmıyor
+    # Bu yüzden sadece normal trailing stop bekliyoruz.
     pm.update_trailing_stop_legacy(pos_long, 102.5, 102.5, 102.5)
-    assert pos_long['stop_loss'] == 100.0 * 1.001
+    assert pos_long['stop_loss'] == 102.5 - (2.0 * 1.5) # = 99.5
 
-    # 2. Test SHORT Break-even
+    # 2. Test SHORT Break-even (Sadece trailing)
     pos_short = {
         'bot_id': 'bot2',
         'symbol': 'ETH/USDT',
@@ -49,9 +50,9 @@ def test_sl_breakeven_logic():
     pm.update_trailing_stop_legacy(pos_short, 196.0, 196.0, 196.0)
     assert pos_short['stop_loss'] == 203.5
 
-    # Enough profit (194 <= 200 - 5), should move to breakeven - buffer
+    # Sadece trailing, breakeven yok
     pm.update_trailing_stop_legacy(pos_short, 194.0, 194.0, 194.0)
-    assert pos_short['stop_loss'] == 200.0 * 0.999
+    assert pos_short['stop_loss'] == 194.0 + (5.0 * 1.5) # = 201.5
 
 if __name__ == "__main__":
     test_sl_breakeven_logic()

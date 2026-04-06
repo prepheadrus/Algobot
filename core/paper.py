@@ -148,6 +148,7 @@ class PaperTrader:
         # Position handlers
         event_bus.subscribe("position.opened", self.on_position_opened)
         event_bus.subscribe("position.closed", self.on_position_closed)
+        event_bus.subscribe("position.partial_closed", self.on_position_partial_closed)
 
         # Bot handlers
         event_bus.subscribe("bot.started", self.on_bot_started)
@@ -534,6 +535,118 @@ class PaperTrader:
         if self.risk_engine.kill_switch_active:
             self.kill_switch_activated = True
             logger.critical("🚨 KILL SWITCH AKTİF!")
+
+    async def on_position_partial_closed(self, event):
+        """
+        Position Partial Closed Event Handler (Kademeli Çıkış).
+
+        Args:
+            event: PositionPartialClosedEvent
+        """
+        payload = event.payload
+        bot_id = payload.get("bot_id")
+        symbol = payload.get("symbol")
+        pnl = payload.get("pnl", 0.0)
+        size_closed = payload.get("size_closed", 0.0)
+        remaining_size = payload.get("remaining_size", 0.0)
+        exit_price = payload.get("exit_price", 0.0)
+        direction = payload.get("direction")
+
+        # 1. Gerçekleşmiş (Realized) Kârı Hesapla: Komisyon (Taker) ve Kayma (Slippage) düşülür
+        # %0.04 Taker Fee + %0.01 Slippage
+        is_spot = self.margin_types.get(symbol, "isolated") == "spot"
+        fee_rate = 0.001 if is_spot else 0.0004
+        slippage_rate = 0.0001
+
+        position_value = size_closed * exit_price
+        fee = position_value * fee_rate
+        slippage_cost = position_value * slippage_rate
+
+        # Net PnL (Komisyonlar düştükten sonra bakiye yansıması)
+        net_pnl = pnl - fee - slippage_cost
+
+        logger.info(f"✨ Kısmi Çıkış (%50 Kâr Alma): {bot_id} | Net PnL=${net_pnl:.2f} (Brüt: ${pnl:.2f}, Komisyon/Kayma: ${fee+slippage_cost:.2f})")
+
+        # 2. Bakiyeye ekle (Serbest Bakiye)
+        async with self._balance_lock:
+            self.balance += net_pnl
+            self.free_margin = self.balance
+
+        # 3. Veritabanına kaydet (Kısmi Trade Kaydı)
+        from data.database import db_manager
+
+        # Partial close ID = trade_{bot_id}_partial_{timestamp}
+        timestamp_us = int(datetime.utcnow().timestamp() * 1000000)
+        trade_id = f"trade_{bot_id}_partial_{timestamp_us}"
+
+        # Partial kaydında entry_price olarak güncel event bilgisini bulmamız gerekir.
+        # Position objesi içinden eski entry price'ı bulalım:
+        entry_price = exit_price  # fallback
+        strategy_id = self.active_strategies.get(symbol, "unknown")
+        leverage = 1
+        position = self.position_manager.get_position(bot_id)
+        if position:
+            entry_price = position.entry_price
+            leverage = position.leverage
+
+        trade_data = {
+            "id": trade_id,
+            "symbol": symbol,
+            "direction": direction,
+            "entry_price": float(entry_price),
+            "exit_price": float(exit_price),
+            "size": float(size_closed),
+            "leverage": int(leverage),
+            "pnl_usd": float(net_pnl),
+            "pnl_percent": float(payload.get("pnl_percent", 0.0)) * 100,  # 0-1 → 0-100
+            "reason": "PARTIAL_TAKE_PROFIT",
+            "strategy_id": strategy_id,
+            "bot_id": bot_id,
+            "closed_at": datetime.utcnow().isoformat(),
+        }
+        await db_manager.save_trade(trade_data)
+
+        # Trade History'ye (RAM) Kısmi Kaydı da ekle
+        from core.trading.entities.trade import Trade, PositionDirection
+        partial_trade = Trade(
+            id=trade_id,
+            bot_id=bot_id,
+            symbol=symbol,
+            direction=PositionDirection(direction),
+            entry_price=entry_price,
+            exit_price=exit_price,
+            size=size_closed,
+            leverage=leverage,
+            pnl=net_pnl,
+            pnl_percent=payload.get("pnl_percent", 0.0),
+            commission=fee + slippage_cost,
+            opened_at=datetime.utcnow(),  # tam bilinmiyor
+            closed_at=datetime.utcnow(),
+            reason="PARTIAL_TAKE_PROFIT",
+            strategy_id=strategy_id,
+            metadata={}
+        )
+        self.trade_history.append(partial_trade)
+
+        # 4. Legacy positions (self.open_positions) Senkronizasyonu
+        # Geriye dönük uyumluluk için, `open_positions` listesindeki size ve stop_loss değerini ez
+        positions_updated = False
+        for pos in self.position_manager.legacy_positions:
+            if pos.get("bot_id") == bot_id:
+                pos["size"] = remaining_size
+                pos["margin"] = pos["margin"] * 0.5  # Marjin de yarıya düşüyor
+                # Breakeven Stop Loss (Giriş Fiyatı) güncelleniyor:
+                # EDA'da PositionManager update_trailing_stop içinde zaten yapıldı, buradan kopyalanır.
+                if position:
+                    pos["stop_loss"] = position.stop_loss
+                else:
+                    pos["stop_loss"] = entry_price # Fallback breakeven
+                pos["partial_profit_taken"] = True
+                positions_updated = True
+                break
+
+        if positions_updated:
+            self.open_positions = list(self.position_manager.legacy_positions)
 
     async def on_bot_started(self, event):
         """Bot Started Event Handler"""
