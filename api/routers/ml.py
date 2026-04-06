@@ -68,7 +68,7 @@ async def get_training_history(limit: int = 50) -> Dict[str, Any]:
     """
     ML eğitim geçmişini döner.
     """
-    return ml_service.get_training_history(limit)
+    return await ml_service.get_training_history(limit)
 
 
 @router.get("/models")
@@ -78,7 +78,7 @@ async def get_available_models(symbol: str, timeframe: str) -> Dict[str, Any]:
     Bu modeller history üzerinden getirilir.
     """
     try:
-        history_response = ml_service.get_training_history(limit=500)
+        history_response = await ml_service.get_training_history(limit=500)
         if history_response.get("status") != "success":
             raise HTTPException(status_code=500, detail="History yüklenemedi")
 
@@ -127,7 +127,7 @@ async def delete_training_history() -> Dict[str, Any]:
     """
     ML eğitim geçmişini siler.
     """
-    return ml_service.delete_training_history()
+    return await ml_service.delete_training_history()
 
 
 @router.delete("/model")
@@ -147,7 +147,7 @@ async def delete_ml_model(symbol: str, timeframe: str) -> Dict[str, Any]:
         }
     """
     try:
-        result = ml_service.delete_model(symbol, timeframe)
+        result = await ml_service.delete_model(symbol, timeframe)
 
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("message"))
