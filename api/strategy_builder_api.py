@@ -12,8 +12,8 @@ from datetime import datetime
 from cachetools import TTLCache
 import traceback
 
-from strategy.builder import StrategyBuilder, StrategyExecutor, StrategyValidator
-from api.routers.backtest import fetch_real_data
+from strategy.builder import StrategyBuilder, StrategyValidator
+from api.routers.backtest import fetch_real_data, calculate_signals
 from core.backtester import VectorizedBacktester
 from core.logger import logger
 
@@ -63,7 +63,6 @@ async def test_strategy(strategy: StrategySchema):
         
         # 2. Stratejiyi RAM'den yükle (Disk I/O Yok)
         strategy_dict = strategy.dict()
-        executor = StrategyExecutor(strategy_dict=strategy_dict)
 
         # 3. Gerçek veriyi önbellekten al (Varsayılan BTC/USDT)
         default_symbol = "BTC/USDT"
@@ -72,7 +71,6 @@ async def test_strategy(strategy: StrategySchema):
         df = await get_cached_real_data(symbol=default_symbol, timeframe=timeframe, days=30)
         
         # 4. Veriyi hazırla (indikatörleri hesapla) ve sinyalleri üret
-        from api.routers.backtest import calculate_signals
         # Cache'teki df'yi değiştirmemek için copy() kullanıyoruz
         signals = calculate_signals(df.copy(), strategy_dict)
 
