@@ -333,7 +333,6 @@ class ModelTrainer:
         missing_classes = expected_classes - existing_classes
 
         if missing_classes:
-            from core.logger import logger
             logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
             for mc in missing_classes:
                 if isinstance(X_train, pd.DataFrame):
@@ -422,7 +421,6 @@ class ModelTrainer:
         missing_classes = expected_classes - existing_classes
 
         if missing_classes:
-            from core.logger import logger
             logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
             for mc in missing_classes:
                 if isinstance(X_train, pd.DataFrame):
