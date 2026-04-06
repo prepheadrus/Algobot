@@ -21,6 +21,7 @@ try:
     import optuna
 except ImportError:
     optuna = None
+import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import (
@@ -794,7 +795,6 @@ class ModelTrainer:
         self.xgb_model.save_model(model_path)
 
         # 2. Random Forest modelini kaydet (Joblib/Pickle)
-        import joblib
         rf_model_path = model_path.replace('.json', '_rf.joblib')
         joblib.dump(self.rf_model, rf_model_path)
 
@@ -860,7 +860,6 @@ class ModelTrainer:
         self.xgb_model.load_model(model_path)
 
         # 2. Random Forest modelini yükle
-        import joblib
         rf_model_path = model_path.replace('.json', '_rf.joblib')
         if os.path.exists(rf_model_path):
             self.rf_model = joblib.load(rf_model_path)

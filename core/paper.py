@@ -270,9 +270,10 @@ class PaperTrader:
             # Model flag güncelleniyor (çalışma zamanı senkronizasyonu)
             self.signal_validator.ml_enabled = self.ml_enabled
 
+            # ML Doğrulaması: model_id bilinçli olarak None geçilir, sistem en güncel modeli kendi bulur
             ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = (
                 await self.signal_validator.validate_signal_with_ml(
-                    symbol, timeframe, indicators, signal, model_id=self.bots[bot_id]['config'].model_id
+                    symbol, timeframe, indicators, signal, model_id=None
                 )
             )
 
