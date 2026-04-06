@@ -266,17 +266,27 @@ class PaperTrader:
                 return
 
             # ============================================
-            # ML KARAR MOTORU - Detaylı loglama
+            # ML KARAR MOTORU (Yön Bazlı) - Detaylı loglama
             # ============================================
             # Model flag güncelleniyor (çalışma zamanı senkronizasyonu)
             self.signal_validator.ml_enabled = self.ml_enabled
 
-            # ML Doğrulaması: model_id bilinçli olarak None geçilir, sistem en güncel modeli kendi bulur
-            ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = (
-                await self.signal_validator.validate_signal_with_ml(
-                    symbol, timeframe, indicators, signal, model_id=None
+            # Sinyal yönünü belirle (Yön bazlı inference için 'long' veya 'short')
+            inference_direction = "long" if signal == 2 else "short" if signal == 0 else None
+
+            ml_confirmed = False
+            ml_confidence = 0.0
+            ml_rec = "HOLD"
+            ml_rec_norm = "HOLD"
+
+            if inference_direction:
+                # ML Doğrulaması: model_id bilinçli olarak None geçilir, sistem en güncel modeli kendi bulur
+                # Yeni Asimetrik Binary modele 'direction' da gönderiliyor
+                ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = (
+                    await self.signal_validator.validate_signal_with_ml(
+                        symbol, timeframe, indicators, signal, model_id=None, direction=inference_direction
+                    )
                 )
-            )
 
             # Emit ml.evaluation event to WebSocket
             from shared.events import event_bus

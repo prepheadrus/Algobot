@@ -192,72 +192,61 @@ class MLService:
             self.training_state["message"] = "XGBoost modeli eğitiliyor..."
             self.training_state["current_step"] = "Model training"
             
-            from ml.model_training import ModelTrainer
-            trainer = ModelTrainer(
-                n_estimators=request.n_estimators,
-                max_depth=request.max_depth,
-                learning_rate=request.learning_rate,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                enable_auto_regularization=False # UI'dan gelen değerleri ezmemesi için auto reg'i kapatıyoruz
-            )
+            # 2-6. Asimetrik Çift Model Eğitimi (run_training_pipeline)
+            self.training_state["progress"] = 70
+            self.training_state["message"] = "LONG ve SHORT modelleri eğitiliyor..."
+            self.training_state["current_step"] = "Dual Model training"
+
+            from ml.model_training import run_training_pipeline
             
             # Modeli eğit (Event-Loop bloklanmasını engellemek için asyncio.to_thread kullanılır)
-            training_metrics = await asyncio.to_thread(
-                trainer.train,
-                X_train,
-                y_train,
-                X_test,
-                y_test,
-                ret_test
+            trainers = await asyncio.to_thread(
+                run_training_pipeline,
+                df,
+                request.symbol,
+                request.tp,
+                request.sl,
+                request.time_horizon,
+                0.8, # train_ratio
+                request.timeframe,
+                request.n_estimators,
+                request.max_depth,
+                request.learning_rate,
+                False # enable_auto_regularization
             )
             
-            logger.info("✅ [ML] Model eğitildi")
-            logger.info(f"📊 [ML] Eğitim metrikleri: {training_metrics}")
+            logger.info("✅ [ML] Çift Yönlü Modeller Eğitildi")
             
-            # 6. Modeli kaydet
-            self.training_state["progress"] = 85
-            self.training_state["message"] = "Model kaydediliyor..."
-            self.training_state["current_step"] = "Save model"
-
-            # Model ID olarak geçerli timestamp'i kullan
-            model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-            # Merkezi path generator fonksiyonunu kullan
-            from ml.inference import get_model_paths
-            model_paths = get_model_paths(request.symbol, request.timeframe, model_id=model_id)
-
-            # Model dizinini oluştur
-            os.makedirs("artifacts/models", exist_ok=True)
-
-            # Ensemble modelleri kaydet (XGBoost + RF + Metadata)
-            trainer.save_model(
-                model_path=model_paths['xgboost_path'],
-                timeframe=request.timeframe,
-                tp_multiplier=request.tp,
-                sl_multiplier=request.sl,
-                time_horizon=request.time_horizon
-            )
-
-            logger.info("💾 [ML] Ensemble modeller kaydedildi:")
-            logger.info(f"   XGBoost: {model_paths['xgboost_path']}")
-            logger.info(f"   RF:      {model_paths['rf_path']}")
-            logger.info(f"   Meta:    {model_paths['metadata_path']}")
-
             # 7. Eğitim geçmişini güncelle
             self.training_state["progress"] = 95
             self.training_state["message"] = "Geçmiş güncelleniyor..."
             self.training_state["current_step"] = "Update history"
 
-            await self._save_training_history(
-                request,
-                model_paths['xgboost_path'],  # XGBoost ana model yolunu kaydet
-                X_train.shape[0] + X_test.shape[0],  # Toplam örnek sayısı
-                X_train.shape[1],  # Feature sayısı
-                training_metrics,  # Eğitim metrikleri
-                start_time,
-                model_id=model_id
-            )
+            # Model ID olarak geçerli timestamp'i kullan
+            model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+            from ml.inference import get_model_paths
+
+            # Long ve Short için ayrı ayrı history kaydet
+            all_metrics = {}
+            for direction, trainer in trainers.items():
+                if hasattr(trainer, 'training_metrics'):
+                    all_metrics[direction] = trainer.training_metrics
+
+                model_paths = get_model_paths(request.symbol, request.timeframe, direction, model_id=model_id)
+                dataset_size = len(df) # Yaklaşık
+                feature_count = len(trainer.feature_names) if trainer.feature_names else 0
+
+                await self._save_training_history(
+                    request,
+                    model_paths['xgboost_path'],  # XGBoost ana model yolunu kaydet
+                    dataset_size,
+                    feature_count,
+                    {'metrics': trainer.training_metrics},  # Eğitim metrikleri
+                    start_time,
+                    model_id=model_id,
+                    direction=direction
+                )
 
             # 8. Tamamlandı
             self.training_state["is_training"] = False
@@ -284,16 +273,15 @@ class MLService:
                     return [convert_numpy_types(item) for item in obj]
                 return obj
 
-            metrics_for_response = convert_numpy_types(training_metrics)
+            metrics_for_response = convert_numpy_types(all_metrics)
 
             # Başarı yanıtı dön
             return {
                 "status": "success",
-                "message": f"ML modeli eğitildi ({request.symbol})",
-                "model_path": model_paths['xgboost_path'],
+                "message": f"ML modelleri (Long & Short) eğitildi ({request.symbol})",
                 "metrics": metrics_for_response,
-                "dataset_size": int(X_train.shape[0] + X_test.shape[0]),
-                "accuracy": float(training_metrics.get('metrics', {}).get('accuracy', 0) * 100)
+                "dataset_size": len(df),
+                "accuracy": float(all_metrics.get('long', {}).get('accuracy', 0) * 100) if 'long' in all_metrics else 0.0
             }
 
         except Exception as e:
@@ -309,7 +297,7 @@ class MLService:
                 "message": str(e)
             }
 
-    async def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None):
+    async def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None, direction: str = 'long'):
         """Eğitim geçmişini kaydet."""
         try:
             history_file = "artifacts/ml_training_history.json"
@@ -354,10 +342,11 @@ class MLService:
             # Yeni kayıt - TÜM METRKLERİ KAYDET
             training_id_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             new_entry = {
-                "training_id": f"{request.symbol}_{request.timeframe}_{training_id_timestamp}",
+                "training_id": f"{request.symbol}_{request.timeframe}_{direction}_{training_id_timestamp}",
                 "model_id": model_id if model_id else training_id_timestamp,
                 "symbol": request.symbol,
                 "timeframe": request.timeframe,
+                "direction": direction,
                 "model_type": request.model_type,
                 "dataset_size": dataset_size,
                 "feature_count": feature_count,
@@ -399,7 +388,7 @@ class MLService:
             logger.info(f"📊 [ML] Model Acc: XGB={xgb_accuracy:.4f}, RF={rf_accuracy:.4f}, Ens={ensemble_accuracy:.4f}")
 
         except Exception as e:
-            logger.error(f"❌ [ML] Geçmiş kaydetme hatası: {e}")
+            logger.error(f"❌ [ML] Geçmiş kaydetme hatası ({direction}): {e}")
             logger.error(f"❌ [ML] Traceback: {traceback.format_exc()}")
 
     def get_training_status(self) -> Dict[str, Any]:
@@ -477,27 +466,35 @@ class MLService:
             logger.error(f"Geçmiş silme hatası: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def delete_model(self, symbol: str, timeframe: str) -> Dict[str, Any]:
+    async def delete_model(self, symbol: str, timeframe: str, direction: str = None) -> Dict[str, Any]:
         """
-        Belirli bir ML modelini sil.
+        Belirli bir ML modelini sil. (Tüm yönleri siler veya belirtilen yönü)
 
         Args:
             symbol: Sembol (örn: BTC/USDT)
             timeframe: Zaman dilimi (örn: 1h)
+            direction: (Opsiyonel) 'long' veya 'short'. Belirtilmezse tümünü siler.
 
         Returns:
             Silme yanıtı
         """
         try:
-            from ml.inference import get_model_paths
+            import glob
 
-            # Model yollarını al
-            model_paths = get_model_paths(symbol, timeframe)
+            # Tüm yön dosyalarını bulmak için wildcard pattern
+            symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
+
+            if direction:
+                search_pattern = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_*_{direction}.*"
+            else:
+                search_pattern = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_*.*"
+
+            files_to_delete = glob.glob(search_pattern)
 
             def _delete_files_sync():
                 dfiles = []
                 errs = []
-                for file_path in [model_paths['xgboost_path'], model_paths['rf_path'], model_paths['metadata_path']]:
+                for file_path in files_to_delete:
                     if os.path.exists(file_path):
                         try:
                             os.remove(file_path)
@@ -508,8 +505,8 @@ class MLService:
 
             # Silinecek dosyalar (Asyncio to thread)
             deleted_files, errors = await asyncio.to_thread(_delete_files_sync)
-            for df in deleted_files:
-                logger.info(f"✅ [ML] Model dosyası silindi: {df}")
+            for df_path in deleted_files:
+                logger.info(f"✅ [ML] Model dosyası silindi: {df_path}")
             for err in errors:
                 logger.error(f"❌ [ML] Dosya silme hatası: {err}")
 
@@ -562,35 +559,54 @@ class MLService:
             logger.error(f"Model silme hatası: {e}")
             return {"status": "error", "message": str(e)}
 
-    def check_model(self, symbol: str, timeframe: str) -> Dict[str, Any]:
+    def check_model(self, symbol: str, timeframe: str, direction: str = 'long') -> Dict[str, Any]:
         """
-        Model varlığını kontrol et.
+        Belirli yöndeki model varlığını kontrol et. (Varsayılan: long)
 
         Args:
             symbol: Sembol
             timeframe: Zaman dilimi
+            direction: Yön ('long' veya 'short')
 
         Returns:
             Model kontrol yanıtı
         """
-        # Merkezi path generator fonksiyonunu kullan
-        from ml.inference import get_model_paths
-        model_paths = get_model_paths(symbol, timeframe)
+        import glob
+        symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
+        search_pattern = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_*_{direction}.json"
+        matching_files = glob.glob(search_pattern)
 
-        # Tüm model dosyalarının varlığını kontrol et
-        xgb_exists = os.path.exists(model_paths['xgboost_path'])
-        rf_exists = os.path.exists(model_paths['rf_path'])
-        metadata_exists = os.path.exists(model_paths['metadata_path'])
+        if matching_files:
+            latest_file = sorted(matching_files)[-1]
+            rf_file = latest_file.replace('.json', '_rf.joblib')
+            meta_file = latest_file.replace('.json', '_metadata.json')
+
+            xgb_exists = os.path.exists(latest_file)
+            rf_exists = os.path.exists(rf_file)
+            metadata_exists = os.path.exists(meta_file)
+
+            return {
+                "status": "success",
+                "model_exists": xgb_exists,
+                "model_path": latest_file,
+                "message": f"{direction.upper()} Model bulundu",
+                "ensemble_status": {
+                    "xgboost": xgb_exists,
+                    "random_forest": rf_exists,
+                    "metadata": metadata_exists,
+                    "full_ensemble": xgb_exists and rf_exists and metadata_exists
+                }
+            }
 
         return {
             "status": "success",
-            "model_exists": xgb_exists,
-            "model_path": model_paths['xgboost_path'] if xgb_exists else None,
-            "message": "Model bulundu" if xgb_exists else "Model bulunamadı",
+            "model_exists": False,
+            "model_path": None,
+            "message": f"{direction.upper()} Model bulunamadı",
             "ensemble_status": {
-                "xgboost": xgb_exists,
-                "random_forest": rf_exists,
-                "metadata": metadata_exists,
-                "full_ensemble": xgb_exists and rf_exists and metadata_exists
+                "xgboost": False,
+                "random_forest": False,
+                "metadata": False,
+                "full_ensemble": False
             }
         }

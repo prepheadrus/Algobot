@@ -18,6 +18,7 @@ from data.features import AdvancedFeatures
 
 def apply_triple_barrier(
     df: pd.DataFrame,
+    direction: str,
     target_col: str = "close",
     atr_col: Optional[str] = None,
     tp_multiplier: float = 2.0,
@@ -26,20 +27,15 @@ def apply_triple_barrier(
     volatility_lookback: int = 14,
 ) -> pd.DataFrame:
     """
-    Triple Barrier Method (Üçlü Bariyer Yöntemi) ile etiketleme yapar.
+    Triple Barrier Method (Üçlü Bariyer Yöntemi) ile Asimetrik Binary etiketleme yapar.
 
-    Her bir mum için 3 bariyer oluşturur:
-    1. Üst Bariyer (Take Profit): Fiyat + (ATR * tp_multiplier)
-    2. Alt Bariyer (Stop Loss): Fiyat - (ATR * sl_multiplier)
-    3. Dikey Bariyer (Time Horizon): time_horizon mum sonrası
-
-    Fiyatın ilk hangi bariyere çarptığına göre etiket atar:
-    - 1: İlk üst bariyere çarptı (LONG başarılı)
-    - -1: İlk alt bariyere çarptı (SHORT başarılı / LONG zarar)
-    - 0: Dikey bariyere çarptı (Nötr/Yatay)
+    Meta-Labeling kuralına göre, yön parametresine ('long' veya 'short') bağlı olarak binary (0, 1) atar:
+    - direction='long': Fiyat ilk TP'ye (Üst Bariyer) değerse 1, SL'ye (Alt Bariyer) veya Zamana takılırsa 0.
+    - direction='short': Fiyat ilk TP'ye (Alt Bariyer) değerse 1, SL'ye (Üst Bariyer) veya Zamana takılırsa 0.
 
     Args:
         df: OHLCV verisi (index datetime olmalı)
+        direction: Etiketleme yönü ('long' veya 'short')
         target_col: Hedef fiyat kolonu (default: 'close')
         atr_col: ATR kolonu adı (varsa kullanılır, yoksa hesaplanır)
         tp_multiplier: Take Profit çarpanı (ATR bazlı)
@@ -49,8 +45,11 @@ def apply_triple_barrier(
     Returns:
         pd.DataFrame: Etiketler (target) ve bariyer bilgileri eklenmiş DataFrame
     """
+    if direction not in ['long', 'short']:
+        raise ValueError(f"Geçersiz direction parametresi: '{direction}'. Sadece 'long' veya 'short' kullanılabilir.")
+
     logger.info(
-        f"Triple Barrier etiketleme başlatılıyor: TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon}"
+        f"Triple Barrier etiketleme başlatılıyor (Yön: {direction}): TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon}"
     )
 
     df = df.copy()
@@ -101,9 +100,13 @@ def apply_triple_barrier(
     # ATR değerlerini al (NaN'leri doldur)
     atr = df[atr_col].fillna(df[target_col] * 0.02)  # Fallback: %2 volatilite
 
-    # Bariyerleri hesapla
-    upper_barrier = df[target_col] + (atr * tp_multiplier)
-    lower_barrier = df[target_col] - (atr * sl_multiplier)
+    # Asimetrik Bariyerleri hesapla
+    if direction == 'long':
+        upper_barrier = df[target_col] + (atr * tp_multiplier)  # TP
+        lower_barrier = df[target_col] - (atr * sl_multiplier)  # SL
+    else:  # short
+        upper_barrier = df[target_col] + (atr * sl_multiplier)  # SL
+        lower_barrier = df[target_col] - (atr * tp_multiplier)  # TP
 
     # Etiketleri sakla
     labels = np.zeros(len(df), dtype=int)
@@ -111,8 +114,6 @@ def apply_triple_barrier(
 
     # Her satır için ileriye dönük tarama
     for i in range(len(df) - time_horizon):
-        entry_price = df[target_col].iloc[i]
-
         # İleriye dönük fiyatları tara (time_horizon mum)
         end_idx = min(i + time_horizon, len(df) - 1)
 
@@ -133,26 +134,27 @@ def apply_triple_barrier(
                 lower_hit = True
                 break
 
-        # Etiket ata (SİSTEM STANDARDI: 2=LONG, 0=SHORT, 1=HOLD)
-        if upper_hit:
-            labels[i] = 2  # LONG başarılı (Üst bariyere çarptı)
-            reasons.append("TP")
-        elif lower_hit:
-            labels[i] = 0  # SHORT başarılı (Alt bariyere çarptı)
-            reasons.append("SL")
-        else:
-            # Dikey bariyere çarptı (zaman doldu)
-            # Son fiyata göre etiket (yukarı=2, aşağı=0, yatay=1)
-            final_price = df[target_col].iloc[end_idx]
-            if final_price > entry_price * 1.001:  # %0.1 üstte
-                labels[i] = 2  # LONG (yukarı kırık)
-                reasons.append("TIME_UP")
-            elif final_price < entry_price * 0.999:  # %0.1 altta
-                labels[i] = 0  # SHORT (aşağı kırık)
-                reasons.append("TIME_DOWN")
+        # Etiket ata (Meta-Labeling SİSTEM STANDARDI: Binary 0, 1)
+        if direction == 'long':
+            if upper_hit:
+                labels[i] = 1  # LONG başarılı (TP)
+                reasons.append("TP")
+            elif lower_hit:
+                labels[i] = 0  # LONG başarısız (SL)
+                reasons.append("SL")
             else:
-                labels[i] = 1  # NÖTR/HOLD (yatay)
-                reasons.append("TIME_NEUTRAL")
+                labels[i] = 0  # LONG başarısız (Zaman Aşımı / Nötr)
+                reasons.append("TIME_UP")
+        else:  # direction == 'short'
+            if lower_hit:
+                labels[i] = 1  # SHORT başarılı (TP)
+                reasons.append("TP")
+            elif upper_hit:
+                labels[i] = 0  # SHORT başarısız (SL)
+                reasons.append("SL")
+            else:
+                labels[i] = 0  # SHORT başarısız (Zaman Aşımı / Nötr)
+                reasons.append("TIME_UP")
 
     # Son time_horizon satır için etiket yok (ileriye dönük veri yok)
     labels[len(df) - time_horizon :] = 0
@@ -427,6 +429,7 @@ def create_train_test_split(
 
 def prepare_ml_data(
     df: pd.DataFrame,
+    direction: str,
     feature_cols: Optional[list] = None,
     target_col: str = "target",
     train_ratio: float = 0.8,
@@ -436,12 +439,13 @@ def prepare_ml_data(
     scaler_type: str = "standard",
     normalize: bool = True,
     skip_barrier: bool = False,  # Yeni parametre - apply_triple_barrier atla
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, object]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, object]:
     """
     End-to-end ML veri hazırlama pipeline'ı.
 
     Args:
         df: Ham OHLCV verisi (indikatörlerle birlikte)
+        direction: İşlem yönü ('long' veya 'short')
         feature_cols: Kullanılacak özellik kolonları
         target_col: Hedef kolon adı
         train_ratio: Eğitim oranı
@@ -453,14 +457,18 @@ def prepare_ml_data(
         skip_barrier: apply_triple_barrier atla (zaten yapıldıysa)
 
     Returns:
-        Tuple: (X_train, X_test, y_train, y_test, scaler)
+        Tuple: (X_train, X_test, y_train, y_test, ret_train, ret_test, scaler)
     """
-    logger.info(f"ML veri hazırlama pipeline'ı başlatılıyor... (Gelen Parametreler: TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon})")
+    if direction not in ['long', 'short']:
+        raise ValueError(f"Geçersiz direction parametresi: '{direction}'. Sadece 'long' veya 'short' kullanılabilir.")
+
+    logger.info(f"ML veri hazırlama pipeline'ı başlatılıyor... (Yön: {direction}, TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon})")
 
     # 1. Triple Barrier etiketleme (skip_barrier=False ise)
     if not skip_barrier:
         df_labeled = apply_triple_barrier(
             df=df,
+            direction=direction,
             target_col="close",
             tp_multiplier=tp_multiplier,
             sl_multiplier=sl_multiplier,

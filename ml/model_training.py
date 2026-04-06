@@ -140,7 +140,7 @@ class ModelTrainer:
         self.n_jobs = n_jobs
         self.num_class = num_class
 
-        # XGBoost modelini başlat
+        # XGBoost modelini başlat (Binary Classification)
         self.xgb_model = xgb.XGBClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
@@ -153,12 +153,11 @@ class ModelTrainer:
             reg_lambda=reg_lambda,
             random_state=random_state,
             n_jobs=n_jobs,
-            objective='multi:softmax',
-            eval_metric='mlogloss',
-            num_class=3
+            objective='binary:logistic',
+            eval_metric='logloss'
         )
 
-        # Random Forest modelini başlat
+        # Random Forest modelini başlat (Binary Classification)
         self.rf_model = RandomForestClassifier(
             n_estimators=rf_n_estimators,
             max_depth=rf_max_depth,
@@ -171,7 +170,7 @@ class ModelTrainer:
         self.is_trained = False
         self.feature_names = None
         self.training_metrics = {}
-        self.class_mapping = {0: 'SHORT', 1: 'LONG', 2: 'NEUTRAL'}
+        self.class_mapping = {0: 'HOLD/NEUTRAL', 1: 'TRADE'}
 
     def apply_auto_regularization(self, data_size: int):
         """
@@ -309,7 +308,8 @@ class ModelTrainer:
         ret_test: pd.Series
     ) -> float:
         """
-        Optuna için Sharpe Oranı Optimizasyon Hedef Fonksiyonu
+        Optuna için F1-Score Optimizasyon Hedef Fonksiyonu (Binary Classification)
+        Class Imbalance nedeniyle Accuracy yerine F1-Score kullanılır.
         """
         params = {
             'n_estimators': self.n_estimators, # Statik tutuyoruz
@@ -317,9 +317,8 @@ class ModelTrainer:
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2, log=True),
             'subsample': trial.suggest_float('subsample', 0.5, 1.0),
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-            'objective': 'multi:softmax',
-            'eval_metric': 'mlogloss',
-            'num_class': 3,
+            'objective': 'binary:logistic',
+            'eval_metric': 'logloss',
             'random_state': self.random_state,
             'n_jobs': self.n_jobs
         }
@@ -327,26 +326,6 @@ class ModelTrainer:
         model = xgb.XGBClassifier(**params)
 
         sample_weights = compute_sample_weight('balanced', y_train)
-
-        # [MİMARİ ZIRH: EKSİK SINIF (MISSING CLASS) ENJEKSİYONU]
-        expected_classes = {0, 1, 2}
-        existing_classes = set(np.unique(y_train))
-        missing_classes = expected_classes - existing_classes
-
-        if missing_classes:
-            logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
-            for mc in missing_classes:
-                if isinstance(X_train, pd.DataFrame):
-                    dummy_x = X_train.iloc[[-1]].copy()
-                    X_train = pd.concat([X_train, dummy_x], ignore_index=True)
-                else:
-                    dummy_x = X_train[-1:]
-                    X_train = np.vstack([X_train, dummy_x])
-
-                y_train = np.append(y_train, mc)
-                sample_weights = np.append(sample_weights, 1.0)
-
-            assert len(X_train) == len(y_train) == len(sample_weights), "Data shape mismatch after missing class injection!"
 
         model.fit(
             X_train,
@@ -357,24 +336,9 @@ class ModelTrainer:
 
         preds = model.predict(X_test)
 
-        # Event-Bus uyumlu: 2=LONG, 0=SHORT, 1=NEUTRAL
-        signal_multipliers = np.select([preds == 2, preds == 0, preds == 1], [1.0, -1.0, 0.0], default=0.0)
-
-        strategy_returns = signal_multipliers * ret_test.values
-
-        # Yıllıklandırma çarpanı (Örn: 15m için sqrt(35040), 1h için sqrt(8760), vs.)
-        # Default olarak 1h üzerinden hesaplıyoruz: 365 * 24 = 8760
-        # Ancak dinamik timeframe bilgisi gelmediği için güvenli bir oran alıyoruz:
-        ann_factor = np.sqrt(35040)  # 15m için standart
-
-        mean_ret = np.mean(strategy_returns)
-        std_ret = np.std(strategy_returns)
-
-        if std_ret < 1e-9:
-            return 0.0
-
-        sharpe_ratio = (mean_ret / std_ret) * ann_factor
-        return sharpe_ratio
+        # Binary classification için Optimizasyon Hedefi olarak F1-Score maksimize ediyoruz.
+        score = f1_score(y_test, preds, zero_division=0)
+        return score
 
     def train(
         self,
@@ -416,25 +380,10 @@ class ModelTrainer:
         # Sınıf Ağırlıklandırması (Class Imbalance) hesapla
         sample_weights = compute_sample_weight('balanced', y_train)
 
-        # [MİMARİ ZIRH: EKSİK SINIF (MISSING CLASS) ENJEKSİYONU]
-        expected_classes = {0, 1, 2}
-        existing_classes = set(np.unique(y_train))
-        missing_classes = expected_classes - existing_classes
-
-        if missing_classes:
-            logger.warning(f"⚠️ [ML] Eksik sınıflar tespit edildi: {missing_classes}. XGBoost C++ çökmesini önlemek için sentetik matris enjekte ediliyor.")
-            for mc in missing_classes:
-                if isinstance(X_train, pd.DataFrame):
-                    dummy_x = X_train.iloc[[-1]].copy()
-                    X_train = pd.concat([X_train, dummy_x], ignore_index=True)
-                else:
-                    dummy_x = X_train[-1:]
-                    X_train = np.vstack([X_train, dummy_x])
-
-                y_train = np.append(y_train, mc)
-                sample_weights = np.append(sample_weights, 1.0)
-
-            assert len(X_train) == len(y_train) == len(sample_weights), "Data shape mismatch after missing class injection!"
+        # Eğitim setinde yeterli sınıf çeşitliliği var mı kontrolü (Fail-Fast)
+        unique_classes = set(np.unique(y_train))
+        if len(unique_classes) < 2:
+            raise ValueError(f"⚠️ [ML] Eğitim setinde yalnızca tek bir sınıf mevcut: {unique_classes}. Binary classification yapılamaz. Yeterli sinyal oluşmamış olabilir.")
 
         # 1. XGBoost modelini eğit (Optuna ile Optimizasyon)
         if optuna is not None and ret_test is not None:
@@ -743,30 +692,23 @@ class ModelTrainer:
         confidence: float
     ) -> str:
         """
-        Tahmin ve güvene göre işlem önerisi üretir.
+        Tahmin ve güvene göre işlem önerisi üretir (Binary).
 
         Args:
-            prediction: Tahmin edilen sınıf
+            prediction: Tahmin edilen sınıf (1: TRADE, 0: HOLD)
             confidence: Güven skoru
 
         Returns:
             str: İşlem önerisi
         """
-        if prediction == 1:  # LONG (class_mapping: 1='LONG')
+        if prediction == 1:
             if confidence >= 0.80:
-                return "STRONG_LONG"
+                return "STRONG_TRADE"
             elif confidence >= 0.65:
-                return "LONG"
+                return "TRADE"
             else:
-                return "WEAK_LONG"
-        elif prediction == 0:  # SHORT (class_mapping: 0='SHORT')
-            if confidence >= 0.80:
-                return "STRONG_SHORT"
-            elif confidence >= 0.65:
-                return "SHORT"
-            else:
-                return "WEAK_SHORT"
-        else:  # NEUTRAL (class_mapping: 2='NEUTRAL')
+                return "WEAK_TRADE"
+        else:
             return "HOLD"
 
     def save_model(self, model_path: str = "artifacts/models/xgb_model.json", timeframe: str = "1h", tp_multiplier: float = 2.0, sl_multiplier: float = 2.0, time_horizon: int = 10) -> str:
@@ -890,23 +832,26 @@ class ModelTrainer:
 
 def run_training_pipeline(
     df: pd.DataFrame,
-    model_save_path: str = "artifacts/models/xgb_model.json",
+    symbol: str,
     tp_multiplier: float = 2.0,
     sl_multiplier: float = 2.0,
     time_horizon: int = 10,
     train_ratio: float = 0.8,
     timeframe: str = "1h",
-    n_estimators: int = 500,  # Default olarak burada bulunabilir ancak dışarıdan ne gelirse o kullanılacak.
+    n_estimators: int = 500,
     max_depth: int = 6,
     learning_rate: float = 0.1,
     enable_auto_regularization: bool = True
-) -> ModelTrainer:
+) -> Dict[str, ModelTrainer]:
     """
-    End-to-end eğitim pipeline'ı.
+    End-to-end Çift Model (Asimetrik) Eğitim Pipeline'ı.
+
+    Aynı DataFrame üzerinden hem 'long' hem de 'short' yönü için
+    bağımsız XGBoost+RF ensemble modelleri eğitir ve kaydeder.
 
     Args:
         df: OHLCV verisi (indikatörlerle birlikte)
-        model_save_path: Model kayıt yolu
+        symbol: Sembol (örn: btcusdtusdt)
         tp_multiplier: Take Profit çarpanı
         sl_multiplier: Stop Loss çarpanı
         time_horizon: Dikey bariyer mum sayısı
@@ -918,54 +863,69 @@ def run_training_pipeline(
         enable_auto_regularization: Otomatik regularization aktif mi
 
     Returns:
-        ModelTrainer: Eğitilmiş model
+        Dict[str, ModelTrainer]: {'long': ModelTrainer, 'short': ModelTrainer}
     """
     from ml.data_prep import prepare_ml_data
+    from datetime import datetime
+    import os
 
     logger.info("=" * 60)
-    logger.info("XGBOOST EĞİTİM PIPELINE'I BAŞLATILIYOR")
+    logger.info("XGBOOST ÇİFT MODEL EĞİTİM PIPELINE'I BAŞLATILIYOR (LONG & SHORT)")
     logger.info("=" * 60)
 
-    # 1. Veri hazırlama
-    logger.info("\n[1/3] Veri hazırlanıyor...")
-    X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
-        df,
-        tp_multiplier=tp_multiplier,
-        sl_multiplier=sl_multiplier,
-        time_horizon=time_horizon,
-        train_ratio=train_ratio,
-        skip_barrier=True  # API'de zaten yapıldı, tekrar yapma!
-    )
+    trainers = {}
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
 
-    # 2. Model eğitimi
-    logger.info(f"\n[2/3] Model eğitiliyor... (Parametreler: Est={n_estimators}, Depth={max_depth}, LR={learning_rate})")
-    trainer = ModelTrainer(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-        learning_rate=learning_rate,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        num_class=3,
-        enable_auto_regularization=enable_auto_regularization
-    )
+    for direction in ['long', 'short']:
+        logger.info(f"\n[{direction.upper()}] Yönü için pipeline başlıyor...")
+        try:
+            # 1. Veri hazırlama (Asimetrik Etiketleme)
+            logger.info(f"[{direction.upper()}] Veri hazırlanıyor...")
+            X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
+                df,
+                direction=direction,
+                tp_multiplier=tp_multiplier if direction == 'long' else sl_multiplier,
+                sl_multiplier=sl_multiplier if direction == 'long' else tp_multiplier,
+                time_horizon=time_horizon,
+                train_ratio=train_ratio,
+                skip_barrier=False
+            )
 
-    trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
+            # 2. Model eğitimi
+            logger.info(f"[{direction.upper()}] Model eğitiliyor...")
+            trainer = ModelTrainer(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                enable_auto_regularization=enable_auto_regularization
+            )
 
-    # 3. Model kaydetme
-    logger.info("\n[3/3] Model kaydediliyor...")
-    trainer.save_model(
-        model_save_path,
-        timeframe=timeframe,
-        tp_multiplier=tp_multiplier,
-        sl_multiplier=sl_multiplier,
-        time_horizon=time_horizon
-    )
+            trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
+            trainers[direction] = trainer
+
+            # 3. Model kaydetme
+            logger.info(f"[{direction.upper()}] Model kaydediliyor...")
+            model_save_path = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_{timestamp}_{direction}.json"
+            os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
+
+            trainer.save_model(
+                model_save_path,
+                timeframe=timeframe,
+                tp_multiplier=tp_multiplier if direction == 'long' else sl_multiplier,
+                sl_multiplier=sl_multiplier if direction == 'long' else tp_multiplier,
+                time_horizon=time_horizon
+            )
+        except Exception as e:
+            logger.error(f"[{direction.upper()}] Model eğitimi sırasında hata: {e}")
 
     logger.info("\n" + "=" * 60)
-    logger.info("EĞİTİM TAMAMLANDI")
+    logger.info("ÇİFT MODEL EĞİTİMİ TAMAMLANDI")
     logger.info("=" * 60)
 
-    return trainer
+    return trainers
 
 
 if __name__ == "__main__":
@@ -1003,9 +963,9 @@ if __name__ == "__main__":
 
         # 3. Eğitim pipeline'ını çalıştır
         logger.info("\nEğitim pipeline'ı başlatılıyor...")
-        trainer = run_training_pipeline(
+        trainers = run_training_pipeline(
             df,
-            model_save_path="artifacts/models/xgb_model_btc.json",
+            symbol="BTCUSDT",
             tp_multiplier=2.0,
             sl_multiplier=2.0,
             time_horizon=10,
@@ -1015,6 +975,9 @@ if __name__ == "__main__":
             learning_rate=0.1,
             enable_auto_regularization=False
         )
+        trainer = trainers.get('long') # Test için birini seç
+        if not trainer:
+            raise RuntimeError("LONG model eğitilemedi")
 
         # 4. Test tahmini
         logger.info("\nTest tahmini yapılıyor...")

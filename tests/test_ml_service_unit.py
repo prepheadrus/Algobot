@@ -88,8 +88,9 @@ class TestMLServiceDeleteHistory:
         # Setup
         mock_exists.return_value = True
 
-        # Execute
-        result = self.ml_service.delete_training_history()
+        # Execute - Run the coroutine in asyncio loop
+        import asyncio
+        result = asyncio.run(self.ml_service.delete_training_history())
 
         # Verify
         assert result["status"] == "success"
@@ -105,8 +106,9 @@ class TestMLServiceDeleteHistory:
         # Setup
         mock_exists.return_value = False
 
-        # Execute
-        result = self.ml_service.delete_training_history()
+        # Execute - Run the coroutine in asyncio loop
+        import asyncio
+        result = asyncio.run(self.ml_service.delete_training_history())
 
         # Verify
         assert result["status"] == "success"
@@ -123,8 +125,9 @@ class TestMLServiceDeleteHistory:
         mock_exists.return_value = True
         mock_remove.side_effect = Exception("Permission denied")
 
-        # Execute
-        result = self.ml_service.delete_training_history()
+        # Execute - Run the coroutine in asyncio loop
+        import asyncio
+        result = asyncio.run(self.ml_service.delete_training_history())
 
         # Verify
         assert result["status"] == "error"
@@ -148,63 +151,49 @@ class TestMLServiceCheckModel:
         }
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.inference.get_model_paths")
-    def test_check_model_all_exist(self, mock_get_paths, mock_exists):
+    @patch("glob.glob")
+    def test_check_model_all_exist(self, mock_glob, mock_exists):
         """Test check_model when all model files exist."""
         # Setup
-        mock_get_paths.return_value = self.mock_model_paths
+        mock_glob.return_value = [self.mock_model_paths['xgboost_path']]
         mock_exists.return_value = True
 
         # Execute
-        result = self.ml_service.check_model(self.symbol, self.timeframe)
+        result = self.ml_service.check_model(self.symbol, self.timeframe, direction="long")
 
         # Verify
-        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
-        assert mock_exists.call_count == 3
-
+        mock_glob.assert_called_once()
         assert result["status"] == "success"
         assert result["model_exists"] is True
         assert result["model_path"] == self.mock_model_paths['xgboost_path']
-        assert result["message"] == "Model bulundu"
-
-        ensemble_status = result["ensemble_status"]
-        assert ensemble_status["xgboost"] is True
-        assert ensemble_status["random_forest"] is True
-        assert ensemble_status["metadata"] is True
-        assert ensemble_status["full_ensemble"] is True
+        assert result["ensemble_status"]["full_ensemble"] is True
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.inference.get_model_paths")
-    def test_check_model_none_exist(self, mock_get_paths, mock_exists):
+    @patch("glob.glob")
+    def test_check_model_none_exist(self, mock_glob, mock_exists):
         """Test check_model when no model files exist."""
         # Setup
-        mock_get_paths.return_value = self.mock_model_paths
+        mock_glob.return_value = []
         mock_exists.return_value = False
 
         # Execute
-        result = self.ml_service.check_model(self.symbol, self.timeframe)
+        result = self.ml_service.check_model(self.symbol, self.timeframe, direction="long")
 
         # Verify
-        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
-        assert mock_exists.call_count == 3
-
+        mock_glob.assert_called_once()
         assert result["status"] == "success"
         assert result["model_exists"] is False
         assert result["model_path"] is None
-        assert result["message"] == "Model bulunamadı"
-
-        ensemble_status = result["ensemble_status"]
-        assert ensemble_status["xgboost"] is False
-        assert ensemble_status["random_forest"] is False
-        assert ensemble_status["metadata"] is False
-        assert ensemble_status["full_ensemble"] is False
+        assert result["ensemble_status"]["full_ensemble"] is False
+        assert result["ensemble_status"]["xgboost"] is False
+        assert result["ensemble_status"]["random_forest"] is False
 
     @patch("api.services.ml_service.os.path.exists")
-    @patch("ml.inference.get_model_paths")
-    def test_check_model_partial_exist(self, mock_get_paths, mock_exists):
+    @patch("glob.glob")
+    def test_check_model_partial_exist(self, mock_glob, mock_exists):
         """Test check_model when only some model files exist."""
         # Setup
-        mock_get_paths.return_value = self.mock_model_paths
+        mock_glob.return_value = [self.mock_model_paths['xgboost_path']]
 
         # Make XGBoost exist, but others not
         def mock_exists_side_effect(path):
@@ -213,19 +202,13 @@ class TestMLServiceCheckModel:
         mock_exists.side_effect = mock_exists_side_effect
 
         # Execute
-        result = self.ml_service.check_model(self.symbol, self.timeframe)
+        result = self.ml_service.check_model(self.symbol, self.timeframe, direction="long")
 
         # Verify
-        mock_get_paths.assert_called_once_with(self.symbol, self.timeframe)
-        assert mock_exists.call_count == 3
-
+        mock_glob.assert_called_once()
         assert result["status"] == "success"
-        assert result["model_exists"] is True
+        assert result["model_exists"] is True  # True because XGBoost is the main indicator
         assert result["model_path"] == self.mock_model_paths['xgboost_path']
-        assert result["message"] == "Model bulundu"
-
-        ensemble_status = result["ensemble_status"]
-        assert ensemble_status["xgboost"] is True
-        assert ensemble_status["random_forest"] is False
-        assert ensemble_status["metadata"] is False
-        assert ensemble_status["full_ensemble"] is False
+        assert result["ensemble_status"]["full_ensemble"] is False
+        assert result["ensemble_status"]["xgboost"] is True
+        assert result["ensemble_status"]["random_forest"] is False

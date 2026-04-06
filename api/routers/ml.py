@@ -131,13 +131,14 @@ async def delete_training_history() -> Dict[str, Any]:
 
 
 @router.delete("/model")
-async def delete_ml_model(symbol: str, timeframe: str) -> Dict[str, Any]:
+async def delete_ml_model(symbol: str, timeframe: str, direction: str = None) -> Dict[str, Any]:
     """
     Belirli bir ML modelini siler.
 
     Query Parameters:
         symbol: Sembol (örn: BTC/USDT)
         timeframe: Zaman dilimi (örn: 1h)
+        direction: (Opsiyonel) 'long' veya 'short'. Belirtilmezse tüm yönleri siler.
 
     Returns:
         {
@@ -147,7 +148,7 @@ async def delete_ml_model(symbol: str, timeframe: str) -> Dict[str, Any]:
         }
     """
     try:
-        result = await ml_service.delete_model(symbol, timeframe)
+        result = await ml_service.delete_model(symbol, timeframe, direction)
 
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("message"))
@@ -161,11 +162,11 @@ async def delete_ml_model(symbol: str, timeframe: str) -> Dict[str, Any]:
 
 
 @router.get("/check-model")
-async def check_model(symbol: str, timeframe: str = "1h") -> Dict[str, Any]:
+async def check_model(symbol: str, timeframe: str = "1h", direction: str = "long") -> Dict[str, Any]:
     """
     ML modelinin varlığını kontrol eder.
     """
-    return ml_service.check_model(symbol, timeframe)
+    return ml_service.check_model(symbol, timeframe, direction)
 
 
 @router.get("/visual-analysis")
@@ -332,85 +333,86 @@ async def run_visual_analysis(
             
         logger.info(f"📊 [ML] İndikatörler hesaplandı: {df.shape[1]} kolon")
 
-        # 3. Modeli Yükle ve Tahmin Yap
-        model_info = ml_service.check_model(symbol, timeframe)
+        # 3. Modelleri Yükle ve Tahmin Yap (LONG ve SHORT)
         markers = []
         feature_importance = []
 
-        if model_info.get('model_exists'):
-            from ml.model_training import ModelTrainer
-            trainer = ModelTrainer()
-            trainer.load_model(model_info['model_path'])
-            
-            # Modelin beklediği özellik isimlerini al
-            model_feature_names = getattr(trainer.xgb_model, 'feature_names_in_', None)
-            if model_feature_names is None:
-                # Fallback for older xgboost versions or different model types
-                model_feature_names = trainer.xgb_model.get_booster().feature_names
+        for direction in ['long', 'short']:
+            model_info = ml_service.check_model(symbol, timeframe, direction=direction)
 
-            if model_feature_names is None or len(model_feature_names) == 0:
-                raise ValueError("Modelden özellik (feature) isimleri alınamadı.")
+            if model_info.get('model_exists'):
+                from ml.model_training import ModelTrainer
+                trainer = ModelTrainer()
+                trainer.load_model(model_info['model_path'])
 
-            # 4. Graceful Degradation: Eksik kolonları 0.0 ile doldur
-            missing_cols = [col for col in model_feature_names if col not in df.columns]
-            if missing_cols:
-                logger.warning(f"⚠️ [ML] {len(missing_cols)} adet eksik kolon tespit edildi. 0.0 ile dolduruluyor: {missing_cols[:10]}...")
-                for col in missing_cols:
-                    df[col] = 0.0  # float64 olarak ekle
+                # Modelin beklediği özellik isimlerini al
+                model_feature_names = getattr(trainer.xgb_model, 'feature_names_in_', None)
+                if model_feature_names is None:
+                    model_feature_names = trainer.xgb_model.get_booster().feature_names
 
-            # 5. Veriyi Temizle ve Tahmin için Hazırla
-            X = df[model_feature_names].copy() # SettingWithCopyWarning önlemi (Copy)
-            
-            # SKILL.md Kuralı: NaN/Inf temizliği
-            X.replace([np.inf, -np.inf], np.nan, inplace=True)
-            X.fillna(0.0, inplace=True)
+                if model_feature_names is None or len(model_feature_names) == 0:
+                    raise ValueError(f"Modelden özellik (feature) isimleri alınamadı. ({direction})")
 
-            # [XGBoost Tip Güvenliği Kalkanı] - Kesin Sayısal Veri (No datetime64)
-            for col in X.columns:
-                X[col] = pd.to_numeric(X[col], errors='coerce').astype(float)
+                # 4. Graceful Degradation: Eksik kolonları 0.0 ile doldur
+                missing_cols = [col for col in model_feature_names if col not in df.columns]
+                if missing_cols:
+                    logger.warning(f"⚠️ [ML] {len(missing_cols)} adet eksik kolon tespit edildi. 0.0 ile dolduruluyor: {missing_cols[:10]}... ({direction})")
+                    for col in missing_cols:
+                        df[col] = 0.0
 
-            logger.info(f"📊 [ML] Tahmin yapılıyor: {len(X)} satır, {X.shape[1]} özellik")
-            predictions = trainer.xgb_model.predict(X)
-            logger.info(f"📊 [ML] Tahminler tamamlandı: {len(predictions)} adet, unique değerler: {np.unique(predictions)}")
+                # 5. Veriyi Temizle ve Tahmin için Hazırla
+                X = df[model_feature_names].copy()
+                X.replace([np.inf, -np.inf], np.nan, inplace=True)
+                X.fillna(0.0, inplace=True)
 
-            # Markers oluştur (Sadece değişim noktalarında ekle - Kalabalığı önlemek için)
-            current_ml_state = None
-            candles_since_last_ml = 0
-            
-            for i in range(len(predictions)): # Her mumu kontrol et, ama sadece state değiştiğinde marker bas
-                if i < len(df):
-                    pred_class = int(predictions[i])
-                    ts = int(df['timestamp'].iloc[i])
-                    
-                    if pred_class == 1 and current_ml_state != 'LONG': # LONG Sinyali
-                        markers.append({'time': ts, 'position': 'belowBar', 'color': '#2ea043', 'shape': 'arrowUp', 'text': 'ML AL', 'size': 0.6})
-                        current_ml_state = 'LONG'
-                        candles_since_last_ml = 0
-                    elif pred_class == 0 and current_ml_state != 'SHORT': # SHORT Sinyali
-                        markers.append({'time': ts, 'position': 'aboveBar', 'color': '#f85149', 'shape': 'arrowDown', 'text': 'ML SAT', 'size': 0.6})
-                        current_ml_state = 'SHORT'
-                        candles_since_last_ml = 0
-                    else:
-                        # Durum değişmedi, sayacı artır
-                        candles_since_last_ml += 1
+                for col in X.columns:
+                    X[col] = pd.to_numeric(X[col], errors='coerce').astype(float)
+
+                import xgboost as xgb
+                dmatrix = xgb.DMatrix(X, feature_names=model_feature_names)
+                probs = trainer.xgb_model.predict(dmatrix)
+                # Binary classification -> prob > 0.5 ise 1, değilse 0
+                predictions = (probs >= 0.5).astype(int)
+
+                logger.info(f"📊 [ML] Tahminler tamamlandı ({direction.upper()}): {len(predictions)} adet, positive count: {sum(predictions)}")
+
+                # Markers oluştur
+                current_ml_state = None
+                candles_since_last_ml = 0
+
+                for i in range(len(predictions)):
+                    if i < len(df):
+                        pred_class = int(predictions[i])
+                        ts = int(df['timestamp'].iloc[i])
                         
-                        # Eğer çok uzun süre aynı sinyal gittiyse (1000 mum) ufak bir hatırlatıcı bas (çok gürültü yapmadan)
-                        if candles_since_last_ml >= 1000:
-                            if current_ml_state == 'LONG':
-                                markers.append({'time': ts, 'position': 'belowBar', 'color': 'rgba(46, 160, 67, 0.4)', 'shape': 'arrowUp', 'text': 'ML AL (DVM)', 'size': 0.3})
-                            elif current_ml_state == 'SHORT':
-                                markers.append({'time': ts, 'position': 'aboveBar', 'color': 'rgba(248, 81, 73, 0.4)', 'shape': 'arrowDown', 'text': 'ML SAT (DVM)', 'size': 0.3})
-                            candles_since_last_ml = 0
+                        if pred_class == 1:
+                            if direction == 'long' and current_ml_state != 'LONG':
+                                markers.append({'time': ts, 'position': 'belowBar', 'color': '#2ea043', 'shape': 'arrowUp', 'text': 'ML LONG', 'size': 0.6})
+                                current_ml_state = 'LONG'
+                                candles_since_last_ml = 0
+                            elif direction == 'short' and current_ml_state != 'SHORT':
+                                markers.append({'time': ts, 'position': 'aboveBar', 'color': '#f85149', 'shape': 'arrowDown', 'text': 'ML SHORT', 'size': 0.6})
+                                current_ml_state = 'SHORT'
+                                candles_since_last_ml = 0
+                        else:
+                            # Sinyal yok (0) -> Sayacı artır
+                            candles_since_last_ml += 1
+                            if candles_since_last_ml >= 1000 and current_ml_state:
+                                if current_ml_state == 'LONG' and direction == 'long':
+                                    markers.append({'time': ts, 'position': 'belowBar', 'color': 'rgba(46, 160, 67, 0.4)', 'shape': 'arrowUp', 'text': 'ML LONG (DVM)', 'size': 0.3})
+                                elif current_ml_state == 'SHORT' and direction == 'short':
+                                    markers.append({'time': ts, 'position': 'aboveBar', 'color': 'rgba(248, 81, 73, 0.4)', 'shape': 'arrowDown', 'text': 'ML SHORT (DVM)', 'size': 0.3})
+                                candles_since_last_ml = 0
 
-            
-            # Feature importance al
-            try:
-                feature_importance = trainer.get_feature_importance_df(top_n=10).to_dict('records')
-            except Exception as e:
-                logger.warning(f"⚠️ [ML] Feature importance alınamadı: {e}")
+                # Feature importance (sadece bir yönünki kalsın, görsel karmaşa olmasın, ya da ortalaması alınabilir ama şimdilik long'u baz alalım)
+                if direction == 'long':
+                    try:
+                        feature_importance = trainer.get_feature_importance_df(top_n=10).to_dict('records')
+                    except Exception as e:
+                        logger.warning(f"⚠️ [ML] Feature importance alınamadı ({direction}): {e}")
 
-        else:
-            logger.warning(f"⚠️ [ML] Aktif model bulunamadı: {symbol} {timeframe}")
+            else:
+                logger.warning(f"⚠️ [ML] Aktif model bulunamadı: {symbol} {timeframe} ({direction})")
 
         # 5.5 Strateji Sinyallerini Hesapla (Karşılaştırma için Mor Sinyaller)
         try:
