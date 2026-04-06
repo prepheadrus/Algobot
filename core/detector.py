@@ -22,7 +22,7 @@ class MarketRegimeDetector:
     """
 
     @staticmethod
-    def _calculate_regime(df: pd.DataFrame) -> dict:
+    def detect_regime(df: pd.DataFrame) -> dict:
         """
         Calculates the market regime vectorically using numpy and pandas.
         This is a CPU-bound operation.
@@ -67,15 +67,15 @@ class MarketRegimeDetector:
             "ema_50": float(ema_50)
         }
 
-    @classmethod
-    async def detect_and_publish(cls, symbol: str, timeframe: str, df: pd.DataFrame):
+    @staticmethod
+    async def detect_and_publish(symbol: str, timeframe: str, df: pd.DataFrame):
         """
         Detects the market regime asynchronously (offloading CPU-bound tasks)
         and publishes the result via the event bus.
         """
         try:
             # Offload CPU-bound calculation to thread pool
-            result = await asyncio.to_thread(cls._calculate_regime, df)
+            result = await asyncio.to_thread(MarketRegimeDetector.detect_regime, df)
 
             # Publish event directly via the event bus
             event_payload = {

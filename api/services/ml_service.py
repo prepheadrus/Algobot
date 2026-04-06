@@ -169,84 +169,98 @@ class MLService:
             except (ImportError, AttributeError):
                 logger.debug("FeatureEngineer modülü bulunamadı, yalnızca indikatörler kullanılıyor.")
 
-            # 2-3. Feature engineering + Triple Barrier + Train/test split (hepsi bir arada)
             from ml.data_prep import prepare_ml_data
+            from ml.model_training import ModelTrainer
+            from ml.inference import get_model_paths
 
             # Argümanları explicitly olarak bir değişkene atayalım ve öyle gönderelim (zincirleme garantisi)
             tp_val = float(request.tp)
             sl_val = float(request.sl)
             hz_val = int(request.time_horizon)
 
-            X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
-                df,
-                tp_multiplier=tp_val,
-                sl_multiplier=sl_val,
-                time_horizon=hz_val,
-                skip_barrier=False  # Triple Barrier uygula
-            )
-            
-            logger.info(f"✅ [ML] ML pipeline tamamlandı: {X_train.shape[0]} eğitim, {X_test.shape[0]} test örnek")
-            
-            # 4. Model eğit
-            self.training_state["progress"] = 70
-            self.training_state["message"] = "XGBoost modeli eğitiliyor..."
-            self.training_state["current_step"] = "Model training"
-            
-            # 2-6. Asimetrik Çift Model Eğitimi (run_training_pipeline)
             self.training_state["progress"] = 70
             self.training_state["message"] = "LONG ve SHORT modelleri eğitiliyor..."
             self.training_state["current_step"] = "Dual Model training"
 
-            from ml.model_training import run_training_pipeline
-            
-            # Modeli eğit (Event-Loop bloklanmasını engellemek için asyncio.to_thread kullanılır)
-            trainers = await asyncio.to_thread(
-                run_training_pipeline,
-                df,
-                request.symbol,
-                request.tp,
-                request.sl,
-                request.time_horizon,
-                0.8, # train_ratio
-                request.timeframe,
-                request.n_estimators,
-                request.max_depth,
-                request.learning_rate,
-                False # enable_auto_regularization
-            )
-            
-            logger.info("✅ [ML] Çift Yönlü Modeller Eğitildi")
-            
-            # 7. Eğitim geçmişini güncelle
-            self.training_state["progress"] = 95
-            self.training_state["message"] = "Geçmiş güncelleniyor..."
-            self.training_state["current_step"] = "Update history"
-
             # Model ID olarak geçerli timestamp'i kullan
             model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+            symbol_clean = request.symbol.replace('/', '').replace(':', '').replace('-', '').lower()
 
-            from ml.inference import get_model_paths
-
-            # Long ve Short için ayrı ayrı history kaydet
+            directions = ['long', 'short']
             all_metrics = {}
-            for direction, trainer in trainers.items():
-                if hasattr(trainer, 'training_metrics'):
-                    all_metrics[direction] = trainer.training_metrics
 
-                model_paths = get_model_paths(request.symbol, request.timeframe, direction, model_id=model_id)
-                dataset_size = len(df) # Yaklaşık
-                feature_count = len(trainer.feature_names) if trainer.feature_names else 0
+            # Modeli eğit (Event-Loop bloklanmasını engellemek için asyncio.to_thread kullanılır)
+            def _train_direction(current_direction):
+                logger.info(f"🧠 [ML] {current_direction.upper()} modeli için asimetrik eğitim başlatılıyor...")
 
-                await self._save_training_history(
-                    request,
-                    model_paths['xgboost_path'],  # XGBoost ana model yolunu kaydet
-                    dataset_size,
-                    feature_count,
-                    {'metrics': trainer.training_metrics},  # Eğitim metrikleri
-                    start_time,
-                    model_id=model_id,
-                    direction=direction
+                # Veri hazırlığında yönü belirt
+                X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
+                    df,
+                    direction=current_direction,
+                    tp_multiplier=tp_val if current_direction == 'long' else sl_val,
+                    sl_multiplier=sl_val if current_direction == 'long' else tp_val,
+                    time_horizon=hz_val,
+                    skip_barrier=False,
+                    train_ratio=0.8
                 )
+
+                trainer = ModelTrainer(
+                    n_estimators=request.n_estimators,
+                    max_depth=request.max_depth,
+                    learning_rate=request.learning_rate,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                    enable_auto_regularization=False
+                )
+
+                trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
+
+                model_save_path = f"artifacts/models/xgb_model_{symbol_clean}_{request.timeframe}_{model_id}_{current_direction}.json"
+                os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
+
+                trainer.save_model(
+                    model_save_path,
+                    timeframe=request.timeframe,
+                    tp_multiplier=tp_val if current_direction == 'long' else sl_val,
+                    sl_multiplier=sl_val if current_direction == 'long' else tp_val,
+                    time_horizon=hz_val
+                )
+                return trainer, X_train.shape[0] + X_test.shape[0]
+
+            for current_direction in directions:
+                try:
+                    trainer, dataset_size = await asyncio.to_thread(_train_direction, current_direction)
+
+                    if hasattr(trainer, 'training_metrics'):
+                        all_metrics[current_direction] = trainer.training_metrics
+
+                    model_paths = get_model_paths(request.symbol, request.timeframe, current_direction, model_id=model_id)
+                    feature_count = len(trainer.feature_names) if hasattr(trainer, 'feature_names') and trainer.feature_names else 0
+
+                    # 7. Eğitim geçmişini güncelle (her başarılı yön için ayrı ayrı kaydedilir)
+                    self.training_state["progress"] = 80 if current_direction == 'long' else 95
+                    self.training_state["message"] = f"{current_direction.upper()} modeli geçmişi güncelleniyor..."
+                    self.training_state["current_step"] = "Update history"
+
+                    await self._save_training_history(
+                        request,
+                        model_paths['xgboost_path'],
+                        dataset_size,
+                        feature_count,
+                        {'metrics': trainer.training_metrics},
+                        start_time,
+                        model_id=model_id,
+                        direction=current_direction
+                    )
+                    logger.info(f"✅ [ML] {current_direction.upper()} modeli başarıyla eğitildi ve kaydedildi.")
+                except Exception as e:
+                    logger.warning(f"⚠️ [ML] {current_direction.upper()} modeli eğitimi başarısız oldu (Hata: {e}). Diğer yön için devam ediliyor...")
+                    continue
+
+            if not all_metrics:
+                raise ValueError("Her iki yön için de model eğitimi başarısız oldu.")
+
+            logger.info("✅ [ML] Çift Yönlü Modeller Eğitildi (Fail-Fast olmadan)")
 
             # 8. Tamamlandı
             self.training_state["is_training"] = False
