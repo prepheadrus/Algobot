@@ -172,7 +172,7 @@
                             <label style="font-size:0.75rem; color:var(--text-muted);">Zaman Dilimi</label>
                             <select id="ml-train-timeframe" class="timeframe-select" style="width:80px;"
                                 onchange="validateMumCount()">
-                                <option value="1m">1m</option>
+                                <option value="1m" selected>1m</option>
                                 <option value="3m">3m</option>
                                 <option value="5m">5m</option>
                                 <option value="10m">10m</option>
@@ -180,7 +180,7 @@
                                 <option value="20m">20m</option>
                                 <option value="30m">30m</option>
                                 <option value="45m">45m</option>
-                                <option value="1h" selected>1h</option>
+                                <option value="1h">1h</option>
                                 <option value="2h">2h</option>
                                 <option value="3h">3h</option>
                                 <option value="4h">4h</option>
@@ -197,7 +197,7 @@
                                 <span id="ml-db-count"
                                     style="color: var(--neon-blue); font-size: 0.7rem; margin-left: 5px;"></span>
                             </label>
-                            <input type="number" id="ml-train-limit" value="5000" min="100" step="100"
+                            <input type="number" id="ml-train-limit" value="45000" min="100" step="100"
                                 style="width: 120px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; font-weight: bold;"
                                 onchange="validateMumCount()" oninput="validateMumCount()">
                             <span id="ml-limit-warning"
@@ -209,7 +209,7 @@
 
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size:0.75rem; color:var(--text-muted);">TP Çarpan</label>
-                            <input type="text" id="ml-train-tp" value="2.0"
+                            <input type="text" id="ml-train-tp" value="3.0"
                                 style="width:70px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
                         </div>
 
@@ -221,7 +221,7 @@
 
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size:0.75rem; color:var(--text-muted);">Horizon (Mum)</label>
-                            <input type="number" id="ml-train-horizon" value="10" min="5" max="200" step="1"
+                            <input type="number" id="ml-train-horizon" value="15" min="5" max="200" step="1"
                                 style="width:90px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
                         </div>
 
