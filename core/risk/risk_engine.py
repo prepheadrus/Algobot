@@ -31,7 +31,9 @@ Usage:
     sl, tp = engine.calculate_dynamic_stops(
         price=50000,
         direction="LONG",
-        atr=500
+        atr=500,
+        sl_multiplier=1.2,
+        tp_multiplier=1.5
     )
 """
 
@@ -173,6 +175,12 @@ class RiskEngine:
             f"FreeMarginLimit: {size_by_free_margin:.4f} -> Final: {position_size:.4f}"
         )
         
+        # Risk Doğrulaması (Assert) - Kayan nokta hassasiyetiyle
+        calculated_risk = position_size * abs(entry_price - stop_loss_price)
+        max_allowed_risk = account_balance * (risk_percentage / 100.0)
+
+        assert calculated_risk <= (max_allowed_risk * 1.01), f"Sistem Hatası: Planlanan risk ({calculated_risk:.2f}) anapara limitini ({max_allowed_risk:.2f}) aşıyor!"
+
         return position_size
     
     # ========================================================================
@@ -187,86 +195,35 @@ class RiskEngine:
         timeframe: str = "1h"  # YENİ: Timeframe bilgisi
     ) -> float:
         """
-        Güven skoruna göre dinamik kaldıraç.
+        Güven skoruna göre dinamik kaldıraç (Meta-Labeling).
 
-        ML confidence skoruna göre:
-        - < 50%: Base leverage (1x)
-        - 50-65%: Orta kaldıraç (2-3x)
-        - 65-80%: Yüksek kaldıraç (3-5x)
-        - > 80%: Maksimum kaldıraç (5-10x)
-
-        TIMEFRAME AWARE:
-        - 1m, 3m: Yüksek gürültü (noise) nedeniyle max 5x-10x ile sınırlandırılır
-        - 5m, 10m, 15m: Orta gürültü, max 15x-20x
-        - 1h+: Normal yüksek kaldıraç kullanılabilir
+        TRADING_RULES_AND_RISK.md standartlarına göre:
+        - confidence < 0.50: return 0 (İşlemi VETO ET)
+        - 0.50 <= confidence < 0.65: return 2 (Düşük Risk, 2x Kaldıraç)
+        - 0.65 <= confidence < 0.80: return 4 (Orta Risk, 4x sabitle)
+        - confidence >= 0.80: return 8 (Yüksek Risk, 8x sabitle)
 
         Args:
             confidence_score: Güven skoru (0.0 - 1.0)
-            base_leverage: Baz kaldıraç (None ise config.default_leverage)
-            max_leverage: Maksimum kaldıraç (None ise config.max_leverage)
+            base_leverage: Baz kaldıraç (None ise config.default_leverage) - kullanılmaz, uyumluluk için var
+            max_leverage: Maksimum kaldıraç (None ise config.max_leverage) - kullanılmaz, uyumluluk için var
             timeframe: Zaman dilimi (örn: "1m", "15m", "1h")
 
         Returns:
-            Dinamik kaldıraç
+            Dinamik kaldıraç (0.0, 2.0, 4.0 veya 8.0)
         """
-        base = base_leverage or self.config.default_leverage
-        maximum = max_leverage or self.config.max_leverage
-
-        # ============================================
-        # TIMEFRAME-AWARE KALDIRAÇ SINIRLANDIRMASI
-        # ============================================
-        # 1m ve 3m gibi düşük zaman dilimlerinde piyasa gürültüsü (noise) çok yüksek
-        # ve komisyon oranları karlılığı ciddi şekilde düşürür.
-        # Bu nedenle kaldıraç otomatik olarak sınırlandırılır.
-
-        timeframe_lower = timeframe.lower()
-
-        # 1m, 3m: Çok yüksek gürültü - Max 5x-10x
-        if timeframe_lower in ["1m", "3m"]:
-            maximum = min(maximum, 10)  # Absolute max 10x
-            logger.info(
-                f"⚠️ [TIMEFRAME-AWARE] {timeframe} için kaldıraç sınırlandırıldı: "
-                f"Max {maximum}x (Noise ve komisyon koruması)"
-            )
-
-        # 5m, 10m, 15m: Orta gürültü - Max 15x-20x
-        elif timeframe_lower in ["5m", "10m", "15m", "20m", "30m"]:
-            maximum = min(maximum, 20)  # Absolute max 20x
-            logger.debug(
-                f"📊 [TIMEFRAME-AWARE] {timeframe} için kaldıraç sınırlandırıldı: "
-                f"Max {maximum}x (Orta gürültü)"
-            )
-
-        # 1h ve üzeri: Normal yüksek kaldıraç kullanılabilir
-        else:
-            logger.debug(f"✅ [TIMEFRAME-AWARE] {timeframe} için normal kaldıraç: Max {maximum}x")
-
-        # Güven skoru çok düşükse base leverage
         if confidence_score < 0.50:
-            return base
-
-        # Confidence bazlı hesaplama (Güçlü bir rampa için karekök/power curve)
-        # 50% confidence = threshold.
-        # Hemen 1x'den kurtulmak için küçük bir 'floor ratio' ekleyelim (0.1)
-        # Bu, 50% güvende bile (eğer limit 50x ise) ~5x-10x arası bir başlangıç sağlar.
-
-        raw_ratio = (confidence_score - 0.50) / 0.50
-
-        # Power curve: Güven arttıkça kaldıraç daha hızlı artar
-        # Ancak başlangıçta (50% eşiğinde) doğrudan 'base' (1x) yerine küçük bir sıçrama yapalım
-        if raw_ratio == 0:
-            boosted_ratio = 0.05 # %5 başlangıç payı
+            final_leverage = 0.0
+        elif confidence_score < 0.65:
+            final_leverage = 2.0
+        elif confidence_score < 0.80:
+            final_leverage = 4.0
         else:
-            boosted_ratio = 0.05 + (0.95 * (raw_ratio ** 0.7))
-
-        calculated = base + (boosted_ratio * (maximum - base))
-
-        # Kaldıracı sınırla ve tam sayı yap
-        final_leverage = int(round(min(maximum, max(base, calculated))))
+            final_leverage = 8.0
 
         logger.debug(
-            f"🚀 Dinamik kaldıraç: Confidence={confidence_score:.2%}, "
-            f"Leverage={final_leverage}x (Base={base}x, Max={maximum}x, TF={timeframe})"
+            f"🚀 Dinamik kaldıraç (Meta-Labeling): Confidence={confidence_score:.2%}, "
+            f"Leverage={final_leverage}x"
         )
 
         return float(final_leverage)
@@ -310,8 +267,8 @@ class RiskEngine:
         price: float,
         direction: str,
         atr: float,
-        multiplier: float = 1.5,
-        risk_reward_ratio: float = 2.0
+        sl_multiplier: float,
+        tp_multiplier: float
     ) -> Tuple[float, float]:
         """
         ATR bazlı dinamik stop loss ve take profit.
@@ -322,21 +279,22 @@ class RiskEngine:
             price: Şu anki fiyat
             direction: Yön (LONG/SHORT)
             atr: ATR değeri
-            multiplier: ATR çarpanı (stop için)
-            risk_reward_ratio: Risk/Ödül oranı (take profit için)
+            sl_multiplier: ATR çarpanı (stop için)
+            tp_multiplier: ATR çarpanı (take profit için)
         
         Returns:
             (stop_loss, take_profit)
         """
-        # Stop mesafesi
-        stop_distance = atr * multiplier
+        # Stop ve Take Profit mesafeleri
+        stop_distance = atr * sl_multiplier
+        take_profit_distance = atr * tp_multiplier
         
         if direction.upper() == "LONG":
             stop_loss = price - stop_distance
-            take_profit = price + (stop_distance * risk_reward_ratio)
+            take_profit = price + take_profit_distance
         else:  # SHORT
             stop_loss = price + stop_distance
-            take_profit = price - (stop_distance * risk_reward_ratio)
+            take_profit = price - take_profit_distance
         
         logger.debug(
             f"Dinamik stops: Price={price:.2f}, ATR={atr:.2f}, "

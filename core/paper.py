@@ -349,20 +349,28 @@ class PaperTrader:
             # POZİSYON AÇ (PositionManager'a delegate)
             # ============================================
             atr = indicators.get("ATR_14", price * 0.01)
+
+            # Stop loss / take profit hesapla
+            direction = "LONG" if signal == 2 else "SHORT"  # 2=LONG, 0=SHORT
+
+            # Faz 3: Asimetrik Yön Çarpanları (Hardcoded)
+            if direction == "LONG":
+                tp_multiplier = 1.5
+                sl_multiplier = 1.2
+            else:  # SHORT
+                tp_multiplier = 2.5
+                sl_multiplier = 1.2
+
+            # Stratejiden gelen stop_params'taki atr_multiplier sadece metadata olarak geçilecek
             stop_params = strategy.get_stop_params()
             atr_multiplier = stop_params.get("atr_multiplier", 3.0)
-            rr_ratio = stop_params.get(
-                "risk_reward_ratio", 2.0
-            )  # Strateji başına RR oranı
 
-            # Stop loss / take profit hesapla (Strateji RR oranı kullan)
-            direction = "LONG" if signal == 2 else "SHORT"  # 2=LONG, 0=SHORT
             stop_loss, take_profit = self.risk_engine.calculate_dynamic_stops(
                 price=price,
                 direction=direction,
                 atr=atr,
-                multiplier=atr_multiplier,
-                risk_reward_ratio=rr_ratio,
+                sl_multiplier=sl_multiplier,
+                tp_multiplier=tp_multiplier
             )
 
             # --- SMC SNIPER STOP-LOSS OVERRIDE ---
@@ -400,6 +408,11 @@ class PaperTrader:
                     max_leverage=max_lev,
                     timeframe=timeframe,  # YENİ: Timeframe bilgisi geçirildi
                 )
+
+                # Fail-Fast Prensibi: Kaldıraç sıfır gelirse işlemi anında veto et (confidence < 0.50)
+                if leverage == 0.0:
+                    logger.info(f"🛑 İŞLEM REDDEDİLDİ (VETO): ML Güven Skoru ({ml_confidence:.2f}) işlem eşiğinin (<0.50) altında.")
+                    return
             else:
                 leverage = CONFIG["risk_management"].get("default_leverage", 1.0)
 
