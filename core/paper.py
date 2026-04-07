@@ -341,6 +341,10 @@ class PaperTrader:
                     "   ÇÖZÜM 3: config.yaml → ml.confidence_threshold = 0.5 (daha düşük threshold)"
                 )
                 return
+            elif not has_model:
+                logger.info(
+                    f"⏭️ [ML] {symbol} için eğitilmiş model bulunamadı. Teknik sinyal ile devam ediliyor..."
+                )
             else:
                 logger.info(
                     f"✅ [ML] {symbol} ML onayı alındı: {ml_rec} (confidence: {ml_confidence:.2f})"

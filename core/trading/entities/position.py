@@ -368,11 +368,11 @@ class Position:
             # Stop asla giriş fiyatının altına düşmemeli (breakeven koruması)
             if self.breakeven_activated:
                 min_stop = self.entry_price * 1.001  # Komisyon buffer
+                # Yeni stop: daha yüksek olan (trailing veya min)
+                new_stop = max(trailing_stop, min_stop, current_stop)
             else:
-                min_stop = self.entry_price
-
-            # Yeni stop: daha yüksek olan (trailing veya min)
-            new_stop = max(trailing_stop, min_stop, current_stop)
+                # Breakeven yoksa sadece trailing ile current_stop'ı kıyasla
+                new_stop = max(trailing_stop, current_stop)
         else:  # SHORT
             # SHORT: Fiyat düştükçe stop'u aşağı çek
             trailing_stop = current_price + (atr * atr_multiplier)
@@ -380,11 +380,11 @@ class Position:
             # Stop asla giriş fiyatının üstüne çıkmamalı (breakeven koruması)
             if self.breakeven_activated:
                 max_stop = self.entry_price * 0.999  # Komisyon buffer
+                # Yeni stop: daha düşük olan (trailing veya max)
+                new_stop = min(trailing_stop, max_stop, current_stop)
             else:
-                max_stop = self.entry_price
-
-            # Yeni stop: daha düşük olan (trailing veya max)
-            new_stop = min(trailing_stop, max_stop, current_stop)
+                # Breakeven yoksa sadece trailing ile current_stop'ı kıyasla
+                new_stop = min(trailing_stop, current_stop)
 
         # Sadece stop_loss iyileşmişse güncelle
         if self.direction == PositionDirection.LONG:
