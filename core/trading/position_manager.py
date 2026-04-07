@@ -377,13 +377,6 @@ class PositionManager:
                 # İstatistikleri güncelle
                 self._update_statistics(trade)
 
-                # Position'ı sil (güvenli yöntem - dict'ten)
-                if bot_id in self.positions:
-                    del self.positions[bot_id]
-
-                # Legacy positions'dan sil (güvenli yöntem - remove ile)
-                self._remove_legacy_position_safe(bot_id)
-
                 logger.info(
                     f"❌ Pozisyon kapatıldı: {bot_id} | "
                     f"PnL: ${trade.pnl:.2f} ({trade.pnl_percent:.2%}) | "
@@ -422,6 +415,13 @@ class PositionManager:
                 # DB'ye kaydetme BURADA YAPILMIYOR (on_position_closed'da yapılacak)
                 # Duplicate kayıt önleme: SADECE EVENT ÜZERİNDEN
 
+                # Position'ı sil (güvenli yöntem - dict'ten)
+                if bot_id in self.positions:
+                    del self.positions[bot_id]
+
+                # Legacy positions'dan sil (güvenli yöntem - remove ile)
+                self._remove_legacy_position_safe(bot_id)
+
                 return trade
 
             except Exception as e:
@@ -443,15 +443,14 @@ class PositionManager:
 
             finally:
                 # Eğer kapatma başarısız olduysa, kilidi sıfırla (zombie önleme)
-                if not close_success and bot_id in self.positions:
-                    logger.warning(f"⚠️ [ZOMBIE KORUMA] {bot_id} kapatma başarısız, kilit sıfırlanıyor.")
+                if bot_id in self.positions:
                     self.positions[bot_id].metadata['is_closing'] = False
+                    logger.warning(f"⚠️ [ZOMBIE KORUMA] {bot_id} kapatılamadı, kilit serbest bırakıldı.")
 
-                    # Legacy position kilidini de sıfırla
-                    for legacy_pos in self.legacy_positions:
-                        if legacy_pos.get('bot_id') == bot_id:
-                            legacy_pos['is_closing'] = False
-                            break
+                # Ayrıca legacy_positions içinde varsa onu da serbest bırak
+                for legacy_pos in self.legacy_positions:
+                    if legacy_pos.get('bot_id') == bot_id:
+                        legacy_pos['is_closing'] = False
     
     def _remove_legacy_position(self, bot_id: str):
         """Legacy positions'dan sil (güvenli yöntem - remove ile)"""

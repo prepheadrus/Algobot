@@ -7,6 +7,8 @@ Business logic for bot operations.
 from typing import Dict, Any
 import asyncio
 
+from shared.events.event_bus import event_bus, Event
+
 from core.logger import logger
 from core.paper import paper_engine
 from core.exchange import exchange_manager
@@ -112,15 +114,12 @@ class BotService:
             Bot durdurma yanıtı
         """
         try:
-            success = self.paper_engine.stop_bot(request.bot_id)
+            await event_bus.publish(Event(type="bot.stop_requested", payload={"bot_id": request.bot_id}))
 
-            if success:
-                return {
-                    "status": "success",
-                    "message": f"Bot durduruldu: {request.bot_id}",
-                }
-            else:
-                return {"status": "error", "message": "Bot bulunamadı"}
+            return {
+                "status": "success",
+                "message": f"Bot durdurma isteği fırlatıldı: {request.bot_id}",
+            }
 
         except Exception as e:
             logger.error(f"Bot durdurma hatası: {e}")

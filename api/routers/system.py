@@ -13,6 +13,8 @@ import yaml
 import asyncio
 import math
 
+from shared.events.event_bus import event_bus, Event
+
 from core.logger import logger
 from core.config import CONFIG
 from core.paper import paper_engine
@@ -482,6 +484,18 @@ async def get_exchange_markets() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Exchange markets error: {e}")
         return {"markets": []}
+
+
+@router.post("/kill-switch")
+async def activate_kill_switch() -> Dict[str, Any]:
+    """
+    Acil durum durdurma (Kill Switch) isteği fırlatır.
+    Sadece Event yayınlar ve arka plan işçilerinin işlemi tamamlamasını beklemez.
+    """
+    await event_bus.publish(
+        Event(type="risk.killswitch_activated", payload={"reason": "manual_override"})
+    )
+    return {"status": "success", "message": "Kill switch activated, event dispatched"}
 
 
 # ============================================================================
