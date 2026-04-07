@@ -52,7 +52,7 @@ def get_model_paths(symbol: str, timeframe: str, direction: str, model_id: str =
     }
 
 
-def load_model(symbol: str, timeframe: str, direction: str):
+def load_model(symbol: str, timeframe: str, direction: str, live_features: Optional[list] = None):
     """
     Ensemble model'i yükle (XGBoost + Random Forest). Yön spesifiktir.
     Cache kullanarak performansı optimize et.
@@ -108,26 +108,23 @@ def load_model(symbol: str, timeframe: str, direction: str):
         feature_names = metadata.get('feature_names', ['open', 'high', 'low', 'close', 'volume'])
 
         # Geriye dönük uyumluluk ve migrasyon (Feature uyuşmazlığı kontrolü)
-        expected_features = [
-            "kalman_ret", "frac_diff_04", "dist_to_vwap", "dist_to_ema50",
-            "MACDh_12_26_9", "RSI_14", "BTC_VIX", "ROC_10", "OBV_EMA",
-            "KONKORDE_AZUL", "KONKORDE_VERDE", "ATR_14"
-        ]
+        if live_features is not None:
+            # Sadece modelin beklediği özelliklerin canlı veride eksik olup olmadığını kontrol et
+            missing_features = set(feature_names) - set(live_features)
 
-        # Eğer beklenen özellikler (veya sayısı) eşleşmiyorsa eski modelleri sil
-        if len(feature_names) != len(expected_features) or set(feature_names) != set(expected_features):
-            print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eski model dosyaları siliniyor: {symbol} {timeframe}")
+            if missing_features:
+                print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eksik özellikler: {missing_features}. Eski model dosyaları siliniyor: {symbol} {timeframe}")
 
-            # Benzersiz dosya yollarını al
-            unique_paths = list(set(model_paths.values()))
-            for path_val in unique_paths:
-                if os.path.exists(path_val):
-                    try:
-                        os.remove(path_val)
-                    except Exception as clean_e:
-                        print(f"❌ [ML] Eski model dosyası silinemedi ({path_val}): {clean_e}")
+                # Benzersiz dosya yollarını al
+                unique_paths = list(set(model_paths.values()))
+                for path_val in unique_paths:
+                    if os.path.exists(path_val):
+                        try:
+                            os.remove(path_val)
+                        except Exception as clean_e:
+                            print(f"❌ [ML] Eski model dosyası silinemedi ({path_val}): {clean_e}")
 
-            return None
+                return None
 
         # Cache'e kaydet
         _model_cache[cache_key] = {
@@ -181,8 +178,11 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
     if direction not in ['long', 'short']:
         return None
 
-    # Model yükle
-    model_data = load_model(symbol, timeframe, direction)
+    # Canlı özellikleri (feature) al
+    live_features = list(indicators.keys())
+
+    # Model yükle (live_features gönderilerek uyumsuzsa silinmesi sağlanır)
+    model_data = load_model(symbol, timeframe, direction, live_features=live_features)
     
     if not model_data:
         return None
@@ -194,15 +194,22 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
     if not xgb_model and not rf_model:
         return None
     
-    # Feature vektörü hazırla
-    X = prepare_features(indicators, feature_names)
+    # Modelin eğitimde gördüğü kesin özellik sırasını XGBoost'tan al (Mevcutsa)
+    if xgb_model and hasattr(xgb_model, 'feature_names') and xgb_model.feature_names:
+        expected_features = xgb_model.feature_names
+    else:
+        expected_features = feature_names
+
+    # Dict'ten sadece beklenenleri, beklenen kesin sırayla alıp 2D DataFrame yap (Slicing & Tensor Order)
+    X_live_ordered = pd.DataFrame([{f: indicators.get(f, 0.0) for f in expected_features}])
     
     # XGBoost tahmini (Binary Classification)
     xgb_pred = None
     xgb_confidence = None
     if xgb_model:
         # XGBoost binary:logistic output probabilities for class 1
-        dmatrix = xgb.DMatrix(X, feature_names=feature_names)
+        # Hizalanmış DataFrame üzerinden DMatrix oluştur
+        dmatrix = xgb.DMatrix(X_live_ordered, feature_names=expected_features)
         prob = xgb_model.predict(dmatrix)[0]
         xgb_pred = 1 if prob >= 0.5 else 0
         xgb_confidence = float(prob if xgb_pred == 1 else 1.0 - prob)
@@ -211,7 +218,8 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
     rf_pred = None
     rf_confidence = None
     if rf_model:
-        rf_pred_proba = rf_model.predict_proba(X)[0]
+        # RF DataFrame üzerinden tahmin yapabilir
+        rf_pred_proba = rf_model.predict_proba(X_live_ordered)[0]
         rf_pred = int(np.argmax(rf_pred_proba))
         rf_confidence = float(np.max(rf_pred_proba))
     
