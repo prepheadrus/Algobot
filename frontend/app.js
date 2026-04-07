@@ -58,8 +58,9 @@ async function loadMLModelsForBot() {
                 const displayName = dateParts.length > 1 ? `Model_${dateParts[dateParts.length-1]}` : `Model_${model.model_id}`;
                 const tpSl = model.tp_multiplier && model.sl_multiplier ? ` - ${model.tp_multiplier}/${model.sl_multiplier}` : '';
                 const legacyText = model.is_legacy ? ' (Legacy)' : '';
+                const directionText = model.direction && model.direction !== 'N/A' ? ` (${model.direction.toUpperCase()})` : '';
 
-                option.textContent = `${displayName} (%${model.accuracy}${tpSl})${legacyText}`;
+                option.textContent = `${displayName}${directionText} (%${model.accuracy}${tpSl})${legacyText}`;
                 select.appendChild(option);
             });
         }
@@ -2089,6 +2090,7 @@ window.loadMLTrainingHistory = async function() {
                             <th style="min-width: 150px;">Tarih</th>
                             <th>Sembol</th>
                             <th>TF</th>
+                            <th>Yön</th>
                             <th>Dataset</th>
                             <th>Feat</th>
                             <th style="min-width: 200px;">📊 Metrikler</th>
@@ -2118,12 +2120,15 @@ window.loadMLTrainingHistory = async function() {
                             const xgbColor = xgbAcc >= 50 ? 'var(--neon-green)' : (xgbAcc >= 40 ? '#ffcc00' : 'var(--neon-red)');
                             const rfColor = rfAcc >= 50 ? 'var(--neon-green)' : (rfAcc >= 40 ? '#ffcc00' : 'var(--neon-red)');
                             const ensembleColor = ensembleAcc >= 50 ? 'var(--neon-green)' : (ensembleAcc >= 40 ? '#ffcc00' : 'var(--neon-red)');
+                            const dirStr = item.direction ? item.direction.toUpperCase() : 'N/A';
+                            const dirColor = dirStr === 'LONG' ? 'var(--neon-green)' : (dirStr === 'SHORT' ? 'var(--neon-red)' : 'var(--text-muted)');
 
                             return `
                                 <tr style="vertical-align: top;">
                                     <td style="font-size: 0.7rem;">${dateStr}<br><span style="color: var(--text-muted);">${typeof date === 'string' && date.includes('T') ? date.split('T')[1].split('.')[0] : ''}</span></td>
                                     <td style="font-weight:600; color:var(--text-main);">${item.symbol || 'N/A'}</td>
                                     <td>${item.timeframe || 'N/A'}</td>
+                                    <td style="font-weight: bold; color: ${dirColor};">${dirStr}</td>
                                     <td>${(item.dataset_size || 0).toLocaleString()}</td>
                                     <td>${item.feature_count || 0}</td>
                                     <td>
