@@ -322,7 +322,8 @@ class PositionManager:
         bot_id: str,
         exit_price: float,
         reason: str = "manual",
-        commission: Optional[float] = None
+        commission: Optional[float] = None,
+        size_to_close: Optional[float] = None
     ) -> Optional[Trade]:
         """
         Pozisyon kapat.
@@ -332,10 +333,15 @@ class PositionManager:
             exit_price: Çıkış fiyatı
             reason: Kapatma nedeni
             commission: Komisyon (None ise hesaplanır)
+            size_to_close: Kapanacak miktar (None ise pozisyonun tamamı kapanır)
 
         Returns:
             Trade object veya None
         """
+        import dataclasses
+        from shared.events import event_bus
+        from shared.events.event_bus import Event
+
         # FIRST CHECK: Overhead'i azaltmak için lock öncesi kontrol
         if bot_id not in self.positions:
             logger.warning(f"Pozisyon bulunamadı (Lock öncesi): {bot_id}")
@@ -356,81 +362,129 @@ class PositionManager:
                 logger.warning(f"⚠️ Pozisyon zaten kapanıyor ama tekrar kapatma deneniyor: {bot_id}")
                 # Bloke etme, devam et - belki önceki kapatma başarısız oldu
 
-            # Kilit set et
-            position.metadata['is_closing'] = True
+            # Kısmi kapanış mı yoksa tam kapanış mı?
+            is_partial_close = size_to_close is not None and size_to_close < position.size
 
-            close_success = False  # Kapatma başarılı mı?
+            if not is_partial_close:
+                # Tam Kapanış Kilidi
+                position.metadata['is_closing'] = True
 
             try:
-                # Komisyon hesapla
-                if commission is None:
-                    is_spot = position.metadata.get('margin_type', 'isolated') == 'spot'
-                    fee_rate = self.fee_rate_spot if is_spot else self.fee_rate_futures
-                    commission = position.size * exit_price * fee_rate
+                if is_partial_close:
+                    # KOMİSYON HESAPLA (Sadece kapanan kısım için)
+                    if commission is None:
+                        is_spot = position.metadata.get('margin_type', 'isolated') == 'spot'
+                        fee_rate = self.fee_rate_spot if is_spot else self.fee_rate_futures
+                        commission = size_to_close * exit_price * fee_rate
 
-                # Trade oluştur (Position.close() metodu)
-                trade = position.close(exit_price, reason, commission)
+                    # PNL HESAPLA (Kapanan miktar oranıyla)
+                    partial_ratio = size_to_close / position.size
+                    partial_pnl = position.unrealized_pnl(exit_price) * partial_ratio
+                    pnl_percent = position.unrealized_pnl_percent(exit_price)
 
-                # Trade history'ye ekle
-                self.trade_history.add(trade)
+                    remaining_size = position.size - size_to_close
 
-                # İstatistikleri güncelle
-                self._update_statistics(trade)
+                    # POSITION GÜNCELLEME (Immutable)
+                    updated_position = dataclasses.replace(
+                        position,
+                        size=remaining_size,
+                        margin=position.margin * (remaining_size / position.size),
+                        realized_pnl=position.realized_pnl + (partial_pnl - commission)
+                    )
 
-                logger.info(
-                    f"❌ Pozisyon kapatıldı: {bot_id} | "
-                    f"PnL: ${trade.pnl:.2f} ({trade.pnl_percent:.2%}) | "
-                    f"Neden: {reason}"
-                )
+                    # Self dict güncelle
+                    self.positions[bot_id] = updated_position
 
-                close_success = True  # Başarılı
+                    logger.info(
+                        f"✨ Kısmi Pozisyon Kapatıldı: {bot_id} | "
+                        f"Kapanan: {size_to_close} | Kalan: {remaining_size} | "
+                        f"Realized PnL: ${(partial_pnl - commission):.2f}"
+                    )
 
-                # Event yayınla (on_position_closed handler'ı DB'ye kaydedecek)
-                # ✅ DÜZELTME: await kullan (asyncio.create_task YASAK - race condition!)
-                from shared.events import event_bus
-                from shared.events.event_bus import Event
+                    # EVENT: position.partial_closed (Sadece PnL ve Size değişikliğini dinleyenlere)
+                    event = Event(
+                        type="position.partial_closed",
+                        payload={
+                            "bot_id": bot_id,
+                            "symbol": updated_position.symbol,
+                            "direction": updated_position.direction.value,
+                            "exit_price": exit_price,
+                            "size_closed": size_to_close,
+                            "remaining_size": remaining_size,
+                            "pnl": partial_pnl,
+                            "pnl_percent": pnl_percent,
+                            "commission": commission,
+                            "reason": reason
+                        },
+                        source="position_manager"
+                    )
+                    await event_bus.publish(event)
 
-                event = Event(
-                    type="position.closed",
-                    payload={
-                        "bot_id": bot_id,
-                        "symbol": trade.symbol,
-                        "pnl": trade.pnl,
-                        "pnl_percent": trade.pnl_percent,
-                        "reason": reason,
-                        "exit_price": trade.exit_price,
-                        "entry_price": trade.entry_price,
-                        "size": trade.size,
-                        "leverage": trade.leverage,
-                        "direction": trade.direction.value,
-                        "trade_id": trade.id,
-                        "strategy_id": trade.strategy_id,
-                        "closed_at": trade.closed_at.isoformat()
-                    },
-                    source="position_manager"
-                )
+                    # Tamamen kapatılmadığı için None dönülebilir (Trade kaydı logic'i Paper'da)
+                    return None
 
-                await event_bus.publish(event)
+                else:
+                    # Tam Kapanış Logic'i (Değiştirilmedi)
+                    # Komisyon hesapla
+                    if commission is None:
+                        is_spot = position.metadata.get('margin_type', 'isolated') == 'spot'
+                        fee_rate = self.fee_rate_spot if is_spot else self.fee_rate_futures
+                        commission = position.size * exit_price * fee_rate
 
-                # DB'ye kaydetme BURADA YAPILMIYOR (on_position_closed'da yapılacak)
-                # Duplicate kayıt önleme: SADECE EVENT ÜZERİNDEN
+                    # Trade oluştur (Position.close() metodu)
+                    trade = position.close(exit_price, reason, commission)
 
-                # Position'ı sil (güvenli yöntem - dict'ten)
-                if bot_id in self.positions:
-                    del self.positions[bot_id]
+                    # Trade history'ye ekle
+                    self.trade_history.add(trade)
 
-                # Legacy positions'dan sil (güvenli yöntem - remove ile)
-                self._remove_legacy_position_safe(bot_id)
+                    # İstatistikleri güncelle
+                    self._update_statistics(trade)
 
-                return trade
+                    logger.info(
+                        f"❌ Pozisyon kapatıldı: {bot_id} | "
+                        f"PnL: ${trade.pnl:.2f} ({trade.pnl_percent:.2%}) | "
+                        f"Neden: {reason}"
+                    )
+
+                    # Event yayınla (on_position_closed handler'ı DB'ye kaydedecek)
+                    event = Event(
+                        type="position.closed",
+                        payload={
+                            "bot_id": bot_id,
+                            "symbol": trade.symbol,
+                            "pnl": trade.pnl,
+                            "pnl_percent": trade.pnl_percent,
+                            "reason": reason,
+                            "exit_price": trade.exit_price,
+                            "entry_price": trade.entry_price,
+                            "size": trade.size,
+                            "leverage": trade.leverage,
+                            "direction": trade.direction.value,
+                            "trade_id": trade.id,
+                            "strategy_id": trade.strategy_id,
+                            "closed_at": trade.closed_at.isoformat()
+                        },
+                        source="position_manager"
+                    )
+
+                    await event_bus.publish(event)
+
+                    # Position'ı sil (güvenli yöntem - dict'ten)
+                    if bot_id in self.positions:
+                        del self.positions[bot_id]
+
+                    # Legacy positions'dan sil (güvenli yöntem - remove ile)
+                    self._remove_legacy_position_safe(bot_id)
+
+                    return trade
 
             except Exception as e:
                 logger.error(f"❌ Pozisyon kapatma hatası ({bot_id}): {e}")
                 import traceback
                 logger.error(traceback.format_exc())
 
-                # Hata durumunda kilidi AÇ (tekrar denenebilir olsun)
-                if bot_id in self.positions:
+                # Hata durumunda kilidi AÇ (tekrar denenebilir olsun) - Yalnızca Tam Kapanışta kitlenmişti
+                if not is_partial_close and bot_id in self.positions:
                     self.positions[bot_id].metadata['is_closing'] = False
 
                 # Legacy position kilidini de aç
@@ -443,14 +497,15 @@ class PositionManager:
 
             finally:
                 # Eğer kapatma başarısız olduysa, kilidi sıfırla (zombie önleme)
-                if bot_id in self.positions:
+                if not is_partial_close and bot_id in self.positions:
                     self.positions[bot_id].metadata['is_closing'] = False
                     logger.warning(f"⚠️ [ZOMBIE KORUMA] {bot_id} kapatılamadı, kilit serbest bırakıldı.")
 
                 # Ayrıca legacy_positions içinde varsa onu da serbest bırak
-                for legacy_pos in self.legacy_positions:
-                    if legacy_pos.get('bot_id') == bot_id:
-                        legacy_pos['is_closing'] = False
+                if not is_partial_close:
+                    for legacy_pos in self.legacy_positions:
+                        if legacy_pos.get('bot_id') == bot_id:
+                            legacy_pos['is_closing'] = False
     
     def _remove_legacy_position(self, bot_id: str):
         """Legacy positions'dan sil (güvenli yöntem - remove ile)"""

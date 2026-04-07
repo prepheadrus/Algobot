@@ -1245,10 +1245,18 @@ class PaperTrader:
                 pos["current_price"] = current_price
                 positions_updated = True
 
-                # 1. Trailing stop güncelle (doğru HIGH/LOW ile)
-                self.position_manager.update_trailing_stop_legacy(
-                    pos, candle_high, candle_low, current_price
-                )
+                # 1. Trailing stop güncelle (Yeni Asenkron Immutable Metod ile)
+                if position:
+                    updated_position = await self.position_manager.update_trailing_stop(
+                        position, candle_high, candle_low
+                    )
+
+                    # DİKKAT: Position nesnesi immutable olduğu için, dönen yeni instance'ı kaydetmeliyiz.
+                    self.position_manager.positions[bot_id] = updated_position
+
+                    # Legacy uyumluluğu için SL güncelle (veya diğer değerler)
+                    if updated_position.stop_loss != position.stop_loss:
+                        pos['stop_loss'] = updated_position.stop_loss
 
                 # 2. PnL hesapla
                 roe, pnl_usd = self.position_manager.get_unrealized_pnl_legacy(

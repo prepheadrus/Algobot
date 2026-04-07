@@ -89,9 +89,11 @@ class Position:
     commission: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    # YENİ: 3 Aşamalı Risk Yönetimi Bayrakları
+    # YENİ: Kademeli Çıkış ve Risk Yönetimi Alanları
     partial_profit_taken: bool = False  # Aşama 1: Kısmi kâr alma (50% TP)
     breakeven_activated: bool = False  # Aşama 2: Başa baş koruması aktif
+    realized_pnl: float = 0.0  # Gerçekleşmiş (Kısmi çıkışlardan gelen) PnL
+    take_profit_levels: list = field(default_factory=list)  # Örn: [{"level": 1.5, "percentage": 0.5, "hit": False}]
     
     def __post_init__(self):
         """Validation (dataclass initialization sonrası)"""
@@ -141,6 +143,12 @@ class Position:
             pnl = (self.entry_price - current_price) * self.size
         
         return pnl - self.commission
+
+    def total_pnl(self, current_price: float) -> float:
+        """
+        Toplam PnL (Gerçekleşmiş + Realize Olmamış).
+        """
+        return self.realized_pnl + self.unrealized_pnl(current_price)
     
     def unrealized_pnl_percent(self, current_price: float) -> float:
         """
