@@ -109,13 +109,15 @@ def load_model(symbol: str, timeframe: str, direction: str, live_features: Optio
 
         # Geriye dönük uyumluluk ve migrasyon (Feature uyuşmazlığı kontrolü)
         if live_features is not None:
-            # Sadece modelin beklediği özelliklerin canlı veride eksik olup olmadığını kontrol et
+            # Sadece modelin beklediği özelliklerin canlı veride EKSİK olup olmadığını kontrol et.
+            # Canlı veride FAZLADAN kolon olması kesinlikle önemsizdir (Set Theory: A - B)
             missing_features = set(feature_names) - set(live_features)
 
             if missing_features:
-                print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Eksik özellikler: {missing_features}. Eski model dosyaları siliniyor: {symbol} {timeframe}")
+                print(f"⚠️ [ML] Özellik uyuşmazlığı tespit edildi. Canlı veride şu beklenen özellikler EKSİK: {missing_features}.")
+                print(f"⚠️ [ML] Model (eski/geçersiz) siliniyor: {symbol} {timeframe} {direction}")
 
-                # Benzersiz dosya yollarını al
+                # Benzersiz dosya yollarını al ve KESİNLİKLE sadece 'eksik özellik' varsa sil
                 unique_paths = list(set(model_paths.values()))
                 for path_val in unique_paths:
                     if os.path.exists(path_val):
@@ -195,24 +197,46 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
         return None
     
     # Modelin eğitimde gördüğü kesin özellik sırasını XGBoost'tan al (Mevcutsa)
-    if xgb_model and hasattr(xgb_model, 'feature_names') and xgb_model.feature_names:
-        expected_features = xgb_model.feature_names
-    else:
-        expected_features = feature_names
+    expected_features = feature_names
+    if xgb_model:
+        try:
+            # XGBoost özellik isimlerini doğrudan booster üzerinden al
+            booster_features = xgb_model.feature_names
+            if booster_features:
+                expected_features = booster_features
+        except AttributeError:
+            pass
 
     # Dict'ten sadece beklenenleri, beklenen kesin sırayla alıp 2D DataFrame yap (Slicing & Tensor Order)
-    X_live_ordered = pd.DataFrame([{f: indicators.get(f, 0.0) for f in expected_features}])
+    # Canlı matrisin tam olarak modelin beklediği özelliklere ve sıraya hizalanması
+    aligned_features = {}
+    for f in expected_features:
+        val = indicators.get(f, 0.0)
+        # NaN kontrolü, güvenli cast işlemleri
+        if isinstance(val, (int, float, np.number)):
+            aligned_features[f] = float(val) if not np.isnan(val) else 0.0
+        else:
+            aligned_features[f] = 0.0
+
+    X_live_ordered = pd.DataFrame([aligned_features])
     
     # XGBoost tahmini (Binary Classification)
     xgb_pred = None
     xgb_confidence = None
     if xgb_model:
-        # XGBoost binary:logistic output probabilities for class 1
-        # Hizalanmış DataFrame üzerinden DMatrix oluştur
-        dmatrix = xgb.DMatrix(X_live_ordered, feature_names=expected_features)
-        prob = xgb_model.predict(dmatrix)[0]
-        xgb_pred = 1 if prob >= 0.5 else 0
-        xgb_confidence = float(prob if xgb_pred == 1 else 1.0 - prob)
+        try:
+            # XGBoost binary:logistic output probabilities for class 1
+            # Hizalanmış DataFrame üzerinden, özelliklerin tam adıyla (feature_names) DMatrix oluştur
+            # DMatrix'in özellikleri modelin beklediği sırayla beslediğinden kesin olarak emin olunur
+            dmatrix = xgb.DMatrix(X_live_ordered, feature_names=expected_features)
+            prob = xgb_model.predict(dmatrix)[0]
+            xgb_pred = 1 if prob >= 0.5 else 0
+            xgb_confidence = float(prob if xgb_pred == 1 else 1.0 - prob)
+        except ValueError as e:
+            # Inference (çıkarım) anında olası feature mismatach hatalarını yut, model silme işlemi uygulama
+            print(f"⚠️ [ML] XGBoost tahmin hatası (Muhtemel Shape Mismatch, model silinmeyecek): {e}")
+            xgb_pred = None
+            xgb_confidence = None
     
     # Random Forest tahmini (Binary Classification)
     rf_pred = None
