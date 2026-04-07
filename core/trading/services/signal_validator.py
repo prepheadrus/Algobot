@@ -22,7 +22,7 @@ class SignalValidatorService:
             Tuple[is_confirmed (bool), confidence (float), recommendation_original (str), recommendation_normalized (str)]
         """
         ml_confirmed = True
-        ml_confidence = 0.5
+        ml_confidence = 0.0
         ml_rec = "HOLD"
         ml_rec_norm = "HOLD"
 
@@ -35,7 +35,7 @@ class SignalValidatorService:
         if ml_data:
             # inference_engine binary döndürüyor: 'prediction': 'LONG'/'SHORT' veya 'HOLD'
             ml_rec = ml_data.get('prediction', 'HOLD')
-            ml_confidence = ml_data.get('confidence', 0.5)
+            ml_confidence = ml_data.get('confidence', 0.0)
 
             # Normalize recommendation
             ml_rec_norm = str(ml_rec).upper()

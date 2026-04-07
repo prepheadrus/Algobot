@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 import numpy as np
 import pandas as pd
 import joblib
+import glob
 import xgboost as xgb
 
 # Model cache
@@ -64,7 +65,6 @@ def load_model(symbol: str, timeframe: str, direction: str):
     try:
         # Inference anında spesifik date bilinmediği için, en güncel model dosyası bulunmalıdır.
         # Basitçe klasörü tarayıp en güncel dosyayı bulalım:
-        import glob
         symbol_clean = symbol.replace('/', '').replace(':', '').replace('-', '').lower()
         search_pattern = f"artifacts/models/xgb_model_{symbol_clean}_{timeframe}_*_{direction}.json"
         matching_files = glob.glob(search_pattern)
@@ -201,7 +201,6 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
     xgb_pred = None
     xgb_confidence = None
     if xgb_model:
-        import xgboost as xgb
         # XGBoost binary:logistic output probabilities for class 1
         dmatrix = xgb.DMatrix(X, feature_names=feature_names)
         prob = xgb_model.predict(dmatrix)[0]
