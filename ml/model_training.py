@@ -73,6 +73,7 @@ class ModelTrainer:
         random_state: int = 42,
         n_jobs: int = -1,
         num_class: int = 3,
+        time_horizon: int = 10,
         # Random Forest parametreleri
         rf_n_estimators: int = 200,
         rf_max_depth: int = 10,
@@ -139,6 +140,7 @@ class ModelTrainer:
         self.random_state = random_state
         self.n_jobs = n_jobs
         self.num_class = num_class
+        self.time_horizon = time_horizon
 
         # XGBoost modelini başlat (Binary Classification)
         self.xgb_model = xgb.XGBClassifier(
@@ -303,14 +305,14 @@ class ModelTrainer:
         trial,
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
-        y_test: pd.Series,
-        ret_test: pd.Series
     ) -> float:
         """
         Optuna için F1-Score Optimizasyon Hedef Fonksiyonu (Binary Classification)
-        Class Imbalance nedeniyle Accuracy yerine F1-Score kullanılır.
+        Purged K-Fold (TimeSeriesSplit + Embargo) kullanarak sızıntısız ortalama F1-Score hesaplar.
         """
+        from sklearn.model_selection import TimeSeriesSplit
+        import gc
+
         params = {
             'n_estimators': self.n_estimators, # Statik tutuyoruz
             'max_depth': trial.suggest_int('max_depth', 3, 9),
@@ -323,22 +325,64 @@ class ModelTrainer:
             'n_jobs': self.n_jobs
         }
 
-        model = xgb.XGBClassifier(**params)
+        tscv = TimeSeriesSplit(n_splits=5)
+        f1_scores = []
 
-        sample_weights = compute_sample_weight('balanced', y_train)
+        # X_train bir DataFrame olduğu varsayılır. Pandas iloc kullanımı için.
+        # Ensure they are pandas types for indexing
+        if not isinstance(X_train, pd.DataFrame):
+            X_train = pd.DataFrame(X_train)
+        if not isinstance(y_train, pd.Series):
+            y_train = pd.Series(y_train)
 
-        model.fit(
-            X_train,
-            y_train,
-            sample_weight=sample_weights,
-            verbose=False
-        )
+        for train_index, val_index in tscv.split(X_train):
+            # Normal split
+            X_train_fold, X_val_fold = X_train.iloc[train_index], X_train.iloc[val_index]
+            y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
 
-        preds = model.predict(X_test)
+            # EMBARGO UYGULAMASI (Purging)
+            # Train ve Val setleri arasına time_horizon kadar boşluk bırak
+            # TimeSeriesSplit'te val_index her zaman train_index'in geleceğindedir.
+            # O yüzden val_fold'un başından time_horizon kadar atıyoruz ki train'in sonuyla val'in başı örtüşmesin
+            # VEYA train'in sonundan atabiliriz. (Lopez de Prado standardı: train'in test ile örtüşen kısmını purge et)
 
-        # Binary classification için Optimizasyon Hedefi olarak F1-Score maksimize ediyoruz.
-        score = f1_score(y_test, preds, zero_division=0)
-        return score
+            if self.time_horizon > 0 and len(train_index) > self.time_horizon:
+                # Purging: Train fold'un sonundan time_horizon kadar kısmı atıyoruz
+                X_train_fold = X_train_fold.iloc[:-self.time_horizon]
+                y_train_fold = y_train_fold.iloc[:-self.time_horizon]
+
+            # Eğer embargo sonrası fold çok küçülürse (örn. veri seti çok ufaksa), atla
+            if len(y_train_fold) == 0 or len(y_val_fold) == 0:
+                continue
+
+            try:
+                # Class imbalance için fold'a özel weight
+                sample_weights = compute_sample_weight('balanced', y_train_fold)
+
+                model = xgb.XGBClassifier(**params)
+                model.fit(
+                    X_train_fold,
+                    y_train_fold,
+                    sample_weight=sample_weights,
+                    verbose=False
+                )
+
+                preds = model.predict(X_val_fold)
+                score = f1_score(y_val_fold, preds, zero_division=0)
+                f1_scores.append(score)
+            except Exception as e:
+                # Olası bir xgboost hatası (örn: sadece tek class kalması durumu)
+                logger.debug(f"Fold atlandı, hata: {e}")
+                pass
+            finally:
+                # MEMORY BLOAT KALKANI
+                del X_train_fold, y_train_fold, X_val_fold, y_val_fold
+                gc.collect()
+
+        if not f1_scores:
+            return 0.0
+
+        return sum(f1_scores) / len(f1_scores)
 
     def train(
         self,
@@ -386,19 +430,19 @@ class ModelTrainer:
             raise ValueError(f"⚠️ [ML] Eğitim setinde yalnızca tek bir sınıf mevcut: {unique_classes}. Binary classification yapılamaz. Yeterli sinyal oluşmamış olabilir.")
 
         # 1. XGBoost modelini eğit (Optuna ile Optimizasyon)
-        if optuna is not None and ret_test is not None:
+        if optuna is not None:
             logger.info("📊 XGBoost eğitiliyor (Optuna TPE Optimizasyonu Başlıyor)...")
             study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=self.random_state))
 
-            # Objective fonksiyonunu lambda ile wrap ediyoruz
-            objective_wrapper = lambda trial: self._objective(trial, X_train, y_train, X_test, y_test, ret_test)
+            # Objective fonksiyonunu lambda ile wrap ediyoruz (Sadece train gönderilir, Hold-Out kuralı)
+            objective_wrapper = lambda trial: self._objective(trial, X_train, y_train)
 
             # n_trials=50 sabiti
             study.optimize(objective_wrapper, n_trials=50)
 
             best_params = study.best_params
             logger.info(f"🏆 Optuna En İyi Parametreler: {best_params}")
-            logger.info(f"🏆 En İyi Sharpe Oranı: {study.best_value:.4f}")
+            logger.info(f"🏆 En İyi Purged F1-Score Oranı: {study.best_value:.4f}")
 
             # Best parametreleri set et
             self._apply_params({
@@ -900,6 +944,7 @@ def run_training_pipeline(
                 learning_rate=learning_rate,
                 subsample=0.8,
                 colsample_bytree=0.8,
+                time_horizon=time_horizon,
                 enable_auto_regularization=enable_auto_regularization
             )
 
