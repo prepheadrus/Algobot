@@ -108,8 +108,7 @@ async def get_available_models(symbol: str, timeframe: str) -> Dict[str, Any]:
                 "tp_multiplier": model.get("tp_multiplier"),
                 "sl_multiplier": model.get("sl_multiplier"),
                 "is_legacy": "model_id" not in model, # History'de explicit olarak model_id yoksa legacy'dir
-                "training_id": model.get("training_id"),
-                "direction": model.get("direction", "N/A")
+                "training_id": model.get("training_id")
             })
 
         return {

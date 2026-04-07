@@ -1397,17 +1397,12 @@ class ExchangeManager:
             try:
                 from ml.inference import get_ml_prediction
 
-                # Get the direction based on raw_signal_int
-                # 2 -> long, 0 -> short. If hold (1), ml confidence check might be skipped,
-                # but we default to 'long' or check only if signal != 1
-                if raw_signal_int in [0, 2]:
-                    ml_direction = "long" if raw_signal_int == 2 else "short"
-                    ml_result = get_ml_prediction(symbol, timeframe, ml_direction, indicators_payload)
-                    if ml_result:
-                        ml_confidence = ml_result.get("confidence", 0)
-                        ml_result.get("prediction", "HOLD")
-                        if "ml_confidence" in signal_dict_for_logging:
-                            signal_dict_for_logging["ml_confidence"] = ml_confidence
+                ml_result = get_ml_prediction(symbol, timeframe, indicators_payload)
+                if ml_result:
+                    ml_confidence = ml_result.get("confidence", 0)
+                    ml_result.get("prediction", "HOLD")
+                    if "ml_confidence" in signal_dict_for_logging:
+                        signal_dict_for_logging["ml_confidence"] = ml_confidence
             except Exception as ml_err:
                 logger.debug(f"⚠️ [ML] Model yüklenemedi: {ml_err}")
                 if "ml_confidence" in signal_dict_for_logging:
