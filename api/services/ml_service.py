@@ -210,6 +210,7 @@ class MLService:
                     learning_rate=request.learning_rate,
                     subsample=0.8,
                     colsample_bytree=0.8,
+                    time_horizon=hz_val,
                     enable_auto_regularization=False
                 )
 
