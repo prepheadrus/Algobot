@@ -14,25 +14,27 @@ class SignalValidatorService:
         self.ml_models = ml_models_cache
         self.ml_enabled = True
 
-    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int, model_id: Optional[str] = None, direction: str = 'long') -> Tuple[bool, float, str, str]:
+    async def validate_signal_with_ml(self, symbol: str, timeframe: str, indicators: Dict[str, float], signal: int, model_id: Optional[str] = None, direction: str = 'long') -> Tuple[bool, float, str, str, bool]:
         """
         ML modeline danışarak mevcut sinyali onaylar veya reddeder.
 
         Returns:
-            Tuple[is_confirmed (bool), confidence (float), recommendation_original (str), recommendation_normalized (str)]
+            Tuple[is_confirmed (bool), confidence (float), recommendation_original (str), recommendation_normalized (str), has_model (bool)]
         """
         ml_confirmed = True
         ml_confidence = 0.0
         ml_rec = "HOLD"
         ml_rec_norm = "HOLD"
+        has_model = False
 
         ml_threshold = CONFIG.get('ml', {}).get('confidence_threshold', 0.65)
 
         if not self.ml_enabled:
-            return True, ml_confidence, ml_rec, ml_rec_norm
+            return True, ml_confidence, ml_rec, ml_rec_norm, has_model
 
         ml_data = await self._get_ml_confirmation(symbol, timeframe, direction, indicators, model_id)
         if ml_data:
+            has_model = True
             # inference_engine binary döndürüyor: 'prediction': 'LONG'/'SHORT' veya 'HOLD'
             ml_rec = ml_data.get('prediction', 'HOLD')
             ml_confidence = ml_data.get('confidence', 0.0)
@@ -55,7 +57,7 @@ class SignalValidatorService:
         else:
             logger.debug(f"ℹ️ {symbol} için aktif ML modeli bulunamadı, sadece teknik sinyal ile gidiliyor.")
 
-        return ml_confirmed, ml_confidence, ml_rec, ml_rec_norm
+        return ml_confirmed, ml_confidence, ml_rec, ml_rec_norm, has_model
 
     async def _get_ml_confirmation(self, symbol: str, timeframe: str, direction: str, indicators: Dict[str, float], model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         try:

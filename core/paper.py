@@ -278,11 +278,12 @@ class PaperTrader:
             ml_confidence = 0.0
             ml_rec = "HOLD"
             ml_rec_norm = "HOLD"
+            has_model = False
 
             if inference_direction:
                 # ML Doğrulaması: model_id bilinçli olarak None geçilir, sistem en güncel modeli kendi bulur
                 # Yeni Asimetrik Binary modele 'direction' da gönderiliyor
-                ml_confirmed, ml_confidence, ml_rec, ml_rec_norm = (
+                ml_confirmed, ml_confidence, ml_rec, ml_rec_norm, has_model = (
                     await self.signal_validator.validate_signal_with_ml(
                         symbol, timeframe, indicators, signal, model_id=None, direction=inference_direction
                     )
@@ -322,7 +323,7 @@ class PaperTrader:
             }
 
             # ML onayı yoksa dur - DETAYLI LOG
-            if not ml_confirmed:
+            if not ml_confirmed and has_model:
                 ml_threshold = CONFIG.get("ml", {}).get("confidence_threshold", 0.65)
                 logger.warning(f"❌ [SİNYAL RED] ML onayı yok: {symbol} {signal_type}")
                 logger.warning(
@@ -395,7 +396,7 @@ class PaperTrader:
                     )
 
             # 1. Önce Kaldıraç hesapla (Dinamik)
-            if self.ml_enabled and ml_confirmed:
+            if self.ml_enabled and ml_confirmed and has_model:
                 # ML Güven Skoruna Göre Dinamik Kaldıraç Hesapla
                 # TIMEFRAME-AWARE: 1m/3m gibi düşük TF'lerde kaldıraç otomatik sınırlandırılır
                 base_lev = CONFIG["risk_management"].get("default_leverage", 1.0)
