@@ -206,6 +206,11 @@ class StrategyIndicators:
         return TrendIndicators.psar(high, low, close, af0, af, max_af)
 
     @staticmethod
+    def ttm_squeeze(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """TTM Squeeze Indicator Wrapper"""
+        return VolatilityIndicators.ttm_squeeze(df['high'], df['low'], df['close'], **kwargs)
+
+    @staticmethod
     def supertrend(
         high: pd.Series,
         low: pd.Series,
@@ -765,6 +770,20 @@ class StrategyIndicators:
             df[f"CHOP_SIGNAL_{chop_period}"] = chop_df["chop_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] CHOP hesaplama hatasi: {e}")
+
+        # --- TTM SQUEEZE ---
+        try:
+            sqz_period = kwargs.get('sqz_period', 20)
+            sqz_bb_mult = kwargs.get('sqz_bb_mult', 2.0)
+            sqz_kc_mult = kwargs.get('sqz_kc_mult', 1.5)
+
+            sqz_df = StrategyIndicators.ttm_squeeze(
+                StrategyIndicators, df, period=sqz_period, bb_mult=sqz_bb_mult, kc_mult=sqz_kc_mult
+            )
+
+            df[f"TTM_SQUEEZE_{sqz_period}_{sqz_bb_mult:.1f}_{sqz_kc_mult:.1f}"] = sqz_df["squeeze_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] TTM Squeeze hesaplama hatası: {e}")
 
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
