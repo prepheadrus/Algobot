@@ -252,6 +252,16 @@ class StrategyIndicators:
         return MomentumIndicators.bulls_power(high, close, **kwargs)
 
     @staticmethod
+    def bear_power(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """Bear Power (Elder Ray Index)"""
+        return MomentumIndicators.bear_power(df['low'], df['close'], **kwargs)
+
+    @staticmethod
+    def cci(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """Commodity Channel Index"""
+        return MomentumIndicators.cci(df['high'], df['low'], df['close'], **kwargs)
+
+    @staticmethod
     def vader(
         high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
     ) -> pd.DataFrame:
@@ -655,6 +665,24 @@ class StrategyIndicators:
             ]
         except Exception as e:
             logger.warning(f"⚠️ [IND] Bulls Power hesaplama hatası: {e}")
+
+        # Bear Power (Elder Ray Index)
+        try:
+            bear_period = kwargs.get('bear_period', 13)
+            bear_df = StrategyIndicators.bear_power(StrategyIndicators, df, period=bear_period)
+            df[f"BEAR_POWER_{bear_period}"] = bear_df["bear_power"]
+            df[f"BEAR_POWER_SIGNAL_{bear_period}"] = bear_df["bear_power_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] Bear Power hesaplama hatası: {e}")
+
+        # CCI (Commodity Channel Index)
+        try:
+            cci_period = kwargs.get('cci_period', 20)
+            cci_df = StrategyIndicators.cci(StrategyIndicators, df, period=cci_period)
+            df[f"CCI_{cci_period}"] = cci_df["cci"]
+            df[f"CCI_SIGNAL_{cci_period}"] = cci_df["cci_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] CCI hesaplama hatası: {e}")
 
         # Vortex Indicator
         try:

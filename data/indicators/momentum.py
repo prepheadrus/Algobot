@@ -239,12 +239,40 @@ class MomentumIndicators:
         return ((series - series.shift(period)) / series.shift(period)) * 100
     
     @staticmethod
+    def bear_power(low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Bear Power (Elder Ray Index)
+
+        Args:
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (period vb.)
+
+        Returns:
+            bear_power ve bear_power_signal içeren DataFrame
+        """
+        period = kwargs.get('period', 13)
+
+        ema = close.ewm(span=period, adjust=False).mean()
+        bear_power = low - ema
+
+        # Sinyal Matrisi: bear_power < 0 ise 0 (SHORT), > 0 ise 2 (LONG), aksi halde 1 (BEKLE)
+        bear_power_signal = np.where(bear_power < 0, 0, np.where(bear_power > 0, 2, 1))
+
+        bear_power = bear_power.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        return pd.DataFrame({
+            'bear_power': bear_power,
+            'bear_power_signal': bear_power_signal
+        }, index=close.index)
+
+    @staticmethod
     def cci(
         high: pd.Series,
         low: pd.Series,
         close: pd.Series,
-        period: int = 20
-    ) -> pd.Series:
+        **kwargs
+    ) -> pd.DataFrame:
         """
         Commodity Channel Index
         
@@ -252,12 +280,30 @@ class MomentumIndicators:
             high: Yüksek fiyatlar
             low: Düşük fiyatlar
             close: Kapanış fiyatları
-            period: Periyot
+            **kwargs: Ek parametreler (period vb.)
         
         Returns:
-            CCI serisi
+            cci ve cci_signal içeren DataFrame
         """
-        tp = (high + low + close) / 3
-        sma = tp.rolling(period).mean()
-        mad = tp.rolling(period).apply(lambda x: np.abs(x - x.mean()).mean())
-        return (tp - sma) / (0.015 * mad)
+        period = kwargs.get('period', 20)
+
+        tp = (high + low + close) / 3.0
+        sma_tp = tp.rolling(window=period, min_periods=1).mean()
+
+        # raw=True ile NumPy C-Array seviyesine inerek performansı artırıyoruz ve Event-Loop bloklanmasını engelliyoruz
+        mad = tp.rolling(window=period, min_periods=1).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
+
+        # Sıfıra Bölünme Koruması
+        mad = mad.replace(0, np.nan)
+
+        cci_val = (tp - sma_tp) / (0.015 * mad)
+
+        # Sinyal Matrisi: CCI > 100 ise 0 (SHORT), CCI < -100 ise 2 (LONG), diğerleri 1
+        cci_signal = np.where(cci_val > 100, 0, np.where(cci_val < -100, 2, 1))
+
+        cci_val = cci_val.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        return pd.DataFrame({
+            'cci': cci_val,
+            'cci_signal': cci_signal
+        }, index=close.index)
