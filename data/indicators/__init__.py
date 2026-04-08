@@ -188,6 +188,11 @@ class StrategyIndicators:
         """Chande Momentum Oscillator (CMO)"""
         return MomentumIndicators.cmo(series, **kwargs)
 
+    @staticmethod
+    def bulls_power(high: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """Bulls Power (Elder Ray Index)"""
+        return MomentumIndicators.bulls_power(high, close, **kwargs)
+
     
     # ========================================================================
     # RESAMPLING
@@ -471,6 +476,15 @@ class StrategyIndicators:
             df[f'CMO_SIGNAL_{cmo_period}'] = cmo_df['cmo_signal']
         except Exception as e:
             logger.warning(f"⚠️ [IND] CMO hesaplama hatası: {e}")
+
+        # Bulls Power (Elder Ray Index)
+        try:
+            bulls_power_period = kwargs.get('bulls_power_period', 13)
+            bull_power_df = StrategyIndicators.bulls_power(df['high'], df['close'], period=bulls_power_period)
+            df[f'BULL_POWER_{bulls_power_period}'] = bull_power_df['bull_power']
+            df[f'BULL_POWER_SIGNAL_{bulls_power_period}'] = bull_power_df['bull_power_signal']
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] Bulls Power hesaplama hatası: {e}")
 
         # --- SMC / LIKIDITE ---
         try:
