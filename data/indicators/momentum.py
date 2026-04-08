@@ -16,6 +16,48 @@ class MomentumIndicators:
     """Momentum indikatörleri"""
     
     @staticmethod
+    def cmo(series: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Chande Momentum Oscillator (CMO)
+
+        CMO = 100 * (SumUp - SumDown) / (SumUp + SumDown)
+
+        Args:
+            series: Fiyat serisi (close)
+            **kwargs: Ek parametreler (period vb.)
+
+        Returns:
+            cmo ve cmo_signal içeren DataFrame
+        """
+        period = kwargs.get('period', 14)
+
+        # Farkları hesapla
+        diff = series.diff()
+
+        # Yukarı ve aşağı yönlü farklar
+        up = diff.clip(lower=0)
+        down = -1 * diff.clip(upper=0)
+
+        # Vektörize toplamlar
+        sum_up = up.rolling(window=period).sum()
+        sum_down = down.rolling(window=period).sum()
+
+        # Payda koruması (Sıfıra bölünme ve yatay piyasa kalkanı)
+        total_movement = (sum_up + sum_down).replace([np.inf, -np.inf, 0], np.nan)
+
+        # CMO hesaplaması ve NaN değerlerin sıfırlanması (warm-up bar kalkanı)
+        cmo = 100 * (sum_up - sum_down) / total_movement
+        cmo = cmo.fillna(0)
+
+        # Sinyal Matrisi
+        cmo_signal = np.where(cmo > 0, 2, np.where(cmo < 0, 0, 1))
+
+        return pd.DataFrame({
+            'cmo': cmo,
+            'cmo_signal': cmo_signal
+        }, index=series.index)
+
+    @staticmethod
     def rsi(series: pd.Series, length: int = 14) -> pd.Series:
         """
         Relative Strength Index

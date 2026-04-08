@@ -183,6 +183,11 @@ class StrategyIndicators:
         """Arnaud Legoux Moving Average (ALMA)"""
         return TrendIndicators.alma(series, **kwargs)
 
+    @staticmethod
+    def cmo(series: pd.Series, **kwargs) -> pd.DataFrame:
+        """Chande Momentum Oscillator (CMO)"""
+        return MomentumIndicators.cmo(series, **kwargs)
+
     
     # ========================================================================
     # RESAMPLING
@@ -457,6 +462,15 @@ class StrategyIndicators:
             df[f'ALMA_SIGNAL_{alma_window}'] = alma_df['alma_signal']
         except Exception as e:
             logger.warning(f"⚠️ [IND] ALMA hesaplama hatası: {e}")
+
+        # CMO (Chande Momentum Oscillator)
+        try:
+            cmo_period = kwargs.get('cmo_period', 14)
+            cmo_df = StrategyIndicators.cmo(df['close'], period=cmo_period)
+            df[f'CMO_{cmo_period}'] = cmo_df['cmo']
+            df[f'CMO_SIGNAL_{cmo_period}'] = cmo_df['cmo_signal']
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] CMO hesaplama hatası: {e}")
 
         # --- SMC / LIKIDITE ---
         try:
