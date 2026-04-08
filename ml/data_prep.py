@@ -289,6 +289,10 @@ def engineer_features(
         "synthetic_imbalance",
     ]
 
+    # Dinamik Sinyal Kolonlarını Otomatik Yakala (_SIGNAL_ içerenler)
+    signal_cols = [col for col in df.columns if "_SIGNAL_" in col]
+    target_features.extend(signal_cols)
+
     # Otomatik özellik kolonları seç (eğer belirtilmemişse)
     if feature_cols is None:
         # Sadece DataFrame'de var olan ve hesaplanabilen kolonları al
@@ -500,6 +504,10 @@ def prepare_ml_data(
         'KONKORDE_AZUL', 'KONKORDE_VERDE', 'ATR_14', 'liquidity_sweep',
         'synthetic_imbalance'
     ]
+
+    # Dinamik Sinyal Kolonlarını Ekle (_SIGNAL_ içerenler)
+    signal_cols = [col for col in df_processed.columns if "_SIGNAL_" in col]
+    allowed_features.extend(signal_cols)
 
     # DataFrame'de mevcut olanları seç
     cols_to_keep = [col for col in allowed_features if col in df_processed.columns]
