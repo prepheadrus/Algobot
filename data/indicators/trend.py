@@ -395,3 +395,65 @@ class TrendIndicators:
                     accel.iloc[i] = af0
         
         return psar, trend
+
+    @staticmethod
+    def vortex(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        Vortex Indicator (VI+ / VI-) - %100 Vektörize
+
+        Args:
+            high: Yüksek fiyatlar
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (period vb.)
+
+        Returns:
+            pd.DataFrame: 'vi_plus', 'vi_minus' ve 'vortex_signal' kolonlarını içerir.
+        """
+        # 1. Parametre Yönetimi (Auto-Grid Uyumlu)
+        period = kwargs.get('period', 14)
+
+        n = len(close)
+        if n < period:
+            return pd.DataFrame({
+                'vi_plus': np.full(n, 0.0),
+                'vi_minus': np.full(n, 0.0),
+                'vortex_signal': np.full(n, 1)
+            }, index=close.index)
+
+        # 2. %100 Vektörize İşlem ve Hızlı Gerçek Aralık (True Range)
+        tr = np.maximum(
+            high - low,
+            np.maximum(
+                np.abs(high - close.shift(1)),
+                np.abs(low - close.shift(1))
+            )
+        )
+
+        vmp = np.abs(high - low.shift(1))
+        vmm = np.abs(low - high.shift(1))
+
+        # 3. Yuvarlama (Rolling) ve Data Integrity Kalkanı
+        sum_tr = tr.rolling(window=period).sum().replace([np.inf, -np.inf, 0], np.nan)
+
+        vi_plus = (vmp.rolling(window=period).sum() / sum_tr).fillna(0)
+        vi_minus = (vmm.rolling(window=period).sum() / sum_tr).fillna(0)
+
+        # 4. Sinyal Matrisi Çıktısı (0, 1, 2)
+        vortex_signal = np.where(
+            vi_plus > vi_minus, 2,
+            np.where(vi_plus < vi_minus, 0, 1)
+        )
+
+        # 5. Sonuçların DataFrame'e Dönüştürülmesi
+        df = pd.DataFrame(index=close.index)
+        df['vi_plus'] = vi_plus
+        df['vi_minus'] = vi_minus
+        df['vortex_signal'] = vortex_signal
+
+        return df

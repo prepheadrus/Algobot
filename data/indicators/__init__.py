@@ -75,6 +75,11 @@ class StrategyIndicators:
     def sma(series: pd.Series, length: int) -> pd.Series:
         """Simple Moving Average"""
         return TrendIndicators.sma(series, length)
+
+    @staticmethod
+    def vortex(high: pd.Series, low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """Vortex Indicator"""
+        return TrendIndicators.vortex(high, low, close, **kwargs)
     
     @staticmethod
     def rsi(series: pd.Series, length: int = 14) -> pd.Series:
@@ -485,6 +490,16 @@ class StrategyIndicators:
             df[f'BULL_POWER_SIGNAL_{bulls_power_period}'] = bull_power_df['bull_power_signal']
         except Exception as e:
             logger.warning(f"⚠️ [IND] Bulls Power hesaplama hatası: {e}")
+
+        # Vortex Indicator
+        try:
+            vortex_period = kwargs.get('vortex_period', 14)
+            vortex_df = StrategyIndicators.vortex(df['high'], df['low'], df['close'], period=vortex_period)
+            df[f'VI_PLUS_{vortex_period}'] = vortex_df['vi_plus']
+            df[f'VI_MINUS_{vortex_period}'] = vortex_df['vi_minus']
+            df[f'VORTEX_SIGNAL_{vortex_period}'] = vortex_df['vortex_signal']
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] Vortex hesaplama hatası: {e}")
 
         # --- SMC / LIKIDITE ---
         try:
