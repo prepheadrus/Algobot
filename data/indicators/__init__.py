@@ -282,6 +282,13 @@ class StrategyIndicators:
     # RESAMPLING
     # ========================================================================
 
+    @classmethod
+    def chop(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """
+        Choppiness Index wrapper
+        """
+        return TrendIndicators.chop(high=df['high'], low=df['low'], close=df['close'], **kwargs)
+
     @staticmethod
     def resample_data(df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
         """
@@ -746,6 +753,19 @@ class StrategyIndicators:
             df[f"RWI_SIGNAL_{rwi_period}"] = rwi_df["rwi_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] RWI hesaplama hatası: {e}")
+
+        # --- CHOPPINESS INDEX (CHOP) ---
+        try:
+            chop_period = kwargs.get("chop_period", 14)
+            chop_df = StrategyIndicators.chop(
+                df, period=chop_period
+            )
+
+            df[f"CHOP_{chop_period}"] = chop_df["chop"]
+            df[f"CHOP_SIGNAL_{chop_period}"] = chop_df["chop_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] CHOP hesaplama hatasi: {e}")
+
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
         df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
