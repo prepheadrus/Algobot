@@ -299,6 +299,13 @@ class StrategyIndicators:
         """
         return TrendIndicators.chop(high=df['high'], low=df['low'], close=df['close'], **kwargs)
 
+    @classmethod
+    def di_spread(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """
+        Directional Indicator Spread (DI Spread) wrapper
+        """
+        return TrendIndicators.di_spread(high=df['high'], low=df['low'], close=df['close'], **kwargs)
+
     @staticmethod
     def resample_data(df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
         """
@@ -818,6 +825,20 @@ class StrategyIndicators:
             df[f"CHOP_SIGNAL_{chop_period}"] = chop_df["chop_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] CHOP hesaplama hatasi: {e}")
+
+        # --- DI SPREAD ---
+        try:
+            di_spread_period = kwargs.get("di_spread_period", 14)
+
+            di_spread_df = StrategyIndicators.di_spread(
+                df, period=di_spread_period
+            )
+
+            # Sadece spread ve spread_signal kolonlarını ekliyoruz ("Curse of Dimensionality" koruması)
+            df[f"DI_SPREAD_{di_spread_period}"] = di_spread_df["spread"]
+            df[f"DI_SPREAD_SIGNAL_{di_spread_period}"] = di_spread_df["spread_signal"]
+        except Exception as e:
+            logger.error(f"[INDICATOR ERROR] DI Spread calculation failed for period {di_spread_period}: {e}")
 
         # --- TTM SQUEEZE ---
         try:

@@ -589,3 +589,85 @@ class TrendIndicators:
             'chop': chop_val,
             'chop_signal': pd.Series(chop_signal, index=high.index)
         })
+
+    @staticmethod
+    def di_spread(high: pd.Series, low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Directional Indicator Spread (DI Spread)
+        XGBoost'un rejim tespiti için ADX'ten daha hızlı tepki veren bağımsız bir algoritma.
+        %100 Vektörize edilmiş ve Wilder's Smoothing kullanılarak optimize edilmiştir.
+
+        Args:
+            high (pd.Series): Yüksek fiyatlar
+            low (pd.Series): Düşük fiyatlar
+            close (pd.Series): Kapanış fiyatları
+            **kwargs:
+                period (int): Periyot (varsayılan: 14)
+                di_threshold_low (float): Bu değerin altındaysa trend ölüdür (varsayılan: 15.0)
+                di_threshold_high (float): Bu değerin üstündeyse trend güçlüdür (varsayılan: 25.0)
+
+        Returns:
+            pd.DataFrame: 'plus_di', 'minus_di', 'spread' ve 'spread_signal' kolonlarını içerir.
+        """
+        period = kwargs.get('period', 14)
+        threshold_low = kwargs.get('di_threshold_low', 15.0)
+        threshold_high = kwargs.get('di_threshold_high', 25.0)
+
+        # 1. Yönsel Hareket (Directional Movement)
+        up_move = high - high.shift(1)
+        down_move = low.shift(1) - low
+
+        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
+        # 2. True Range (TR) ve NaN Sızıntısı Koruması
+        # close.shift(1) NaN üreteceğinden ilk mumda NaN sızıntısını engelliyoruz
+        close_shifted = close.shift(1).fillna(close)
+
+        tr = np.maximum(
+            high - low,
+            np.maximum(
+                abs(high - close_shifted),
+                abs(low - close_shifted)
+            )
+        )
+        tr = tr.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # 3. Wilder's Smoothing (Sıfır Döngü, Pandas .ewm)
+        plus_dm_smooth = pd.Series(plus_dm, index=close.index).ewm(alpha=1/period, adjust=False).mean()
+        minus_dm_smooth = pd.Series(minus_dm, index=close.index).ewm(alpha=1/period, adjust=False).mean()
+        tr_smooth = tr.ewm(alpha=1/period, adjust=False).mean()
+
+        # 4. DI Hesaplaması ve Sıfıra Bölünme Kalkanı
+        tr_safe = tr_smooth.replace(0, np.nan)
+        plus_di = 100 * (plus_dm_smooth / tr_safe)
+        minus_di = 100 * (minus_dm_smooth / tr_safe)
+
+        # 5. DI Spread (Mutlak Mesafe)
+        spread = abs(plus_di - minus_di)
+
+        # 6. Veri Bütünlüğü Kalkanı (Data Integrity Shield)
+        spread = spread.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # 7. Sinyal Matrisi (0=CHOPPY, 1=NEUTRAL, 2=TRENDING)
+        spread_signal = np.where(
+            spread < threshold_low, 0,
+            np.where(spread > threshold_high, 2, 1)
+        )
+
+        spread_signal = pd.Series(spread_signal, index=close.index).fillna(1).astype(int)
+
+        # Warm-up periyodu (ilk `period` kadar bar) için sinyalleri Nötr (1) yapıyoruz
+        spread_signal.iloc[:period] = 1
+
+        # Sonuçların DataFrame'e dönüştürülmesi
+        # Single Responsibility gereği gelecekteki olası grafik/loglama ihtiyaçları için
+        # plus_di ve minus_di de döndürülüyor.
+        df = pd.DataFrame({
+            'plus_di': plus_di.replace([np.inf, -np.inf], np.nan).fillna(0.0),
+            'minus_di': minus_di.replace([np.inf, -np.inf], np.nan).fillna(0.0),
+            'spread': spread,
+            'spread_signal': spread_signal
+        }, index=close.index)
+
+        return df
