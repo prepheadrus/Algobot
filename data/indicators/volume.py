@@ -137,30 +137,37 @@ class VolumeIndicators:
         return df.replace([np.inf, -np.inf], np.nan).fillna(0)
 
     @staticmethod
-    def nvi(close: pd.Series, volume: pd.Series) -> pd.Series:
+    def nvi(close: pd.Series, volume: pd.Series, **kwargs) -> pd.DataFrame:
         """
-        Negative Volume Index
+        Negative Volume Index (Vectorized)
 
         Args:
             close: Kapanış fiyatları
             volume: Hacim
+            **kwargs: Ek parametreler (ema_period vs.)
 
         Returns:
-            NVI serisi
+            DataFrame: (nvi, nvi_ema, nvi_signal)
         """
-        nvi = np.zeros(len(close))
-        nvi[0] = 100.0
+        ema_period = kwargs.get("ema_period", 255)
 
-        for i in range(1, len(close)):
-            if volume.iloc[i] < volume.iloc[i - 1]:
-                ret = (close.iloc[i] - close.iloc[i - 1]) / (
-                    close.iloc[i - 1] if close.iloc[i - 1] != 0 else 1.0
-                )
-                nvi[i] = nvi[i - 1] + (ret * volume.iloc[i])
-            else:
-                nvi[i] = nvi[i - 1]
+        price_change = close.pct_change()
+        vol_decrease = volume < volume.shift(1)
+        nvi_pct = np.where(vol_decrease, price_change, 0)
 
-        return pd.Series(nvi, index=close.index)
+        nvi = 1000 * (1 + pd.Series(nvi_pct, index=close.index)).cumprod()
+
+        nvi_ema = nvi.ewm(span=ema_period, adjust=False).mean()
+
+        # Sinyal Matrisi: nvi > nvi_ema = 2 (LONG), nvi < nvi_ema = 0 (SHORT), eşit/NaN = 1 (BEKLE)
+        nvi_signal = np.where(nvi > nvi_ema, 2, np.where(nvi < nvi_ema, 0, 1))
+
+        df = pd.DataFrame(
+            {"nvi": nvi, "nvi_ema": nvi_ema, "nvi_signal": nvi_signal},
+            index=close.index,
+        )
+
+        return df.replace([np.inf, -np.inf], np.nan).fillna(0)
 
     @staticmethod
     def cmf(
