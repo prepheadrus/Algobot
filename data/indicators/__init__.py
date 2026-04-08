@@ -246,6 +246,13 @@ class StrategyIndicators:
         """Bulls Power (Elder Ray Index)"""
         return MomentumIndicators.bulls_power(high, close, **kwargs)
 
+    @staticmethod
+    def vader(
+        high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
+    ) -> pd.DataFrame:
+        """Volume Adjusted Directional Energy Ratio (VADER)"""
+        return VolumeIndicators.vader(high, low, close, volume, **kwargs)
+
     # ========================================================================
     # RESAMPLING
     # ========================================================================
@@ -535,6 +542,22 @@ class StrategyIndicators:
                 df["NVI"] = nvi_df["nvi"]
             except Exception as e:
                 logger.warning(f"⚠️ [IND] NVI hesaplama hatası: {e}")
+
+            try:
+                vader_period = kwargs.get("vader_period", 14)
+                vader_df = StrategyIndicators.vader(
+                    df["high"],
+                    df["low"],
+                    df["close"],
+                    df["volume"],
+                    vader_period=vader_period,
+                )
+
+                # Dinamik Atama
+                df[f"VADER_{vader_period}"] = vader_df["vader"]
+                df[f"VADER_SIGNAL_{vader_period}"] = vader_df["vader_signal"]
+            except Exception as e:
+                logger.warning(f"⚠️ [IND] VADER hesaplama hatası: {e}")
 
             # VWAP
             df["VWAP"] = VolumeIndicators.vwap(

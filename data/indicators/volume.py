@@ -257,3 +257,68 @@ class VolumeIndicators:
         box_ratio = volume / high_low
         eom = distance / box_ratio
         return eom.rolling(period).mean()
+
+    @staticmethod
+    def vader(
+        high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
+    ) -> pd.DataFrame:
+        """
+        Volume Adjusted Directional Energy Ratio (VADER)
+
+        Args:
+            high: Yüksek fiyatlar
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            volume: Hacim
+            **kwargs: Ek parametreler (vader_period vs.)
+
+        Returns:
+            DataFrame: (vader, vader_signal)
+        """
+        period = kwargs.get("vader_period", 14)
+
+        # 1. Yönsel Farklar (Directional Differences)
+        up = high.diff()
+        down = -1 * low.diff()
+
+        # 2. DM+ ve DM- İzolasyonu
+        dm_plus = np.where((up > down) & (up > 0), up, 0.0)
+        dm_minus = np.where((down > up) & (down > 0), down, 0.0)
+
+        # 3. True Range (TR) Hesaplaması
+        # Shift ile pre-computing yapıp np.maximum ile hızlandırıyoruz
+        prev_close = close.shift(1)
+        tr = np.maximum(
+            high - low, np.maximum(abs(high - prev_close), abs(low - prev_close))
+        )
+
+        # 4. Hacim Ayarlaması (Volume Adjustment) ve Index Koruması
+        vdm_plus = pd.Series(dm_plus * volume, index=high.index)
+        vdm_minus = pd.Series(dm_minus * volume, index=high.index)
+        vtr = pd.Series(tr * volume, index=high.index)
+
+        # 5. EMA ile Yumuşatma (Smoothing)
+        ema_vdm_plus = vdm_plus.ewm(span=period, adjust=False).mean()
+        ema_vdm_minus = vdm_minus.ewm(span=period, adjust=False).mean()
+        ema_vtr = vtr.ewm(span=period, adjust=False).mean()
+
+        # 6. Data Integrity Kalkanı (Division by Zero Koruması)
+        ema_vtr = ema_vtr.replace([np.inf, -np.inf, 0], np.nan)
+
+        # 7. VADER Formülü
+        vader_val = 100 * (ema_vdm_plus - ema_vdm_minus) / ema_vtr
+
+        # Nan ve Inifity'leri zırh ile temizle
+        vader_val = vader_val.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        # 8. Sinyal Matrisi
+        # vader > 0: 2 (LONG/BULL), vader < 0: 0 (SHORT/BEAR), vader == 0: 1 (NEUTRAL/HOLD)
+        vader_signal = np.where(vader_val > 0, 2, np.where(vader_val < 0, 0, 1))
+
+        # 9. DataFrame Çıktısı
+        df = pd.DataFrame(
+            {"vader": vader_val, "vader_signal": vader_signal},
+            index=high.index,
+        )
+
+        return df
