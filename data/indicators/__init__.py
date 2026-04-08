@@ -97,6 +97,11 @@ class StrategyIndicators:
         return VolatilityIndicators.atr(high, low, close, length)
 
     @staticmethod
+    def btc_vix(low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """BTC VIX (Synthetic Crypto Volatility Index)"""
+        return VolatilityIndicators.btc_vix(low, close, **kwargs)
+
+    @staticmethod
     def macd(
         series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
     ) -> tuple:
@@ -492,8 +497,24 @@ class StrategyIndicators:
         df["BBU_20_2.0"] = df["SMA_20"] + (2.0 * std_20)
         df["BBL_20_2.0"] = df["SMA_20"] - (2.0 * std_20)
 
-        # BTC VIX (Dinamik Volatilite)
-        df["BTC_VIX"] = VolatilityIndicators.btc_vix(df["close"])
+        # BTC VIX (Dinamik Volatilite - Williams VIX Fix)
+        try:
+            vix_period = kwargs.get("vix_period", 22)
+            vix_ema_period = kwargs.get("vix_ema_period", 20)
+
+            vix_df = StrategyIndicators.btc_vix(
+                df["low"], df["close"], period=vix_period, ema_period=vix_ema_period
+            )
+
+            # Dinamik Atama (WFO Arama Uzayı için)
+            df[f"BTC_VIX_{vix_period}"] = vix_df["btc_vix"]
+            df[f"BTC_VIX_EMA_{vix_period}"] = vix_df["vix_ema"]
+            df[f"BTC_VIX_SIGNAL_{vix_period}"] = vix_df["vix_signal"]
+
+            # Geriye Dönük Uyumluluk
+            df["BTC_VIX"] = vix_df["btc_vix"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] BTC_VIX hesaplama hatası: {e}")
 
         # --- VOLUME (Manuel) ---
         if "volume" in df.columns:

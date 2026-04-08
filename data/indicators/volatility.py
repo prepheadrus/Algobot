@@ -112,21 +112,49 @@ class VolatilityIndicators:
         return (close - lower) / (upper - lower)
     
     @staticmethod
-    def btc_vix(close: pd.Series, period: int = 20) -> pd.Series:
+    def btc_vix(low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
         """
-        BTC Volatility Index (VIX)
+        BTC Volatility Index (Synthetic Crypto VIX)
         
-        Formül: ta.stdev(math.log(close/close[1]), 20) * math.sqrt(365) * 100
+        Williams VIX Fix formülünün optimize edilmiş halidir. Fiyatın son N periyottaki
+        en yüksek kapanışından ne kadar saptığını ölçerek piyasadaki korkuyu (Fear) rakamsallaştırır.
         
         Args:
-            close: Kapanış fiyatları
-            period: Periyot
+            low: Düşük fiyatlar (pd.Series)
+            close: Kapanış fiyatları (pd.Series)
+            **kwargs: Ek parametreler
+                - period (int): VIX hesaplama periyodu (default: 22)
+                - ema_period (int): VIX EMA sinyal hattı periyodu (default: 20)
         
         Returns:
-            BTC VIX serisi
+            pd.DataFrame: 'btc_vix', 'vix_ema', 'vix_signal' (0=SHORT, 1=NEUTRAL, 2=LONG) sütunlarını içerir.
         """
-        log_ret = np.log(close / close.shift(1))
-        return log_ret.rolling(period).std() * np.sqrt(365) * 100
+        period = kwargs.get('period', 22)
+        ema_period = kwargs.get('ema_period', 20)
+
+        # 1. Williams VIX Fix Çekirdeği
+        highest_close = close.rolling(window=period).max()
+
+        # Sıfıra bölünmeyi önlemek için, highest_close sıfır olduğunda küçük bir epsilon ekliyoruz,
+        # ancak asıl koruma fillna(0) ile yapılıyor.
+        btc_vix = 100 * (highest_close - low) / highest_close
+
+        # Veri Bütünlüğü (Data Integrity) Kalkanı: overflow ve sıfıra bölünme hatalarını koru
+        btc_vix = btc_vix.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        # 2. Dinamik Sinyal Hattı
+        vix_ema = btc_vix.ewm(span=ema_period, adjust=False).mean()
+
+        # 3. Sinyal Matrisi (0: SHORT/Panik, 2: LONG/Güven, 1: Nötr)
+        # btc_vix > vix_ema -> Korku artıyor (Panik satışı, SHORT)
+        # btc_vix < vix_ema -> Piyasa sakinleşiyor (LONG onayı)
+        vix_signal = np.where(btc_vix > vix_ema, 0, np.where(btc_vix < vix_ema, 2, 1))
+
+        return pd.DataFrame({
+            'btc_vix': btc_vix,
+            'vix_ema': vix_ema,
+            'vix_signal': pd.Series(vix_signal, index=close.index)
+        })
     
     @staticmethod
     def keltner_channels(
