@@ -172,6 +172,12 @@ class StrategyIndicators:
     def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, multiplier: float = 3.0, period: int = 10) -> tuple:
         """SuperTrend"""
         return TrendIndicators.supertrend(high, low, close, multiplier, period)
+
+    @staticmethod
+    def kama(series: pd.Series, **kwargs) -> pd.DataFrame:
+        """Kaufman Adaptive Moving Average (KAMA)"""
+        return TrendIndicators.kama(series, **kwargs)
+
     
     # ========================================================================
     # RESAMPLING

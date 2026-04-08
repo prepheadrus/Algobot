@@ -16,6 +16,66 @@ import numpy as np
 
 class TrendIndicators:
     """Trend indikatörleri"""
+
+    @staticmethod
+    def kama(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Kaufman Adaptive Moving Average (KAMA)
+        pandas_ta KULLANILMADAN, saf Pandas/NumPy ile hesaplanmıştır.
+
+        Returns:
+            pd.DataFrame: 'kama' (float) ve 'kama_signal' (int: 0=SAT, 1=BEKLE, 2=AL) kolonlarını içerir.
+        """
+        # 1. Parametre Yönetimi ve Esneklik (Auto-Grid Uyumlu)
+        period = kwargs.get('period', 10)
+        fast_end = kwargs.get('fast_end', 2)
+        slow_end = kwargs.get('slow_end', 30)
+
+        n = len(close)
+        kama_vals = np.full(n, np.nan)
+
+        # Yetersiz veri kalkanı
+        if n < period:
+            return pd.DataFrame({'kama': kama_vals, 'kama_signal': 1}, index=close.index)
+
+        # 2. Vektörize Momentum ve Volatilite Hesaplamaları
+        change = np.abs(close.diff(period))
+        volatility = np.abs(close.diff()).rolling(window=period).sum()
+
+        # 3. Sıfıra Bölünme ve Veri Bütünlüğü Kalkanı
+        # Yatay piyasada volatilite 0 olabilir, inf/-inf oluşumunu engellemek için nan'a çeviriyoruz
+        volatility = volatility.replace([np.inf, -np.inf, 0], np.nan)
+
+        er = (change / volatility).fillna(0).to_numpy()
+        close_array = close.to_numpy()
+
+        # 4. Smoothing Constant (SSC) Vektörizasyonu
+        fast_sc = 2 / (fast_end + 1)
+        slow_sc = 2 / (slow_end + 1)
+        ssc = (er * (fast_sc - slow_sc) + slow_sc) ** 2
+
+        # 5. Özyinelemeli (Recursive) Adım - İterasyon Optimizasyonu
+        # Numba kullanılmıyorsa, Pandas .apply() yerine en hızlı yöntem önceden tahsis edilmiş NumPy dizisinde dönmektir.
+        kama_vals[period-1] = close_array[period-1]  # İlk değeri fiyata veya SMA'ya eşitle
+
+        for i in range(period, n):
+            kama_vals[i] = kama_vals[i-1] + ssc[i] * (close_array[i] - kama_vals[i-1])
+
+        # 6. Sonuçların DataFrame'e Dönüştürülmesi
+        df = pd.DataFrame(index=close.index)
+        df['kama'] = kama_vals
+
+        # 7. Vektörize Sinyal Matrisi (0=SHORT, 1=NEUTRAL, 2=LONG)
+        df['kama_signal'] = np.where(
+            close > df['kama'], 2,
+            np.where(close < df['kama'], 0, 1)
+        )
+
+        # Başlangıçtaki NaN periyotlar için sinyali nötralize et
+        df.loc[df['kama'].isna(), 'kama_signal'] = 1
+
+        return df
+
     
     @staticmethod
     def ema(series: pd.Series, length: int) -> pd.Series:
