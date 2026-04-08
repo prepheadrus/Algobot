@@ -157,6 +157,65 @@ class VolatilityIndicators:
         })
     
     @staticmethod
+    def ttm_squeeze(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        TTM Squeeze Indicator (Vectorized)
+
+        Measures the geometric intersection between Bollinger Bands and Keltner Channels
+        to identify periods of consolidation (squeeze) and momentum expansion (breakout).
+
+        Args:
+            high: Yüksek fiyatlar (pd.Series)
+            low: Düşük fiyatlar (pd.Series)
+            close: Kapanış fiyatları (pd.Series)
+            **kwargs: Optuna WFO arama uzayı için dinamik parametreler:
+                - period (int): Ortak periyot (default: 20)
+                - bb_mult (float): Bollinger Bands standart sapma çarpanı (default: 2.0)
+                - kc_mult (float): Keltner Channels ATR çarpanı (default: 1.5)
+
+        Returns:
+            pd.DataFrame: 'bb_upper', 'bb_lower', 'kc_upper', 'kc_lower', 'squeeze_signal' kolonları.
+                          squeeze_signal: 0 (Squeeze ON / Konsolidasyon), 2 (Squeeze OFF / Trend), 1 (Nötr).
+        """
+        period = kwargs.get('period', 20)
+        bb_mult = kwargs.get('bb_mult', 2.0)
+        kc_mult = kwargs.get('kc_mult', 1.5)
+
+        # 1. Ortak Orta Hat (Midline)
+        sma = close.rolling(window=period, min_periods=1).mean()
+
+        # 2. Bollinger Bantları (BB)
+        std = close.rolling(window=period, min_periods=1).std(ddof=0).fillna(0)
+        bb_upper = sma + (bb_mult * std)
+        bb_lower = sma - (bb_mult * std)
+
+        # 3. Keltner Kanalları (KC)
+        tr = np.maximum(high - low, np.maximum(abs(high - close.shift(1).fillna(close)), abs(low - close.shift(1).fillna(close))))
+        atr = tr.rolling(window=period, min_periods=1).mean().fillna(0)
+        kc_upper = sma + (kc_mult * atr)
+        kc_lower = sma - (kc_mult * atr)
+
+        # 4. Daralma (Squeeze) Mantığı ve Sinyal Matrisi
+        squeeze_on = (bb_upper < kc_upper) & (bb_lower > kc_lower)
+        squeeze_signal = np.where(squeeze_on, 0, 2)
+
+        # 5. Data Integrity Kalkanı
+        squeeze_signal = pd.Series(squeeze_signal, index=close.index).fillna(1).astype(int)
+
+        return pd.DataFrame({
+            'bb_upper': bb_upper,
+            'bb_lower': bb_lower,
+            'kc_upper': kc_upper,
+            'kc_lower': kc_lower,
+            'squeeze_signal': squeeze_signal
+        })
+
+    @staticmethod
     def keltner_channels(
         high: pd.Series,
         low: pd.Series,
