@@ -105,9 +105,9 @@ class AdvancedIndicators:
         from data.indicators.momentum import MomentumIndicators
         from data.indicators.volatility import VolatilityIndicators
         
-        # 1. PVI/NVI ve Hareketli Ortalamalar
-        pvi = VolumeIndicators.pvi(close, volume)
-        nvi = VolumeIndicators.nvi(close, volume)
+        # 1. PVI/NVI ve Hareketli Ortalamalar (Sütun İzolasyonu Hotfix)
+        pvi = VolumeIndicators.pvi(close, volume)['pvi']
+        nvi = VolumeIndicators.nvi(close, volume)['nvi']
         pvim = pvi.ewm(span=period, adjust=False).mean()
         nvim = nvi.ewm(span=period, adjust=False).mean()
         
