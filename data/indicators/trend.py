@@ -457,3 +457,85 @@ class TrendIndicators:
         df['vortex_signal'] = vortex_signal
 
         return df
+
+    @staticmethod
+    def rwi(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        Random Walk Index (RWI)
+        Piyasanın rastgele yürüyüşte (choppy) mi yoksa trendde mi olduğunu ölçer.
+
+        Args:
+            high: Yüksek fiyatlar
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (period vb.)
+
+        Returns:
+            pd.DataFrame: 'rwi_high', 'rwi_low' ve 'rwi_signal' kolonlarını içerir.
+        """
+        period = kwargs.get('period', 14)
+        n = len(close)
+
+        if n < period:
+            return pd.DataFrame({
+                'rwi_high': np.full(n, 0.0),
+                'rwi_low': np.full(n, 0.0),
+                'rwi_signal': np.full(n, 1)
+            }, index=close.index)
+
+        # 1. True Range (TR) Hesaplama
+        tr = np.maximum(
+            high - low,
+            np.maximum(
+                np.abs(high - close.shift(1)),
+                np.abs(low - close.shift(1))
+            )
+        )
+
+        rwi_high_list = []
+        rwi_low_list = []
+
+        # 2. Vektörize Matematiksel Çekirdek (C-Array Hızında)
+        for i in range(2, period + 1):
+            # Sıfıra Bölünme (Division by Zero) ve Data Integrity kalkanı
+            atr_i = tr.rolling(window=i, min_periods=1).mean().replace(0, np.nan)
+            denominator = atr_i * np.sqrt(i)
+
+            rwi_h = (high - low.shift(i)) / denominator
+            rwi_l = (high.shift(i) - low) / denominator
+
+            rwi_high_list.append(rwi_h)
+            rwi_low_list.append(rwi_l)
+
+        # Matris birleştirme ve maksimum ivmeyi bulma
+        rwi_high = pd.concat(rwi_high_list, axis=1).max(axis=1)
+        rwi_low = pd.concat(rwi_low_list, axis=1).max(axis=1)
+
+        # 3. Data Integrity (Veri Bütünlüğü) Kalkanı
+        rwi_high = rwi_high.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        rwi_low = rwi_low.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # 4. Sinyal Matrisi Çıktısı (0, 1, 2)
+        # RWI değeri 1'in altındaysa piyasa rastgele yürüyüştedir (Random Walk / Yatay).
+        # 1'in üzerindeyse trend vardır.
+        rwi_signal = np.where(
+            (rwi_high > 1) & (rwi_high > rwi_low), 2,
+            np.where(
+                (rwi_low > 1) & (rwi_low > rwi_high), 0, 1
+            )
+        )
+
+        # İlk periyotlardaki eksik veriler için sinyali nötralize et (1)
+        rwi_signal[:period] = 1
+
+        df = pd.DataFrame(index=close.index)
+        df['rwi_high'] = rwi_high
+        df['rwi_low'] = rwi_low
+        df['rwi_signal'] = rwi_signal
+
+        return df
