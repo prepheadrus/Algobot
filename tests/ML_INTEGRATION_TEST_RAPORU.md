@@ -1,6 +1,6 @@
 # 📊 ML INTEGRATION E2E TEST RAPORU
 
-**Tarih:** 2026-04-04 20:47:47
+**Tarih:** 2026-04-08 20:24:29
 **Test Suite:** `test_ml_integration.py`
 **Sistem:** CryptoAlgoBot v2026.03 - ML Entegrasyonu
 
@@ -129,5 +129,5 @@ Veritabanından 1000 mum çek → Model eğit → Mock Event fırlat → Log do�
 
 ---
 
-**Rapor Tarihi:** 2026-04-04 20:47:47
+**Rapor Tarihi:** 2026-04-08 20:24:29
 **Test Environment:** Windows 11, Python 3.12, Scikit-learn, XGBoost ✅

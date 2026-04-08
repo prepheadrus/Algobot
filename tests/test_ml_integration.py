@@ -146,7 +146,7 @@ class MLIntegrationTest:
 
             # 2. Triple Barrier uygula
             labeled_df = apply_triple_barrier(
-                test_df, tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
+                test_df, direction="long", tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
             )
 
             # 3. Etiket dağılımı
@@ -295,7 +295,7 @@ class MLIntegrationTest:
 
             # 2. Triple Barrier ile etiketle
             labeled_df = apply_triple_barrier(
-                mock_df, tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
+                mock_df, direction="long", tp_multiplier=2.0, sl_multiplier=2.0, time_horizon=10
             )
 
             # 3. Feature engineering
