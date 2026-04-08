@@ -272,6 +272,11 @@ class StrategyIndicators:
         return MomentumIndicators.cci(df['high'], df['low'], df['close'], **kwargs)
 
     @staticmethod
+    def trix(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """Triple Exponential Average (TRIX)"""
+        return MomentumIndicators.trix(df['close'], **kwargs)
+
+    @staticmethod
     def vader(
         high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
     ) -> pd.DataFrame:
@@ -714,6 +719,17 @@ class StrategyIndicators:
             ]
         except Exception as e:
             logger.warning(f"⚠️ [IND] Bulls Power hesaplama hatası: {e}")
+
+        # TRIX (Triple Exponential Average)
+        try:
+            trix_period = kwargs.get('trix_period', 18)
+            trix_signal_period = kwargs.get('trix_signal_period', 9)
+
+            trix_df = StrategyIndicators.trix(StrategyIndicators, df, period=trix_period, signal_period=trix_signal_period)
+            df[f"TRIX_{trix_period}_{trix_signal_period}"] = trix_df["trix_val"]
+            df[f"TRIX_SIGNAL_{trix_period}_{trix_signal_period}"] = trix_df["trix_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] TRIX hesaplama hatası: {e}")
 
         # Bear Power (Elder Ray Index)
         try:

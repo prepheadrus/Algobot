@@ -4,6 +4,54 @@ import numpy as np
 from data.indicators.momentum import MomentumIndicators
 from data.indicators import StrategyIndicators
 
+def test_trix_basic_calculation():
+    """
+    Test TRIX calculation returns valid dataframe containing 'trix_val' and 'trix_signal'
+    """
+    np.random.seed(42)
+    dates = pd.date_range("2023-01-01", periods=50, freq="D")
+
+    df = pd.DataFrame(
+        {
+            "close": np.linspace(95, 145, 50) + np.random.normal(0, 2, 50),
+        },
+        index=dates,
+    )
+
+    result_df = MomentumIndicators.trix(df["close"], period=18, signal_period=9)
+
+    assert isinstance(result_df, pd.DataFrame), "Output must be a DataFrame"
+    assert "trix_val" in result_df.columns, "Output must contain 'trix_val'"
+    assert "trix_signal" in result_df.columns, "Output must contain 'trix_signal'"
+
+    # Check that signals are mapped to 0, 1, 2
+    assert set(result_df["trix_signal"].dropna().unique()).issubset({0, 1, 2})
+
+def test_trix_flat_market_protection():
+    """
+    Test TRIX zero-division protection in case of completely flat market (pct_change yields inf/nan)
+    """
+    dates = pd.date_range("2023-01-01", periods=30, freq="D")
+
+    df = pd.DataFrame(
+        {
+            "close": [100.0] * 30,
+        },
+        index=dates,
+    )
+
+    result_df = MomentumIndicators.trix(df["close"], period=18, signal_period=9)
+
+    assert not result_df["trix_val"].isna().any(), "trix_val should not have NaNs"
+    assert not np.isinf(result_df["trix_val"]).any(), "trix_val should not have infinities"
+
+    # In a flat market, pct_change will be 0 or NaN, and our shield (replace inf -> nan -> fillna 0.0)
+    # should ensure exactly 0.0 momentum
+    assert (result_df["trix_val"] == 0.0).all(), "Zero-division should fallback to 0.0 for TRIX"
+    # The signal will be 2 (because trix_val >= trix_sma, which is 0.0 == 0.0) or 1 depending on where condition.
+    # Since we used np.where(trix_val > trix_sma, 2, np.where(trix_val < trix_sma, 0, 1)), it evaluates to 1
+    assert (result_df["trix_signal"] == 1).all(), "Flat market should yield neutral/1 signal"
+
 def test_ultimate_oscillator_basic_calculation():
     """
     Test UO calculation returns valid dataframe containing 'uo_val' and 'uo_signal'
