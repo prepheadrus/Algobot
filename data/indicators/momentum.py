@@ -58,6 +58,40 @@ class MomentumIndicators:
         }, index=series.index)
 
     @staticmethod
+    def bulls_power(high: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Bulls Power (Elder Ray Index)
+
+        Bulls Power = High - EMA(Close, period)
+
+        Args:
+            high: Yüksek fiyatlar
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (period vb.)
+
+        Returns:
+            bull_power ve bull_power_signal içeren DataFrame
+        """
+        period = kwargs.get('period', 13)
+
+        # 100% Vektörize EMA hesabı
+        ema = close.ewm(span=period, adjust=False).mean()
+
+        # Bulls Power
+        bull_power = high - ema
+
+        # Data Integrity Kalkanı
+        bull_power = bull_power.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        # Sinyal Matrisi Çıktısı (0, 1, 2)
+        bull_power_signal = np.where(bull_power > 0, 2, np.where(bull_power < 0, 0, 1))
+
+        return pd.DataFrame({
+            'bull_power': bull_power,
+            'bull_power_signal': bull_power_signal
+        }, index=close.index)
+
+    @staticmethod
     def rsi(series: pd.Series, length: int = 14) -> pd.Series:
         """
         Relative Strength Index
