@@ -6,15 +6,15 @@ Geriye dönük uyumluluk için StrategyIndicators sınıfını sağlar.
 
 Usage:
     from data.indicators import StrategyIndicators
-    
+
     # Eski kullanım hala çalışır
     df = StrategyIndicators.add_all_indicators(df)
     df['EMA_20'] = StrategyIndicators.ema(df['close'], 20)
-    
+
     # Yeni modüler kullanım
     from data.indicators.trend import TrendIndicators
     from data.indicators.momentum import MomentumIndicators
-    
+
     df['EMA_20'] = TrendIndicators.ema(df['close'], 20)
     df['RSI_14'] = MomentumIndicators.rsi(df['close'], 14)
 """
@@ -34,7 +34,7 @@ from data.indicators.advanced import AdvancedIndicators
 # Set global pandas option to avoid FutureWarning on downcasting object dtype arrays
 # E402 (Module level import not at top of file) is silenced intentionally,
 # or we move `set_option` after all imports
-pd.set_option('future.no_silent_downcasting', True)
+pd.set_option("future.no_silent_downcasting", True)
 
 # TA-Lib ve pandas-ta bağımlılıkları SKILL.md gereği kaldırıldı.
 # Tüm hesaplamalar manuel (numpy/pandas) sınıflar üzerinden yapılır.
@@ -53,66 +53,88 @@ logger.info("🎉 [MİMARİ] Faz 4 Tamamlandı: İndikatör Kütüphanesi 5 Mod�
 # STRATEGY INDICATORS CLASS (Facade Pattern - Geriye Dönük Uyumluluk)
 # ============================================================================
 
+
 class StrategyIndicators:
     """
     Facade class for backward compatibility.
-    
+
     Eski kodların çalışmaya devam etmesi için tüm indikatör
     metodlarını bu sınıfta topluyoruz. Arka planda alt modülleri
     kullanır.
     """
-    
+
     # ========================================================================
     # BASIC INDICATORS (Wrapper methods)
     # ========================================================================
-    
+
     @staticmethod
     def ema(series: pd.Series, length: int) -> pd.Series:
         """Exponential Moving Average"""
         return TrendIndicators.ema(series, length)
-    
+
     @staticmethod
     def sma(series: pd.Series, length: int) -> pd.Series:
         """Simple Moving Average"""
         return TrendIndicators.sma(series, length)
 
     @staticmethod
-    def vortex(high: pd.Series, low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+    def vortex(
+        high: pd.Series, low: pd.Series, close: pd.Series, **kwargs
+    ) -> pd.DataFrame:
         """Vortex Indicator"""
         return TrendIndicators.vortex(high, low, close, **kwargs)
-    
+
     @staticmethod
     def rsi(series: pd.Series, length: int = 14) -> pd.Series:
         """RSI"""
         return MomentumIndicators.rsi(series, length)
-    
+
     @staticmethod
-    def atr(high: pd.Series, low: pd.Series, close: pd.Series, length: int = 14) -> pd.Series:
+    def atr(
+        high: pd.Series, low: pd.Series, close: pd.Series, length: int = 14
+    ) -> pd.Series:
         """ATR"""
         return VolatilityIndicators.atr(high, low, close, length)
-    
+
     @staticmethod
-    def macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple:
+    def macd(
+        series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+    ) -> tuple:
         """MACD"""
         return MomentumIndicators.macd(series, fast, slow, signal)
-    
+
     @staticmethod
     def bollinger_bands(series: pd.Series, length: int = 20, std: float = 2) -> tuple:
         """Bollinger Bands"""
         return VolatilityIndicators.bollinger_bands(series, length, std)
-    
+
     @staticmethod
-    def vwap(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series) -> pd.Series:
+    def vwap(
+        high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series
+    ) -> pd.Series:
         """VWAP"""
         return VolumeIndicators.vwap(high, low, close, volume)
-    
+
     @staticmethod
-    def mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, period: int = 14) -> pd.Series:
+    def mfi(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        volume: pd.Series,
+        period: int = 14,
+    ) -> pd.Series:
         """MFI"""
         return VolumeIndicators.mfi(high, low, close, volume, period)
-    
+
     @staticmethod
-    def uo(high: pd.Series, low: pd.Series, close: pd.Series, fast: int = 7, medium: int = 14, slow: int = 28) -> pd.Series:
+    def uo(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        fast: int = 7,
+        medium: int = 14,
+        slow: int = 28,
+    ) -> pd.Series:
         """Ultimate Oscillator"""
         return MomentumIndicators.uo(high, low, close, fast, medium, slow)
 
@@ -122,9 +144,7 @@ class StrategyIndicators:
 
     @staticmethod
     def apply_kalman(
-        prices: pd.Series,
-        process_noise: float = 0.001,
-        measurement_noise: float = 0.1
+        prices: pd.Series, process_noise: float = 0.001, measurement_noise: float = 0.1
     ) -> pd.Series:
         """
         Kalman Filtresi ile fiyat gürültüsünü azalt.
@@ -166,17 +186,40 @@ class StrategyIndicators:
 
             filtered_prices.append(x)
 
-        return pd.Series(filtered_prices, index=prices.index, name='smoothed_close')
-    
+        return pd.Series(filtered_prices, index=prices.index, name="smoothed_close")
+
     @staticmethod
-    def psar(high: pd.Series, low: pd.Series, close: pd.Series = None, af0: float = 0.02, af: float = 0.02, max_af: float = 0.2) -> tuple:
+    def psar(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series = None,
+        af0: float = 0.02,
+        af: float = 0.02,
+        max_af: float = 0.2,
+    ) -> tuple:
         """Parabolic SAR"""
         return TrendIndicators.psar(high, low, close, af0, af, max_af)
-    
+
     @staticmethod
-    def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, multiplier: float = 3.0, period: int = 10) -> tuple:
+    def supertrend(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        multiplier: float = 3.0,
+        period: int = 10,
+    ) -> tuple:
         """SuperTrend"""
         return TrendIndicators.supertrend(high, low, close, multiplier, period)
+
+    @staticmethod
+    def pvi(close: pd.Series, volume: pd.Series, **kwargs) -> pd.DataFrame:
+        """Positive Volume Index (Vectorized)"""
+        return VolumeIndicators.pvi(close, volume, **kwargs)
+
+    @staticmethod
+    def obv_ema(close: pd.Series, volume: pd.Series, **kwargs) -> pd.DataFrame:
+        """On-Balance Volume + EMA (Vectorized)"""
+        return VolumeIndicators.obv_ema(close, volume, **kwargs)
 
     @staticmethod
     def kama(series: pd.Series, **kwargs) -> pd.DataFrame:
@@ -198,11 +241,10 @@ class StrategyIndicators:
         """Bulls Power (Elder Ray Index)"""
         return MomentumIndicators.bulls_power(high, close, **kwargs)
 
-    
     # ========================================================================
     # RESAMPLING
     # ========================================================================
-    
+
     @staticmethod
     def resample_data(df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
         """
@@ -220,27 +262,27 @@ class StrategyIndicators:
             return df
 
         # Zaman damgasını index yap
-        if 'timestamp' in df.columns:
-            if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
-            df.set_index('timestamp', inplace=True)
+        if "timestamp" in df.columns:
+            if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+            df.set_index("timestamp", inplace=True)
 
         # Resample kuralları
         logic = {
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume": "sum",
         }
 
         # Pandas resample formatına çevir
-        if timeframe.endswith('m'):
-            rule = timeframe.replace('m', 'min')
-        elif timeframe.endswith('h'):
-            rule = timeframe.replace('h', 'h')
-        elif timeframe.endswith('d'):
-            rule = timeframe.replace('d', 'D')
+        if timeframe.endswith("m"):
+            rule = timeframe.replace("m", "min")
+        elif timeframe.endswith("h"):
+            rule = timeframe.replace("h", "h")
+        elif timeframe.endswith("d"):
+            rule = timeframe.replace("d", "D")
         else:
             rule = timeframe
 
@@ -252,38 +294,42 @@ class StrategyIndicators:
         # Bu sayede son (henüz kapanmamış) mum geleceği göstermez
         # ========================================================================
         # .apply() yerine .agg() kullanımı (C düzeyinde vektörize ve optimize)
-        resampled_df = df.resample(rule, closed='left', label='left').agg(logic)
+        resampled_df = df.resample(rule, closed="left", label="left").agg(logic)
 
         # Eksik mumları doldur (inplace kopyalamayı ve warning'leri engellemek için doğrudan atama kullan)
-        if 'volume' in resampled_df.columns:
-            resampled_df['volume'] = resampled_df['volume'].fillna(0)
+        if "volume" in resampled_df.columns:
+            resampled_df["volume"] = resampled_df["volume"].fillna(0)
         resampled_df = resampled_df.ffill()
 
         # ========================================================================
         # [TZ FIX] Index timezone-aware yap (UTC)
         # ========================================================================
         if resampled_df.index.tzinfo is None:
-            resampled_df.index = resampled_df.index.tz_localize('UTC')
+            resampled_df.index = resampled_df.index.tz_localize("UTC")
         else:
-            resampled_df.index = resampled_df.index.tz_convert('UTC')
+            resampled_df.index = resampled_df.index.tz_convert("UTC")
 
         # ========================================================================
         # GELECEK MUM KORUMASI (Son mum henüz kapanmadıysa düşür)
         # ========================================================================
-        now_utc = pd.Timestamp.now(tz='UTC')
+        now_utc = pd.Timestamp.now(tz="UTC")
 
         # Son mumun kapanış zamanını kontrol et
         last_mum_time = resampled_df.index[-1]
 
         # Eğer son mum gelecekteyse (henüz kapanmadıysa) düşür
         if last_mum_time > now_utc:
-            logger.debug(f"⚠️ [RESAMPLE] Son mum henüz kapanmadı ({last_mum_time} > {now_utc}), düşürülüyor")
+            logger.debug(
+                f"⚠️ [RESAMPLE] Son mum henüz kapanmadı ({last_mum_time} > {now_utc}), düşürülüyor"
+            )
             resampled_df = resampled_df.iloc[:-1]  # Son mumu düşür
 
         # Alternatif: Son 1 dakika içinde kapanmış mumları da düşür (güvenlik)
         time_since_last_mum = now_utc - last_mum_time
         if time_since_last_mum.total_seconds() < 60:  # 1 dakikadan az
-            logger.debug("⚠️ [RESAMPLE] Son mum 1 dakika önce kapandı, güvenlik için düşürülüyor")
+            logger.debug(
+                "⚠️ [RESAMPLE] Son mum 1 dakika önce kapandı, güvenlik için düşürülüyor"
+            )
             resampled_df = resampled_df.iloc[:-1]
 
         # ========================================================================
@@ -296,13 +342,15 @@ class StrategyIndicators:
         # ÖNEMLİ: reset_index KALDIRILDI!
         # ML servisi ve Data servisi index'in DatetimeIndex olmasını bekliyor
         return resampled_df
-    
+
     # ========================================================================
     # ADD ALL INDICATORS (Monolithic method - geriye dönük uyumluluk)
     # ========================================================================
-    
+
     @staticmethod
-    def add_all_indicators(df: pd.DataFrame, apply_kalman_from_config: bool = True, **kwargs) -> pd.DataFrame:
+    def add_all_indicators(
+        df: pd.DataFrame, apply_kalman_from_config: bool = True, **kwargs
+    ) -> pd.DataFrame:
         """
         Tüm indikatörleri hesapla (SKILL.md / Faz 4 Manuel Hesaplama).
         YENİ: Plug & Play Kalman Filtresi desteği.
@@ -319,29 +367,29 @@ class StrategyIndicators:
             return df
 
         # Veri kalitesini garanti altına al
-        for col in ['open', 'high', 'low', 'close', 'volume']:
+        for col in ["open", "high", "low", "close", "volume"]:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').astype(float)
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
 
         # VWAP için DatetimeIndex şart
-        if 'timestamp' in df.columns:
-            if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('timestamp', inplace=True, drop=False)
+        if "timestamp" in df.columns:
+            if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            df.set_index("timestamp", inplace=True, drop=False)
 
         # Null'ları temizle
         df.ffill(inplace=True)
         df.bfill(inplace=True)
 
-        if df['close'].isnull().any():
+        if df["close"].isnull().any():
             df.fillna(0, inplace=True)
 
         # --- TREND (Manuel) ---
-        df['EMA_5'] = TrendIndicators.ema(df['close'], 5)
-        df['EMA_13'] = TrendIndicators.ema(df['close'], 13)
-        df['SMA_20'] = TrendIndicators.sma(df['close'], 20)
-        df['EMA_50'] = TrendIndicators.ema(df['close'], 50)
-        df['EMA_200'] = TrendIndicators.ema(df['close'], 200)
+        df["EMA_5"] = TrendIndicators.ema(df["close"], 5)
+        df["EMA_13"] = TrendIndicators.ema(df["close"], 13)
+        df["SMA_20"] = TrendIndicators.sma(df["close"], 20)
+        df["EMA_50"] = TrendIndicators.ema(df["close"], 50)
+        df["EMA_200"] = TrendIndicators.ema(df["close"], 200)
 
         # ========================================================================
         # KALMAN FİLTRESİ (Plug & Play) - LOGARİTMİK SÖNÜMLEMELİ
@@ -349,26 +397,29 @@ class StrategyIndicators:
         if apply_kalman_from_config:
             try:
                 from core.config import CONFIG
-                kalman_config = CONFIG.get('kalman_smoothing', {})
 
-                if kalman_config.get('enabled', False):
-                    process_noise = kalman_config.get('process_noise', 0.001)
-                    measurement_noise = kalman_config.get('measurement_noise', 0.1)
+                kalman_config = CONFIG.get("kalman_smoothing", {})
+
+                if kalman_config.get("enabled", False):
+                    process_noise = kalman_config.get("process_noise", 0.001)
+                    measurement_noise = kalman_config.get("measurement_noise", 0.1)
 
                     # YENİ: Logaritmik sönümlemeli dinamik Kalman Filter
                     # high, low, close ile ATR hesaplayarak dinamik beta
-                    df['smoothed_close'] = TrendIndicators.kalman_filter(
-                        src=df['close'],
-                        high=df['high'],
-                        low=df['low'],
-                        close=df['close'],
+                    df["smoothed_close"] = TrendIndicators.kalman_filter(
+                        src=df["close"],
+                        high=df["high"],
+                        low=df["low"],
+                        close=df["close"],
                         alpha=process_noise,
                         beta=measurement_noise,
-                        use_dynamic_beta=True  # ATR bazlı dinamik beta
+                        use_dynamic_beta=True,  # ATR bazlı dinamik beta
                     )
 
                     # Log mesajı
-                    logger.info(f"[KALMAN] Dampened Kalman & Triple Barrier Hazır | Q={process_noise}, R={measurement_noise}")
+                    logger.info(
+                        f"[KALMAN] Dampened Kalman & Triple Barrier Hazır | Q={process_noise}, R={measurement_noise}"
+                    )
 
                     # Stratejiler için close fiyatını smoothed_close olarak ayarla
                     # NOT: Orijinal 'close' korunur, stratejiler 'smoothed_close' kullanabilir
@@ -376,148 +427,196 @@ class StrategyIndicators:
                     logger.debug("[KALMAN] Filtre devre dışı (config'den)")
             except Exception as e:
                 logger.warning(f"[KALMAN] Filtre uygulanamadı: {e}")
-                df['smoothed_close'] = df['close']  # Fallback
+                df["smoothed_close"] = df["close"]  # Fallback
         else:
-            df['smoothed_close'] = df['close']
-        
+            df["smoothed_close"] = df["close"]
+
         # Supertrend
-        st, direction = TrendIndicators.supertrend(df['high'], df['low'], df['close'], 3.0, 10)
-        df['SUPERTREND'] = st
-        df['SUPERTREND_DIR'] = direction
-        
+        st, direction = TrendIndicators.supertrend(
+            df["high"], df["low"], df["close"], 3.0, 10
+        )
+        df["SUPERTREND"] = st
+        df["SUPERTREND_DIR"] = direction
+
         # EWO (Elliott Wave Oscillator)
-        df['EWO'] = AdvancedIndicators.ewo(df['close'])
-        
+        df["EWO"] = AdvancedIndicators.ewo(df["close"])
+
         # --- MOMENTUM (Manuel) ---
-        df['RSI_14'] = MomentumIndicators.rsi(df['close'], 14)
-        df['ROC_10'] = MomentumIndicators.roc(df['close'], 10)
-        
+        df["RSI_14"] = MomentumIndicators.rsi(df["close"], 14)
+        df["ROC_10"] = MomentumIndicators.roc(df["close"], 10)
+
         # MACD (Manuel Unpack)
-        macd_line, signal_line, hist = MomentumIndicators.macd(df['close'], fast=12, slow=26, signal=9)
-        df['MACD_12_26_9'] = macd_line
-        df['MACDs_12_26_9'] = signal_line
-        df['MACDh_12_26_9'] = hist
-        
+        macd_line, signal_line, hist = MomentumIndicators.macd(
+            df["close"], fast=12, slow=26, signal=9
+        )
+        df["MACD_12_26_9"] = macd_line
+        df["MACDs_12_26_9"] = signal_line
+        df["MACDh_12_26_9"] = hist
+
         # Stochastic
-        stoch_k, stoch_d = MomentumIndicators.stochastic(df['high'], df['low'], df['close'], 14, 3)
-        df['STOCH_K_14_3_3'] = stoch_k
-        df['STOCH_D_14_3_3'] = stoch_d
-        
+        stoch_k, stoch_d = MomentumIndicators.stochastic(
+            df["high"], df["low"], df["close"], 14, 3
+        )
+        df["STOCH_K_14_3_3"] = stoch_k
+        df["STOCH_D_14_3_3"] = stoch_d
+
         # UO (Ultimate Oscillator)
-        df['UO'] = MomentumIndicators.uo(df['high'], df['low'], df['close'], 7, 14, 28)
-        
+        df["UO"] = MomentumIndicators.uo(df["high"], df["low"], df["close"], 7, 14, 28)
+
         # --- VOLATILITY (Manuel) ---
-        df['ATR_14'] = VolatilityIndicators.atr(df['high'], df['low'], df['close'], 14)
-        
+        df["ATR_14"] = VolatilityIndicators.atr(df["high"], df["low"], df["close"], 14)
+
         # Bollinger Bands
-        upper, middle, lower = VolatilityIndicators.bollinger_bands(df['close'], length=20, std=2)
-        df['BBU_20_2.0_2.0'] = upper
-        df['BBM_20_2.0_2.0'] = middle
-        df['BBL_20_2.0_2.0'] = lower
-        
+        upper, middle, lower = VolatilityIndicators.bollinger_bands(
+            df["close"], length=20, std=2
+        )
+        df["BBU_20_2.0_2.0"] = upper
+        df["BBM_20_2.0_2.0"] = middle
+        df["BBL_20_2.0_2.0"] = lower
+
         # Market Regime Detector (Faz 1) için gerekli Bollinger Bantları ve SMA
-        df['SMA_20'] = df['close'].rolling(window=20).mean()
-        std_20 = df['close'].rolling(window=20).std()
-        df['BBU_20_2.0'] = df['SMA_20'] + (2.0 * std_20)
-        df['BBL_20_2.0'] = df['SMA_20'] - (2.0 * std_20)
+        df["SMA_20"] = df["close"].rolling(window=20).mean()
+        std_20 = df["close"].rolling(window=20).std()
+        df["BBU_20_2.0"] = df["SMA_20"] + (2.0 * std_20)
+        df["BBL_20_2.0"] = df["SMA_20"] - (2.0 * std_20)
 
         # BTC VIX (Dinamik Volatilite)
-        df['BTC_VIX'] = VolatilityIndicators.btc_vix(df['close'])
-        
+        df["BTC_VIX"] = VolatilityIndicators.btc_vix(df["close"])
+
         # --- VOLUME (Manuel) ---
-        if 'volume' in df.columns:
-            # OBV
-            df['OBV'] = VolumeIndicators.obv(df['close'], df['volume'])
-            df['OBV_EMA'] = df['OBV'].ewm(span=10, adjust=False).mean()
-            
+        if "volume" in df.columns:
+            try:
+                obv_ema_period = kwargs.get("obv_ema_period", 21)
+                obv_df = StrategyIndicators.obv_ema(
+                    df["close"], df["volume"], ema_period=obv_ema_period
+                )
+
+                # Dinamik Atama
+                df[f"OBV_{obv_ema_period}"] = obv_df["obv"]
+                df[f"OBV_EMA_{obv_ema_period}"] = obv_df["obv_ema"]
+                df[f"OBV_SIGNAL_{obv_ema_period}"] = obv_df["obv_signal"]
+
+                # Backward Compatibility (Legacy Alias)
+                df["OBV"] = obv_df["obv"]
+                df["OBV_EMA"] = obv_df["obv_ema"]
+            except Exception as e:
+                logger.warning(f"⚠️ [IND] OBV_EMA hesaplama hatası: {e}")
+
+            try:
+                pvi_ema_period = kwargs.get("pvi_ema_period", 255)
+                pvi_df = StrategyIndicators.pvi(
+                    df["close"], df["volume"], ema_period=pvi_ema_period
+                )
+
+                # Dinamik Atama
+                df[f"PVI_{pvi_ema_period}"] = pvi_df["pvi"]
+                df[f"PVI_EMA_{pvi_ema_period}"] = pvi_df["pvi_ema"]
+                df[f"PVI_SIGNAL_{pvi_ema_period}"] = pvi_df["pvi_signal"]
+            except Exception as e:
+                logger.warning(f"⚠️ [IND] PVI hesaplama hatası: {e}")
+
             # VWAP
-            df['VWAP'] = VolumeIndicators.vwap(df['high'], df['low'], df['close'], df['volume'])
-        
+            df["VWAP"] = VolumeIndicators.vwap(
+                df["high"], df["low"], df["close"], df["volume"]
+            )
+
         # --- KONKORDE (Gelişmiş) ---
-        if 'volume' in df.columns and len(df) > 1:
+        if "volume" in df.columns and len(df) > 1:
             try:
                 koncorde = AdvancedIndicators.calculate_koncorde(
-                    df['close'], df['high'], df['low'], df['volume'], 15
+                    df["close"], df["high"], df["low"], df["volume"], 15
                 )
-                df['PVI'] = koncorde['pvi']
-                df['NVI'] = koncorde['nvi']
-                df['PVIM'] = koncorde['pvim']
-                df['NVIM'] = koncorde['nvim']
-                df['KONKORDE_AZUL'] = koncorde['azul']
-                df['KONKORDE_VERDE'] = koncorde['verde']
-                df['KONKORDE_MARRON'] = koncorde['marron']
+                df["PVI"] = koncorde["pvi"]
+                df["NVI"] = koncorde["nvi"]
+                df["PVIM"] = koncorde["pvim"]
+                df["NVIM"] = koncorde["nvim"]
+                df["KONKORDE_AZUL"] = koncorde["azul"]
+                df["KONKORDE_VERDE"] = koncorde["verde"]
+                df["KONKORDE_MARRON"] = koncorde["marron"]
             except Exception as e:
                 logger.warning(f"⚠️ [IND] Koncorde hesaplama hatası: {e}")
-        
+
         # --- TREND ADVANCED ---
         # ADX
-        adx, plus_di, minus_di = TrendIndicators.adx(df['high'], df['low'], df['close'], 14)
-        df['ADX_14'] = adx
-        df['DMP_14'] = plus_di
-        df['DMN_14'] = minus_di
-        
+        adx, plus_di, minus_di = TrendIndicators.adx(
+            df["high"], df["low"], df["close"], 14
+        )
+        df["ADX_14"] = adx
+        df["DMP_14"] = plus_di
+        df["DMN_14"] = minus_di
+
         # PSAR (Parabolic SAR)
         try:
-            psar, direction = TrendIndicators.psar(df['high'], df['low'], df['close'])
-            df['PSAR'] = psar
-            df['PSAR_DIR'] = direction
+            psar, direction = TrendIndicators.psar(df["high"], df["low"], df["close"])
+            df["PSAR"] = psar
+            df["PSAR_DIR"] = direction
         except Exception as e:
             logger.warning(f"⚠️ [IND] PSAR hesaplama hatası: {e}")
 
         # ALMA (Arnaud Legoux Moving Average)
         try:
-            alma_window = kwargs.get('alma_window', 9)
-            alma_df = StrategyIndicators.alma(df['close'], window=alma_window, sigma=6.0, offset=0.85)
-            df[f'ALMA_{alma_window}'] = alma_df['alma']
-            df[f'ALMA_SIGNAL_{alma_window}'] = alma_df['alma_signal']
+            alma_window = kwargs.get("alma_window", 9)
+            alma_df = StrategyIndicators.alma(
+                df["close"], window=alma_window, sigma=6.0, offset=0.85
+            )
+            df[f"ALMA_{alma_window}"] = alma_df["alma"]
+            df[f"ALMA_SIGNAL_{alma_window}"] = alma_df["alma_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] ALMA hesaplama hatası: {e}")
 
         # CMO (Chande Momentum Oscillator)
         try:
-            cmo_period = kwargs.get('cmo_period', 14)
-            cmo_df = StrategyIndicators.cmo(df['close'], period=cmo_period)
-            df[f'CMO_{cmo_period}'] = cmo_df['cmo']
-            df[f'CMO_SIGNAL_{cmo_period}'] = cmo_df['cmo_signal']
+            cmo_period = kwargs.get("cmo_period", 14)
+            cmo_df = StrategyIndicators.cmo(df["close"], period=cmo_period)
+            df[f"CMO_{cmo_period}"] = cmo_df["cmo"]
+            df[f"CMO_SIGNAL_{cmo_period}"] = cmo_df["cmo_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] CMO hesaplama hatası: {e}")
 
         # Bulls Power (Elder Ray Index)
         try:
-            bulls_power_period = kwargs.get('bulls_power_period', 13)
-            bull_power_df = StrategyIndicators.bulls_power(df['high'], df['close'], period=bulls_power_period)
-            df[f'BULL_POWER_{bulls_power_period}'] = bull_power_df['bull_power']
-            df[f'BULL_POWER_SIGNAL_{bulls_power_period}'] = bull_power_df['bull_power_signal']
+            bulls_power_period = kwargs.get("bulls_power_period", 13)
+            bull_power_df = StrategyIndicators.bulls_power(
+                df["high"], df["close"], period=bulls_power_period
+            )
+            df[f"BULL_POWER_{bulls_power_period}"] = bull_power_df["bull_power"]
+            df[f"BULL_POWER_SIGNAL_{bulls_power_period}"] = bull_power_df[
+                "bull_power_signal"
+            ]
         except Exception as e:
             logger.warning(f"⚠️ [IND] Bulls Power hesaplama hatası: {e}")
 
         # Vortex Indicator
         try:
-            vortex_period = kwargs.get('vortex_period', 14)
-            vortex_df = StrategyIndicators.vortex(df['high'], df['low'], df['close'], period=vortex_period)
-            df[f'VI_PLUS_{vortex_period}'] = vortex_df['vi_plus']
-            df[f'VI_MINUS_{vortex_period}'] = vortex_df['vi_minus']
-            df[f'VORTEX_SIGNAL_{vortex_period}'] = vortex_df['vortex_signal']
+            vortex_period = kwargs.get("vortex_period", 14)
+            vortex_df = StrategyIndicators.vortex(
+                df["high"], df["low"], df["close"], period=vortex_period
+            )
+            df[f"VI_PLUS_{vortex_period}"] = vortex_df["vi_plus"]
+            df[f"VI_MINUS_{vortex_period}"] = vortex_df["vi_minus"]
+            df[f"VORTEX_SIGNAL_{vortex_period}"] = vortex_df["vortex_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] Vortex hesaplama hatası: {e}")
 
         # --- SMC / LIKIDITE ---
         try:
-            smc = AdvancedIndicators.liquidity_zones(df['high'], df['low'], df['close'], lookback=10)
-            df['SWING_HIGH'] = smc['swing_high']
-            df['SWING_LOW'] = smc['swing_low']
-            df['SWEEP_BULLISH'] = smc['sweep_bullish']
-            df['SWEEP_BEARISH'] = smc['sweep_bearish']
+            smc = AdvancedIndicators.liquidity_zones(
+                df["high"], df["low"], df["close"], lookback=10
+            )
+            df["SWING_HIGH"] = smc["swing_high"]
+            df["SWING_LOW"] = smc["swing_low"]
+            df["SWEEP_BULLISH"] = smc["sweep_bullish"]
+            df["SWEEP_BEARISH"] = smc["sweep_bearish"]
 
             # Yeni Alpha Faktörleri (Liquidity Sweep ve Synthetic Imbalance)
-            df['liquidity_sweep'] = AdvancedIndicators.liquidity_sweep(df)
-            df['synthetic_imbalance'] = AdvancedIndicators.synthetic_imbalance(df)
+            df["liquidity_sweep"] = AdvancedIndicators.liquidity_sweep(df)
+            df["synthetic_imbalance"] = AdvancedIndicators.synthetic_imbalance(df)
         except Exception as e:
             logger.warning(f"⚠️ [IND] SMC hesaplama hatası: {e}")
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
         df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
-        
+
         return df
 
 
@@ -527,17 +626,15 @@ class StrategyIndicators:
 
 __all__ = [
     # Backward compatibility
-    'StrategyIndicators',
-    
+    "StrategyIndicators",
     # New modular imports
-    'TrendIndicators',
-    'MomentumIndicators',
-    'VolatilityIndicators',
-    'VolumeIndicators',
-    'AdvancedIndicators',
-    
+    "TrendIndicators",
+    "MomentumIndicators",
+    "VolatilityIndicators",
+    "VolumeIndicators",
+    "AdvancedIndicators",
     # Library detection
-    'USING_TALIB',
-    'USING_PANDAS_TA',
-    'ta',
+    "USING_TALIB",
+    "USING_PANDAS_TA",
+    "ta",
 ]
