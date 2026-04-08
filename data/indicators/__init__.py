@@ -242,6 +242,11 @@ class StrategyIndicators:
         return TrendIndicators.alma(series, **kwargs)
 
     @staticmethod
+    def rwi(high: pd.Series, low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """Random Walk Index (RWI)"""
+        return TrendIndicators.rwi(high, low, close, **kwargs)
+
+    @staticmethod
     def cmo(series: pd.Series, **kwargs) -> pd.DataFrame:
         """Chande Momentum Oscillator (CMO)"""
         return MomentumIndicators.cmo(series, **kwargs)
@@ -728,6 +733,19 @@ class StrategyIndicators:
             df[f"QQE_MOD_SIGNAL_{qqe_rsi_period}"] = qqe_df["qqe_mod_signal"]
         except Exception as e:
             logger.warning(f"⚠️ [IND] QQE Mod hesaplama hatası: {e}")
+
+        # --- RANDOM WALK INDEX (RWI) ---
+        try:
+            rwi_period = kwargs.get("rwi_period", 14)
+            rwi_df = StrategyIndicators.rwi(
+                df["high"], df["low"], df["close"], period=rwi_period
+            )
+
+            df[f"RWI_HIGH_{rwi_period}"] = rwi_df["rwi_high"]
+            df[f"RWI_LOW_{rwi_period}"] = rwi_df["rwi_low"]
+            df[f"RWI_SIGNAL_{rwi_period}"] = rwi_df["rwi_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] RWI hesaplama hatası: {e}")
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
         df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
