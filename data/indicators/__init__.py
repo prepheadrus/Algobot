@@ -178,6 +178,11 @@ class StrategyIndicators:
         """Kaufman Adaptive Moving Average (KAMA)"""
         return TrendIndicators.kama(series, **kwargs)
 
+    @staticmethod
+    def alma(series: pd.Series, **kwargs) -> pd.DataFrame:
+        """Arnaud Legoux Moving Average (ALMA)"""
+        return TrendIndicators.alma(series, **kwargs)
+
     
     # ========================================================================
     # RESAMPLING
@@ -282,7 +287,7 @@ class StrategyIndicators:
     # ========================================================================
     
     @staticmethod
-    def add_all_indicators(df: pd.DataFrame, apply_kalman_from_config: bool = True) -> pd.DataFrame:
+    def add_all_indicators(df: pd.DataFrame, apply_kalman_from_config: bool = True, **kwargs) -> pd.DataFrame:
         """
         Tüm indikatörleri hesapla (SKILL.md / Faz 4 Manuel Hesaplama).
         YENİ: Plug & Play Kalman Filtresi desteği.
@@ -290,6 +295,7 @@ class StrategyIndicators:
         Args:
             df: OHLCV DataFrame
             apply_kalman_from_config: Config'den Kalman ayarını oku
+            **kwargs: Ek parametreler (örn: alma_window)
 
         Returns:
             DataFrame with all indicators
@@ -442,6 +448,15 @@ class StrategyIndicators:
             df['PSAR_DIR'] = direction
         except Exception as e:
             logger.warning(f"⚠️ [IND] PSAR hesaplama hatası: {e}")
+
+        # ALMA (Arnaud Legoux Moving Average)
+        try:
+            alma_window = kwargs.get('alma_window', 9)
+            alma_df = StrategyIndicators.alma(df['close'], window=alma_window, sigma=6.0, offset=0.85)
+            df[f'ALMA_{alma_window}'] = alma_df['alma']
+            df[f'ALMA_SIGNAL_{alma_window}'] = alma_df['alma_signal']
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] ALMA hesaplama hatası: {e}")
 
         # --- SMC / LIKIDITE ---
         try:
