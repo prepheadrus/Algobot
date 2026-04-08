@@ -258,6 +258,11 @@ class StrategyIndicators:
         """Volume Adjusted Directional Energy Ratio (VADER)"""
         return VolumeIndicators.vader(high, low, close, volume, **kwargs)
 
+    @staticmethod
+    def qqe_mod(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """QQE Mod (Quantitative Qualitative Estimation Mod)"""
+        return AdvancedIndicators.qqe_mod(close, **kwargs)
+
     # ========================================================================
     # RESAMPLING
     # ========================================================================
@@ -678,6 +683,23 @@ class StrategyIndicators:
             df["synthetic_imbalance"] = AdvancedIndicators.synthetic_imbalance(df)
         except Exception as e:
             logger.warning(f"⚠️ [IND] SMC hesaplama hatası: {e}")
+
+        # --- QQE MOD ---
+        try:
+            qqe_rsi_period = kwargs.get("qqe_rsi_period", 14)
+            qqe_smoothing = kwargs.get("qqe_smoothing", 5)
+
+            qqe_df = StrategyIndicators.qqe_mod(
+                df["close"],
+                rsi_period=qqe_rsi_period,
+                smoothing=qqe_smoothing
+            )
+
+            df[f"QQE_LINE_{qqe_rsi_period}"] = qqe_df["qqe_line"]
+            df[f"QQE_HISTO_{qqe_rsi_period}"] = qqe_df["histo"]
+            df[f"QQE_MOD_SIGNAL_{qqe_rsi_period}"] = qqe_df["qqe_mod_signal"]
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] QQE Mod hesaplama hatası: {e}")
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
         df = df.replace([np.inf, -np.inf], np.nan).fillna(0)

@@ -303,3 +303,62 @@ class AdvancedIndicators:
             'swing_high': swing_high,
             'swing_low': swing_low
         }
+
+    @staticmethod
+    def qqe_mod(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        QQE Mod (Quantitative Qualitative Estimation Mod) - Vektörize MACD-Style.
+        RSI ve Smoothed RSI tabanlıdır. Standart ardışık (recursive) trailing stop mantığı yerine,
+        Olay Döngüsünü (Event-Loop) bloklamaması için tamamen vektörize edilmiştir.
+
+        Args:
+            close: Kapanış fiyatları serisi
+            kwargs: rsi_period (default 14), smoothing (default 5)
+
+        Returns:
+            DataFrame: qqe_line, histo ve qqe_mod_signal kolonlarını içerir.
+                       Sinyaller: 2 (LONG / Boğa), 0 (SHORT / Ayı), 1 (Nötr / Bekle)
+        """
+        # Parametreleri al
+        rsi_period = kwargs.get('rsi_period', 14)
+        smoothing = kwargs.get('smoothing', 5)
+
+        # 1. Vektörize RSI Hesaplaması (Wilder's Smoothing)
+        delta = close.diff()
+        up = delta.clip(lower=0)
+        down = -1 * delta.clip(upper=0)
+
+        # Wilder's Smoothing için ewm (alpha=1/N)
+        roll_up = up.ewm(alpha=1/rsi_period, adjust=False).mean()
+        roll_down = down.ewm(alpha=1/rsi_period, adjust=False).mean()
+
+        # Sıfıra bölünme koruması: roll_down 0 ise nan yap
+        rs = roll_up / roll_down.replace(0, np.nan)
+        rsi = 100.0 - (100.0 / (1.0 + rs))
+
+        # 2. Smoothed RSI (QQE Line)
+        qqe_line = rsi.ewm(span=smoothing, adjust=False).mean()
+
+        # 3. MACD-Style QQE Signal ve Histogram Hesaplaması
+        qqe_signal = qqe_line.ewm(span=smoothing, adjust=False).mean()
+        histo = qqe_line - qqe_signal
+
+        # 4. Veri Bütünlüğü Kalkanı (Data Integrity Shield)
+        # NaN ve Sonsuz değerleri temizle.
+        # qqe_line nötr bölgesi 50.0, histo'nun nötr değeri 0.0'dır.
+        qqe_line = qqe_line.replace([np.inf, -np.inf], np.nan).fillna(50.0)
+        histo = histo.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # 5. Sinyal Matrisi (0=SHORT, 1=NÖTR, 2=LONG)
+        # Superalgos mantığına göre qqe_line 50'nin üstü ve histo pozitif ise LONG,
+        # qqe_line 50'nin altı ve histo negatif ise SHORT
+        qqe_mod_signal = np.where(
+            (qqe_line > 50) & (histo > 0), 2,
+            np.where((qqe_line < 50) & (histo < 0), 0, 1)
+        )
+
+        return pd.DataFrame({
+            'qqe_line': qqe_line,
+            'histo': histo,
+            'qqe_mod_signal': pd.Series(qqe_mod_signal, index=close.index).fillna(1).astype(int)
+        }, index=close.index)
