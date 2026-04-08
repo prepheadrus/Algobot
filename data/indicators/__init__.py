@@ -510,7 +510,26 @@ class StrategyIndicators:
         df["STOCH_D_14_3_3"] = stoch_d
 
         # UO (Ultimate Oscillator)
-        df["UO"] = MomentumIndicators.uo(df["high"], df["low"], df["close"], 7, 14, 28)
+        try:
+            uo_timeframe1 = kwargs.get('uo_timeframe1', 7)
+            uo_timeframe2 = kwargs.get('uo_timeframe2', 14)
+            uo_timeframe3 = kwargs.get('uo_timeframe3', 28)
+            uo_overbought = kwargs.get('uo_overbought', 70.0)
+            uo_oversold = kwargs.get('uo_oversold', 30.0)
+
+            uo_df = MomentumIndicators.ultimate_oscillator(
+                df['high'], df['low'], df['close'],
+                uo_timeframe1=uo_timeframe1, uo_timeframe2=uo_timeframe2, uo_timeframe3=uo_timeframe3,
+                uo_overbought=uo_overbought, uo_oversold=uo_oversold
+            )
+
+            # Dinamik atama
+            df[f'UO_{uo_timeframe1}_{uo_timeframe2}_{uo_timeframe3}'] = uo_df['uo_signal']
+
+            # Geriye dönük uyumluluk: eski UO ataması (Divergence Hunter vs için)
+            df['UO'] = uo_df['uo_val']
+        except Exception as e:
+            logger.warning(f"⚠️ [IND] Ultimate Oscillator hesaplama hatası: {e}")
 
         # --- VOLATILITY (Manuel) ---
         df["ATR_14"] = VolatilityIndicators.atr(df["high"], df["low"], df["close"], 14)
@@ -611,6 +630,19 @@ class StrategyIndicators:
                 df[f"VADER_SIGNAL_{vader_period}"] = vader_df["vader_signal"]
             except Exception as e:
                 logger.warning(f"⚠️ [IND] VADER hesaplama hatası: {e}")
+
+            # Demand Index (DI)
+            try:
+                di_period = kwargs.get("di_period", 19)
+                di_df = VolumeIndicators.demand_index(
+                    df["high"], df["low"], df["close"], df["volume"], period=di_period
+                )
+
+                # Dinamik Atama
+                df[f"DI_VAL_{di_period}"] = di_df["di"]
+                df[f"DI_SIGNAL_{di_period}"] = di_df["di_signal"]
+            except Exception as e:
+                logger.warning(f"⚠️ [IND] Demand Index hesaplama hatası: {e}")
 
             # VWAP
             df["VWAP"] = VolumeIndicators.vwap(

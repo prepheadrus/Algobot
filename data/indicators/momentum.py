@@ -165,6 +165,61 @@ class MomentumIndicators:
         return stoch_k, stoch_d
     
     @staticmethod
+    def ultimate_oscillator(
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        Ultimate Oscillator (Vectorized)
+
+        Larry Williams'ın üç farklı zaman periyodunu birleştirerek oluşturduğu,
+        aşırı alım/satım hatalarını sıfırlayan momentum algoritması.
+
+        Args:
+            high: Yüksek fiyatlar
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (timeframe1, timeframe2, timeframe3, overbought, oversold)
+
+        Returns:
+            uo_val ve uo_signal içeren DataFrame
+        """
+        timeframe1 = kwargs.get('uo_timeframe1', 7)
+        timeframe2 = kwargs.get('uo_timeframe2', 14)
+        timeframe3 = kwargs.get('uo_timeframe3', 28)
+        overbought = kwargs.get('uo_overbought', 70.0)
+        oversold = kwargs.get('uo_oversold', 30.0)
+
+        # Vectorized Math
+        min_low_close = np.minimum(low, close.shift(1))
+        max_high_close = np.maximum(high, close.shift(1))
+
+        # Buying Pressure (BP) and True Range (TR)
+        bp = close - min_low_close
+        tr = max_high_close - min_low_close
+
+        # Rolling sums with zero-division protection
+        avg1 = bp.rolling(timeframe1).sum() / tr.rolling(timeframe1).sum().replace(0, np.nan)
+        avg2 = bp.rolling(timeframe2).sum() / tr.rolling(timeframe2).sum().replace(0, np.nan)
+        avg3 = bp.rolling(timeframe3).sum() / tr.rolling(timeframe3).sum().replace(0, np.nan)
+
+        # UO Formula
+        uo_val = 100 * ((4 * avg1) + (2 * avg2) + (1 * avg3)) / 7
+
+        # Signal Matrix: UO > overbought -> 0 (SHORT), UO < oversold -> 2 (LONG), else 1 (NEUTRAL)
+        uo_signal = np.where(uo_val > overbought, 0, np.where(uo_val < oversold, 2, 1))
+
+        # Data Integrity Shield
+        uo_val = uo_val.replace([np.inf, -np.inf], np.nan).fillna(50.0)
+
+        return pd.DataFrame({
+            'uo_val': uo_val,
+            'uo_signal': uo_signal
+        }, index=close.index)
+
+    @staticmethod
     def uo(
         high: pd.Series,
         low: pd.Series,
@@ -174,32 +229,12 @@ class MomentumIndicators:
         slow: int = 28
     ) -> pd.Series:
         """
-        Ultimate Oscillator
-        
-        Args:
-            high: Yüksek fiyatlar
-            low: Düşük fiyatlar
-            close: Kapanış fiyatları
-            fast: Fast periyot
-            medium: Medium periyot
-            slow: Slow periyot
-        
-        Returns:
-            UO serisi
+        Legacy Ultimate Oscillator Wrapper for backward compatibility.
         """
-        # Buying pressure ve true range
-        bp = close - pd.concat([low, close.shift(1)], axis=1).min(axis=1)
-        tr = pd.concat([high - low,
-                       abs(high - close.shift(1)),
-                       abs(low - close.shift(1))], axis=1).max(axis=1)
-        
-        # Averages
-        avg_fast = bp.rolling(window=fast).sum() / tr.rolling(window=fast).sum()
-        avg_medium = bp.rolling(window=medium).sum() / tr.rolling(window=medium).sum()
-        avg_slow = bp.rolling(window=slow).sum() / tr.rolling(window=slow).sum()
-        
-        # Ultimate Oscillator
-        return 100 * (4 * avg_fast + 2 * avg_medium + avg_slow) / (4 + 2 + 1)
+        return MomentumIndicators.ultimate_oscillator(
+            high, low, close,
+            uo_timeframe1=fast, uo_timeframe2=medium, uo_timeframe3=slow
+        )['uo_val']
     
     @staticmethod
     def williams_r(

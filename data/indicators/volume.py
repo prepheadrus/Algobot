@@ -259,6 +259,53 @@ class VolumeIndicators:
         return eom.rolling(period).mean()
 
     @staticmethod
+    def demand_index(
+        high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
+    ) -> pd.DataFrame:
+        """
+        Demand Index (DI)
+
+        James Sibbet'in fiyat-hacim uyuşmazlığını ölçen metriği. Döngülerden kaçınmak
+        için hacim-fiyat değişimli vektörize VPO (Volume Price Oscillator) yaklaşımı.
+
+        Args:
+            high: Yüksek fiyatlar
+            low: Düşük fiyatlar
+            close: Kapanış fiyatları
+            volume: Hacim
+            **kwargs: Ek parametreler (period)
+
+        Returns:
+            di (Demand Index) ve di_signal içeren DataFrame
+        """
+        period = kwargs.get('period', 19)
+
+        # Delta computation
+        delta = close.diff()
+
+        # Buying pressure and Selling pressure based on price delta
+        bp = pd.Series(np.where(delta > 0, volume * delta, 0), index=close.index)
+        sp = pd.Series(np.where(delta < 0, volume * abs(delta), 0), index=close.index)
+
+        # Exponential moving averages of buying and selling pressure
+        bp_ema = bp.ewm(span=period, adjust=False).mean()
+        sp_ema = sp.ewm(span=period, adjust=False).mean()
+
+        # Demand Index formula with zero-division protection
+        di_val = 100 * (bp_ema - sp_ema) / (bp_ema + sp_ema).replace(0, np.nan)
+
+        # Signal Matrix: DI > 0 (LONG: 2), DI < 0 (SHORT: 0), else (NEUTRAL: 1)
+        di_signal = np.where(di_val > 0, 2, np.where(di_val < 0, 0, 1))
+
+        # Data Integrity Shield
+        di_val = di_val.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        return pd.DataFrame({
+            'di': di_val,
+            'di_signal': di_signal
+        }, index=close.index)
+
+    @staticmethod
     def vader(
         high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, **kwargs
     ) -> pd.DataFrame:
