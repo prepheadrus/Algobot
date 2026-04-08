@@ -539,3 +539,53 @@ class TrendIndicators:
         df['rwi_signal'] = rwi_signal
 
         return df
+
+    @staticmethod
+    def chop(high: pd.Series, low: pd.Series, close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Choppiness Index (CHOP)
+        A quantitative metric that determines if the market is choppy (trading sideways)
+        or not choppy (trading within a trend in either direction).
+
+        Args:
+            high (pd.Series): High prices
+            low (pd.Series): Low prices
+            close (pd.Series): Close prices
+            **kwargs: Optuna search space parameters.
+                      period (int, default=14)
+
+        Returns:
+            pd.DataFrame: DataFrame containing 'chop' and 'chop_signal'.
+        """
+        period = kwargs.get('period', 14)
+
+        # 1. True Range calculation with np.maximum shield
+        tr = np.maximum(
+            high - low,
+            np.maximum(
+                abs(high - close.shift(1)),
+                abs(low - close.shift(1))
+            )
+        )
+
+        # 2. Vectorized Math Core (Fractal Dimension)
+        atr_sum = tr.rolling(window=period, min_periods=1).sum()
+        max_high = high.rolling(window=period, min_periods=1).max()
+        min_low = low.rolling(window=period, min_periods=1).min()
+
+        # Zero-division and logarithm shield
+        range_hl = (max_high - min_low).replace(0, np.nan).clip(lower=1e-10)
+
+        # CHOP Formula
+        chop_val = 100 * np.log10(atr_sum / range_hl) / np.log10(period)
+
+        # 3. Data Integrity Shield
+        chop_val = chop_val.replace([np.inf, -np.inf], np.nan).fillna(50.0)
+
+        # 4. Signal Matrix Output
+        chop_signal = np.where(chop_val > 61.8, 0, np.where(chop_val < 38.2, 2, 1))
+
+        return pd.DataFrame({
+            'chop': chop_val,
+            'chop_signal': pd.Series(chop_signal, index=high.index)
+        })
