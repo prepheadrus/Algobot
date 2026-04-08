@@ -106,6 +106,49 @@ class TrendIndicators:
         return series.rolling(window=length).mean()
     
     @staticmethod
+    def alma(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Arnaud Legoux Moving Average (ALMA)
+        Pure NumPy Vectorization with np.convolve (No loops)
+        """
+        window = kwargs.get('window', 9)
+        sigma = kwargs.get('sigma', 6.0)
+        offset = kwargs.get('offset', 0.85)
+
+        n = len(close)
+        if n < window:
+            return pd.DataFrame({'alma': np.full(n, np.nan), 'alma_signal': 1}, index=close.index)
+
+        # 1. Gauss Ağırlıklarının Hesaplanması (Gaussian Weights)
+        m = np.floor(offset * (window - 1))
+        s = window / sigma
+
+        weights = np.exp(-((np.arange(window) - m) ** 2) / (2 * s ** 2))
+        weights /= weights.sum()
+
+        # 2. Vektörize Konvolüsyon (Sıfır Döngü, C-Level Hız)
+        close_array = close.to_numpy()
+        alma_vals = np.convolve(close_array, weights[::-1], mode='valid')
+
+        # 3. Padding (Veri hizalama)
+        alma_full = np.concatenate((np.full(window - 1, np.nan), alma_vals))
+
+        # 4. DataFrame Çıktısı
+        df = pd.DataFrame(index=close.index)
+        df['alma'] = alma_full
+
+        # 5. Sinyal Matrisi
+        df['alma_signal'] = np.where(
+            close > df['alma'], 2,
+            np.where(close < df['alma'], 0, 1)
+        )
+
+        # NaN koruması
+        df.loc[df['alma'].isna(), 'alma_signal'] = 1
+
+        return df
+
+    @staticmethod
     def supertrend(
         high: pd.Series,
         low: pd.Series,
