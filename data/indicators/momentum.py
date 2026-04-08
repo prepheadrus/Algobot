@@ -302,6 +302,43 @@ class MomentumIndicators:
         }, index=close.index)
 
     @staticmethod
+    def trix(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Triple Exponential Average (TRIX)
+
+        Args:
+            close: Kapanış fiyatları
+            **kwargs: Ek parametreler (period, signal_period)
+
+        Returns:
+            trix_val ve trix_signal içeren DataFrame
+        """
+        period = kwargs.get('period', 18)
+        signal_period = kwargs.get('signal_period', 9)
+
+        # Triple EMA Hesaplaması (Sıfır Döngü, Vektörize)
+        ema1 = close.ewm(span=period, adjust=False).mean()
+        ema2 = ema1.ewm(span=period, adjust=False).mean()
+        ema3 = ema2.ewm(span=period, adjust=False).mean()
+
+        # TRIX Değeri (Yüzdesel İvme) - FutureWarning engellemek için fill_method=None
+        trix_val = ema3.pct_change(fill_method=None) * 100
+
+        # Sıfıra Bölünme ve Data Integrity Zırhı
+        trix_val = trix_val.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # Sinyal Hattı (SMA)
+        trix_sma = trix_val.rolling(window=signal_period, min_periods=1).mean()
+
+        # Sinyal Mantığı: TRIX kendi SMA'sını yukarı kesmiş/üzerindeyse 2, aşağısındaysa 0, aksi halde 1
+        trix_signal = np.where(trix_val > trix_sma, 2, np.where(trix_val < trix_sma, 0, 1))
+
+        return pd.DataFrame({
+            'trix_val': trix_val,
+            'trix_signal': trix_signal
+        }, index=close.index)
+
+    @staticmethod
     def cci(
         high: pd.Series,
         low: pd.Series,
