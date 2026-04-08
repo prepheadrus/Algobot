@@ -217,6 +217,11 @@ class StrategyIndicators:
         return VolumeIndicators.pvi(close, volume, **kwargs)
 
     @staticmethod
+    def nvi(close: pd.Series, volume: pd.Series, **kwargs) -> pd.DataFrame:
+        """Negative Volume Index (Vectorized)"""
+        return VolumeIndicators.nvi(close, volume, **kwargs)
+
+    @staticmethod
     def obv_ema(close: pd.Series, volume: pd.Series, **kwargs) -> pd.DataFrame:
         """On-Balance Volume + EMA (Vectorized)"""
         return VolumeIndicators.obv_ema(close, volume, **kwargs)
@@ -515,6 +520,22 @@ class StrategyIndicators:
             except Exception as e:
                 logger.warning(f"⚠️ [IND] PVI hesaplama hatası: {e}")
 
+            try:
+                nvi_ema_period = kwargs.get("nvi_ema_period", 255)
+                nvi_df = StrategyIndicators.nvi(
+                    df["close"], df["volume"], ema_period=nvi_ema_period
+                )
+
+                # Yeni NVI Dinamik Atama
+                df[f"NVI_{nvi_ema_period}"] = nvi_df["nvi"]
+                df[f"NVI_EMA_{nvi_ema_period}"] = nvi_df["nvi_ema"]
+                df[f"NVI_SIGNAL_{nvi_ema_period}"] = nvi_df["nvi_signal"]
+
+                # Geriye Dönük Uyumluluk (Legacy Alias) - TEK OTORİTE
+                df["NVI"] = nvi_df["nvi"]
+            except Exception as e:
+                logger.warning(f"⚠️ [IND] NVI hesaplama hatası: {e}")
+
             # VWAP
             df["VWAP"] = VolumeIndicators.vwap(
                 df["high"], df["low"], df["close"], df["volume"]
@@ -526,10 +547,10 @@ class StrategyIndicators:
                 koncorde = AdvancedIndicators.calculate_koncorde(
                     df["close"], df["high"], df["low"], df["volume"], 15
                 )
-                df["PVI"] = koncorde["pvi"]
-                df["NVI"] = koncorde["nvi"]
-                df["PVIM"] = koncorde["pvim"]
-                df["NVIM"] = koncorde["nvim"]
+                df["KONCORDE_PVI"] = koncorde["pvi"]
+                df["KONCORDE_NVI"] = koncorde["nvi"]
+                df["KONCORDE_PVIM"] = koncorde["pvim"]
+                df["KONCORDE_NVIM"] = koncorde["nvim"]
                 df["KONKORDE_AZUL"] = koncorde["azul"]
                 df["KONKORDE_VERDE"] = koncorde["verde"]
                 df["KONKORDE_MARRON"] = koncorde["marron"]
