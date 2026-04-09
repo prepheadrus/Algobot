@@ -30,7 +30,8 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     classification_report,
-    confusion_matrix
+    confusion_matrix,
+    log_loss
 )
 import asyncio
 from core.logger import logger
@@ -309,8 +310,9 @@ class ModelTrainer:
         y_train: pd.Series,
     ) -> float:
         """
-        Optuna için F1-Score Optimizasyon Hedef Fonksiyonu (Binary Classification)
-        Purged K-Fold (TimeSeriesSplit + Embargo) kullanarak sızıntısız ortalama F1-Score hesaplar.
+        Optuna için Negative Log Loss Optimizasyon Hedef Fonksiyonu
+        Purged K-Fold (TimeSeriesSplit + Embargo) kullanarak sızıntısız ortalama Negatif Logloss hesaplar.
+        Modelin ürettiği ham olasılıkların kalitesini ölçer.
         """
         from sklearn.model_selection import TimeSeriesSplit
         import gc
@@ -330,9 +332,8 @@ class ModelTrainer:
 
         # Sızıntı kalkanı (Purged K-Fold/Embargoing): test/val ufku kadar boşluk bırakıyoruz
         tscv = TimeSeriesSplit(n_splits=5, gap=self.time_horizon)
-        f1_scores = []
+        neg_logloss_scores = []
 
-        # X_train bir DataFrame olduğu varsayılır. Pandas iloc kullanımı için.
         # Ensure they are pandas types for indexing
         if not isinstance(X_train, pd.DataFrame):
             X_train = pd.DataFrame(X_train)
@@ -359,9 +360,9 @@ class ModelTrainer:
                     verbose=False
                 )
 
-                preds = model.predict(X_val_fold)
-                score = f1_score(y_val_fold, preds, average='macro', zero_division=0)
-                f1_scores.append(score)
+                preds_proba = model.predict_proba(X_val_fold)
+                loss = log_loss(y_val_fold, preds_proba, labels=model.classes_)
+                neg_logloss_scores.append(-1.0 * loss)
             except Exception as e:
                 # Olası bir xgboost hatası (örn: sadece tek class kalması durumu)
                 logger.debug(f"Fold atlandı, hata: {e}")
@@ -371,10 +372,10 @@ class ModelTrainer:
                 del X_train_fold, y_train_fold, X_val_fold, y_val_fold
                 gc.collect()
 
-        if not f1_scores:
-            return 0.0
+        if not neg_logloss_scores:
+            return -999.0
 
-        return sum(f1_scores) / len(f1_scores)
+        return sum(neg_logloss_scores) / len(neg_logloss_scores)
 
     def train(
         self,
@@ -502,7 +503,7 @@ class ModelTrainer:
 
             best_params = study.best_params
             logger.info(f"🏆 Optuna En İyi Parametreler: {best_params}")
-            logger.info(f"🏆 En İyi Purged F1-Score Oranı: {study.best_value:.4f}")
+            logger.info(f"🏆 En İyi Purged Negatif Log Loss Oranı: {study.best_value:.4f}")
 
             # Best parametreleri set et
             self._apply_params({
