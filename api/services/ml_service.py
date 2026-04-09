@@ -193,7 +193,7 @@ class MLService:
             def _train_direction(current_direction):
                 logger.info(f"🧠 [ML] {current_direction.upper()} modeli için asimetrik eğitim başlatılıyor...")
 
-                # Veri hazırlığında yönü belirt
+                # Veri hazırlığında yönü belirt ve asimetrik risk yönetimini KESİNLİKLE uygula
                 X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
                     df,
                     direction=current_direction,
