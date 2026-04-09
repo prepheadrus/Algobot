@@ -312,11 +312,13 @@ class ModelTrainer:
         dynamic_xgb_params: dict,
     ) -> float:
         """
-        Optuna için Negative Log Loss Optimizasyon Hedef Fonksiyonu
-        Purged K-Fold (TimeSeriesSplit + Embargo) kullanarak sızıntısız ortalama Negatif Logloss hesaplar.
-        Modelin ürettiği ham olasılıkların kalitesini ölçer.
+        Optuna için Precision Optimizasyon Hedef Fonksiyonu
+        Purged K-Fold (TimeSeriesSplit + Embargo) kullanarak sızıntısız ortalama Precision hesaplar.
+        LogLoss yerine Hedge Fund standardı asimetrik risk profiline uygun olarak
+        Precision maksimizasyonu yapar ve 0.60 Olasılık Eşiği uygular.
         """
         from sklearn.model_selection import TimeSeriesSplit
+        from sklearn.metrics import precision_score
         import gc
 
         params = {
@@ -332,7 +334,7 @@ class ModelTrainer:
 
         # Sızıntı kalkanı (Purged K-Fold/Embargoing): test/val ufku kadar boşluk bırakıyoruz
         tscv = TimeSeriesSplit(n_splits=5, gap=self.time_horizon)
-        neg_logloss_scores = []
+        precision_scores = []
 
         # Ensure they are pandas types for indexing
         if not isinstance(X_train, pd.DataFrame):
@@ -361,8 +363,27 @@ class ModelTrainer:
                 )
 
                 preds_proba = model.predict_proba(X_val_fold)
-                loss = log_loss(y_val_fold, preds_proba, labels=model.classes_)
-                neg_logloss_scores.append(-1.0 * loss)
+
+                # Olasılık Eşiği (Threshold Gate) Kalkanı (>= 0.60)
+                # Model predict() yerine 0.60 eşiğini kullanarak manuel tahmin oluştururuz
+
+                # Model sınıfları içerisinde hedef sınıfın (1) olasılık indeksini bul
+                if 1 in model.classes_:
+                    pos_class_idx = list(model.classes_).index(1)
+                    # Sadece >= 0.60 olasılıkla 1(Trade) sinyali üret
+                    preds_custom = (preds_proba[:, pos_class_idx] >= 0.60).astype(int)
+                else:
+                    # Model sadece sınıf 0 üretiyorsa hiç sinyal oluşmaz
+                    preds_custom = np.zeros(len(X_val_fold))
+
+                # Underfitting / Sıfır İşlem Kalkanı (Overfitting Paradoksu)
+                total_trades = np.sum(preds_custom)
+                if total_trades < 5:
+                    precision_scores.append(0.0) # Ceza
+                else:
+                    score = precision_score(y_val_fold, preds_custom, zero_division=0)
+                    precision_scores.append(score)
+
             except Exception as e:
                 logger.warning(f"Trial pruned due to exception: {str(e)}")
                 raise optuna.TrialPruned()
@@ -371,10 +392,10 @@ class ModelTrainer:
                 del X_train_fold, y_train_fold, X_val_fold, y_val_fold
                 gc.collect()
 
-        if not neg_logloss_scores:
-            return -999.0
+        if not precision_scores:
+            return 0.0
 
-        return sum(neg_logloss_scores) / len(neg_logloss_scores)
+        return sum(precision_scores) / len(precision_scores)
 
     def train(
         self,
@@ -524,7 +545,7 @@ class ModelTrainer:
 
             best_params = study.best_params
             logger.info(f"🏆 Optuna En İyi Parametreler: {best_params}")
-            logger.info(f"🏆 En İyi Purged Negatif Log Loss Oranı: {study.best_value:.4f}")
+            logger.info(f"🏆 En İyi Purged Precision Skoru: {study.best_value:.4f}")
 
             # Best parametreleri set et
             self._apply_params({
