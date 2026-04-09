@@ -369,3 +369,24 @@ class VolumeIndicators:
         )
 
         return df
+
+    @staticmethod
+    def rel_volume(volume: pd.Series, period: int = 20) -> pd.Series:
+        """
+        Göreceli Hacim (Relative Volume).
+        Mevcut hacmin periyot ortalamasına oranı.
+        """
+        vol_sma = volume.rolling(window=period, min_periods=1).mean()
+        vol_sma = vol_sma.replace(0, np.nan)
+        rel_vol = volume / vol_sma
+        return rel_vol.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    @staticmethod
+    def vwap_dist(close: pd.Series, vwap_val: pd.Series) -> pd.Series:
+        """
+        Hacim Ağırlıklı Fiyat Basıncı (Distance to VWAP).
+        Fiyatın VWAP'a oransal uzaklığı.
+        """
+        vwap_val = vwap_val.replace(0, np.nan)
+        dist = (close - vwap_val) / vwap_val * 100
+        return dist.replace([np.inf, -np.inf], np.nan).fillna(0)
