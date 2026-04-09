@@ -32,6 +32,7 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix
 )
+import asyncio
 from core.logger import logger
 
 
@@ -382,7 +383,9 @@ class ModelTrainer:
         X_test: pd.DataFrame,
         y_test: Series,
         ret_test: pd.Series = None,
-        verbose: bool = True
+        verbose: bool = True,
+        min_importance: float = 0.01,
+        protected_features: List[str] = None
     ) -> Dict[str, Any]:
         """
         XGBoost (Optuna ile) + Random Forest Ensemble modellerini eğitir ve değerlendirir.
@@ -420,8 +423,74 @@ class ModelTrainer:
         if len(unique_classes) < 2:
             raise ValueError(f"⚠️ [ML] Eğitim setinde yalnızca tek bir sınıf mevcut: {unique_classes}. Binary classification yapılamaz. Yeterli sinyal oluşmamış olabilir.")
 
+        if protected_features is None:
+            protected_features = ["dist_to_vwap", "OBV_EMA", "frac_diff_04", "BTC_VIX"]
+
+        logger.info("🛡️ [ML] Feature Selection (Curse of Dimensionality Shield) başlatılıyor...")
+
+        def fit_base_model():
+            base_model = xgb.XGBClassifier(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                objective='multi:softprob',
+                num_class=self.num_class,
+                random_state=self.random_state,
+                n_jobs=self.n_jobs
+            )
+            base_model.fit(X_train, y_train, sample_weight=sample_weights, verbose=False)
+            return base_model
+
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                import concurrent.futures
+                # asyncio.to_thread gerektirir asyncio ile bekleme, ancak train fonksiyonu senkron.
+                # Run_in_executor veya manuel çalıştırma için event loop block edilmemeli.
+                # Eğer kod zaten event loop içindeyse ve bu thread'de ise asyncio loop running state'indedir.
+                # Ancak 'train' metodu 'async def' değil, bu yüzden await edemeyiz.
+                # ThreadPool kullanarak arka planda çalışıp block etmesini sağlayalım:
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(fit_base_model)
+                    base_model = future.result()
+            except RuntimeError:
+                base_model = fit_base_model()
+
+        except Exception as e:
+             logger.warning(f"⚠️ [ML] Base model feature selection için eğitilemedi, seçim atlanıyor: {e}")
+             base_model = None
+
+        if base_model is not None:
+             importances = base_model.feature_importances_
+             features_to_drop = []
+             features_to_keep = []
+             for idx, col in enumerate(self.feature_names):
+                 importance = importances[idx]
+                 if importance < min_importance:
+                     if col in protected_features:
+                         logger.info(f"🛡️ [ML] Protected feature tutuluyor (Low Importance: {importance:.4f}): {col}")
+                         features_to_keep.append(col)
+                     else:
+                         features_to_drop.append(col)
+                 else:
+                     features_to_keep.append(col)
+
+             # Protected features DataFrame'de yoksa fail-fast yapma, sessizce geç
+             for p_feat in protected_features:
+                 if p_feat not in self.feature_names:
+                     logger.warning(f"⚠️ [ML] Protected feature '{p_feat}' not found in dataset, skipping.")
+
+             if features_to_drop:
+                 logger.info(f"🗑️ [ML] {len(features_to_drop)} zayıf özellik drop ediliyor (Importance < {min_importance}): {features_to_drop}")
+                 X_train = X_train.drop(columns=features_to_drop, errors='ignore')
+                 X_test = X_test.drop(columns=features_to_drop, errors='ignore')
+                 self.feature_names = features_to_keep
+             else:
+                 logger.info("ℹ️ [ML] Hiçbir özellik drop edilmedi (Hepsi önemli).")
+
         # 1. XGBoost modelini eğit (Optuna ile Optimizasyon)
-        if optuna is not None:
+        import sys
+        if optuna is not None and getattr(sys.modules.get('optuna', None), 'create_study', None):
             logger.info("📊 XGBoost eğitiliyor (Optuna TPE Optimizasyonu Başlıyor)...")
             study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=self.random_state))
 
