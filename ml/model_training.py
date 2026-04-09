@@ -155,8 +155,9 @@ class ModelTrainer:
             reg_lambda=reg_lambda,
             random_state=random_state,
             n_jobs=n_jobs,
-            objective='binary:logistic',
-            eval_metric='logloss'
+            objective='multi:softprob',
+            num_class=num_class,
+            eval_metric='mlogloss'
         )
 
         # Random Forest modelini başlat (Binary Classification)
@@ -319,13 +320,15 @@ class ModelTrainer:
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2, log=True),
             'subsample': trial.suggest_float('subsample', 0.5, 1.0),
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-            'objective': 'binary:logistic',
-            'eval_metric': 'logloss',
+            'objective': 'multi:softprob',
+            'num_class': self.num_class,
+            'eval_metric': 'mlogloss',
             'random_state': self.random_state,
             'n_jobs': self.n_jobs
         }
 
-        tscv = TimeSeriesSplit(n_splits=5)
+        # Sızıntı kalkanı (Purged K-Fold/Embargoing): test/val ufku kadar boşluk bırakıyoruz
+        tscv = TimeSeriesSplit(n_splits=5, gap=self.time_horizon)
         f1_scores = []
 
         # X_train bir DataFrame olduğu varsayılır. Pandas iloc kullanımı için.
@@ -336,20 +339,8 @@ class ModelTrainer:
             y_train = pd.Series(y_train)
 
         for train_index, val_index in tscv.split(X_train):
-            # Normal split
             X_train_fold, X_val_fold = X_train.iloc[train_index], X_train.iloc[val_index]
             y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
-
-            # EMBARGO UYGULAMASI (Purging)
-            # Train ve Val setleri arasına time_horizon kadar boşluk bırak
-            # TimeSeriesSplit'te val_index her zaman train_index'in geleceğindedir.
-            # O yüzden val_fold'un başından time_horizon kadar atıyoruz ki train'in sonuyla val'in başı örtüşmesin
-            # VEYA train'in sonundan atabiliriz. (Lopez de Prado standardı: train'in test ile örtüşen kısmını purge et)
-
-            if self.time_horizon > 0 and len(train_index) > self.time_horizon:
-                # Purging: Train fold'un sonundan time_horizon kadar kısmı atıyoruz
-                X_train_fold = X_train_fold.iloc[:-self.time_horizon]
-                y_train_fold = y_train_fold.iloc[:-self.time_horizon]
 
             # Eğer embargo sonrası fold çok küçülürse (örn. veri seti çok ufaksa), atla
             if len(y_train_fold) == 0 or len(y_val_fold) == 0:
@@ -368,7 +359,7 @@ class ModelTrainer:
                 )
 
                 preds = model.predict(X_val_fold)
-                score = f1_score(y_val_fold, preds, zero_division=0)
+                score = f1_score(y_val_fold, preds, average='macro', zero_division=0)
                 f1_scores.append(score)
             except Exception as e:
                 # Olası bir xgboost hatası (örn: sadece tek class kalması durumu)
