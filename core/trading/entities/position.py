@@ -44,6 +44,8 @@ from typing import Optional, Dict, Any
 from enum import Enum
 
 
+DEFAULT_COMMISSION_BUFFER = 0.0008
+
 class PositionDirection(str, Enum):
     """Pozisyon yönü"""
     LONG = "LONG"
@@ -84,6 +86,7 @@ class Position:
     
     # Optional fields
     stop_loss: Optional[float] = None
+    initial_stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     margin: float = 0.0
     commission: float = 0.0
@@ -257,33 +260,30 @@ class Position:
     # 3 AŞAMALI RİSK YÖNETİMİ (Kâr Koruma Sistemi)
     # ========================================================================
 
-    def should_take_partial_profit(self, current_price: float, atr: float = 0.0) -> bool:
+    def get_triggered_tp_levels(self, current_price: float) -> list:
         """
-        Aşama 1: Kısmi Kâr Alma (50% TP).
-
-        Fiyat, TP hedefinin %50'sine ulaştıysa ve henüz partial_profit_taken=False ise
-        pozisyonun yarısını kapat.
-
-        Args:
-            current_price: Şu anki fiyat
-            atr: ATR değeri (opsiyonel)
-
-        Returns:
-            True ise kısmi kâr alma zamanı
+        Aşama 1: R-Multiple tabanlı kademeli çıkış.
         """
-        if self.partial_profit_taken or self.take_profit is None:
-            return False
+        if not self.initial_stop_loss:
+            return []
 
-        # TP mesafesinin %50'si
-        tp_distance = abs(self.take_profit - self.entry_price)
-        half_tp_distance = tp_distance * 0.5
+        risk_distance = abs(self.entry_price - self.initial_stop_loss)
+        if risk_distance <= 0:
+            return []
 
         if self.direction == PositionDirection.LONG:
             profit_distance = current_price - self.entry_price
-            return profit_distance >= half_tp_distance
         else:  # SHORT
             profit_distance = self.entry_price - current_price
-            return profit_distance >= half_tp_distance
+
+        current_r = profit_distance / risk_distance
+
+        triggered = []
+        for level_info in self.take_profit_levels:
+            if not level_info.get("hit", False) and current_r >= level_info.get("level", float('inf')):
+                triggered.append(level_info)
+
+        return triggered
 
     def should_activate_breakeven(self, current_price: float, atr: float) -> bool:
         """
@@ -312,7 +312,7 @@ class Position:
             profit_distance = self.entry_price - current_price
             return profit_distance >= min_profit_distance
 
-    def activate_breakeven(self, commission_buffer: float = 0.001) -> 'Position':
+    def activate_breakeven(self, commission_buffer: float = DEFAULT_COMMISSION_BUFFER) -> 'Position':
         """
         Başa baş (breakeven) korumasını aktif et.
 
@@ -367,7 +367,7 @@ class Position:
 
             # Stop asla giriş fiyatının altına düşmemeli (breakeven koruması)
             if self.breakeven_activated:
-                min_stop = self.entry_price * 1.001  # Komisyon buffer
+                min_stop = self.entry_price * (1 + DEFAULT_COMMISSION_BUFFER)  # Komisyon buffer
                 # Yeni stop: daha yüksek olan (trailing veya min)
                 new_stop = max(trailing_stop, min_stop, current_stop)
             else:
@@ -379,7 +379,7 @@ class Position:
 
             # Stop asla giriş fiyatının üstüne çıkmamalı (breakeven koruması)
             if self.breakeven_activated:
-                max_stop = self.entry_price * 0.999  # Komisyon buffer
+                max_stop = self.entry_price * (1 - DEFAULT_COMMISSION_BUFFER)  # Komisyon buffer
                 # Yeni stop: daha düşük olan (trailing veya max)
                 new_stop = min(trailing_stop, max_stop, current_stop)
             else:
@@ -489,6 +489,7 @@ class Position:
             'leverage': self.leverage,
             'margin': self.margin,
             'stop_loss': self.stop_loss,
+            'initial_stop_loss': self.initial_stop_loss,
             'take_profit': self.take_profit,
             'liquidation_price': self.liquidation_price,
             'commission': self.commission,
@@ -528,6 +529,7 @@ class Position:
             leverage=data['leverage'],
             opened_at=datetime.fromisoformat(data['opened_at']) if isinstance(data['opened_at'], str) else data['opened_at'],
             stop_loss=data.get('stop_loss'),
+            initial_stop_loss=data.get('initial_stop_loss'),
             take_profit=data.get('take_profit'),
             margin=data.get('margin', 0.0),
             commission=data.get('commission', 0.0),
