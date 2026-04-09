@@ -220,75 +220,67 @@ def get_ml_prediction(symbol: str, timeframe: str, direction: str, indicators: D
 
     X_live_ordered = pd.DataFrame([aligned_features])
     
-    # XGBoost tahmini (Binary Classification)
-    xgb_pred = None
-    xgb_confidence = None
+    from core.config import CONFIG
+    # Dinamik olarak (Runtime/Hot-Reload) güven eşiğini oku
+    ml_confidence_threshold = float(CONFIG.get('ml', {}).get('confidence_threshold', 0.60))
+
+    # Çok sınıflı (multi:softprob) çıktı için Ensemble Voting (XGB + RF)
+    xgb_probs = None
     if xgb_model:
         try:
-            # XGBoost binary:logistic output probabilities for class 1
-            # Hizalanmış DataFrame üzerinden, özelliklerin tam adıyla (feature_names) DMatrix oluştur
-            # DMatrix'in özellikleri modelin beklediği sırayla beslediğinden kesin olarak emin olunur
             dmatrix = xgb.DMatrix(X_live_ordered, feature_names=expected_features)
+            # multi:softprob döndürdüğü için shape (1, 3) şeklindedir
             prob = xgb_model.predict(dmatrix)[0]
-            xgb_pred = 1 if prob >= 0.5 else 0
-            xgb_confidence = float(prob if xgb_pred == 1 else 1.0 - prob)
+            # Eğer model binary trained ise prob bir skalar veya (1,) olabilir. Bunu çok sınıflı yapıya göre uyarla.
+            if isinstance(prob, (float, np.float32, np.float64)):
+                 xgb_probs = np.array([1.0 - float(prob), float(prob), 0.0])
+            else:
+                 xgb_probs = np.array(prob)
         except ValueError as e:
-            # Inference (çıkarım) anında olası feature mismatach hatalarını yut, model silme işlemi uygulama
             print(f"⚠️ [ML] XGBoost tahmin hatası (Muhtemel Shape Mismatch, model silinmeyecek): {e}")
-            xgb_pred = None
-            xgb_confidence = None
     
-    # Random Forest tahmini (Binary Classification)
-    rf_pred = None
-    rf_confidence = None
+    rf_probs = None
     if rf_model:
-        # RF DataFrame üzerinden tahmin yapabilir
-        rf_pred_proba = rf_model.predict_proba(X_live_ordered)[0]
-        rf_pred = int(np.argmax(rf_pred_proba))
-        rf_confidence = float(np.max(rf_pred_proba))
-    
-    # Ensemble voting (Soft Voting - confidence ağırlıklı - Binary)
-    predictions = []
-    confidences = []
-    
-    if xgb_pred is not None:
-        predictions.append(xgb_pred)
-        confidences.append(xgb_confidence)
-    
-    if rf_pred is not None:
-        predictions.append(rf_pred)
-        confidences.append(rf_confidence)
-    
-    if not predictions:
+        try:
+            rf_pred_proba = rf_model.predict_proba(X_live_ordered)[0]
+            # RF genellikle eğitildiği sınıf sayısına göre döner (örn 3 sınıf)
+            rf_probs = np.array(rf_pred_proba)
+        except Exception as e:
+            print(f"⚠️ [ML] Random Forest tahmin hatası: {e}")
+
+    # Soft Voting
+    probs_list = [p for p in [xgb_probs, rf_probs] if p is not None]
+    if not probs_list:
         return None
-    
-    # Confidence-ağırlıklı ortalama
-    total_confidence = sum(confidences)
-    if total_confidence > 0:
-        # Her tahmini confidence ile ağırla (Binary: 0 veya 1)
-        weighted_votes = [0.0, 0.0]
-        for pred, conf in zip(predictions, confidences):
-            if 0 <= pred <= 1:
-                weighted_votes[pred] += conf
-        
-        ensemble_pred = int(np.argmax(weighted_votes))
-        ensemble_confidence = weighted_votes[ensemble_pred] / sum(weighted_votes)
-    else:
-        ensemble_pred = int(np.round(np.mean(predictions)))
-        ensemble_confidence = np.mean(confidences) if confidences else 0.0
-    
-    # Label mapping (Binary)
-    label_map = {0: 'HOLD', 1: 'TRADE'}
-    
-    # İşlem yönü de döndürülerek ek bilgi sağlanır
-    direction_upper = direction.upper()
+
+    ensemble_probs = np.mean(probs_list, axis=0)
+
+    # Güvenlik: Eğer ensemble_probs beklendiği gibi 3 boyutlu değilse sıfırlarla doldur
+    if len(ensemble_probs) < 3:
+        padded = np.zeros(3)
+        padded[:len(ensemble_probs)] = ensemble_probs
+        ensemble_probs = padded
+
+    # Sınıflar: 0=SHORT, 1=HOLD, 2=LONG
+    predicted_class = int(np.argmax(ensemble_probs))
+    ensemble_confidence = float(ensemble_probs[predicted_class])
+
+    # KATI ML GÜVEN EŞİĞİ (STRICT CONFIDENCE VETO) - Sadece LONG/SHORT sinyallerini filtrele
+    if predicted_class in [0, 2] and ensemble_confidence < ml_confidence_threshold:
+        print(f"🛡️ [ML VETO] Tahmin {predicted_class} için güven ({ensemble_confidence:.4f}) eşiğin ({ml_confidence_threshold}) altında. HOLD(1) yapılıyor.")
+        predicted_class = 1  # HOLD / VETO
+        # Güven skoru, VETO yapılmış haliyle o yöndeki/hold oranına atanabilir ama ensemble_confidence'ı orijinal prob olarak tutmak analitik için daha iyidir.
+
+    label_map = {0: 'SHORT', 1: 'HOLD', 2: 'LONG'}
+    prediction_label = label_map.get(predicted_class, 'HOLD')
 
     return {
-        'prediction': direction_upper if ensemble_pred == 1 else 'HOLD',
+        'prediction': prediction_label,
         'confidence': ensemble_confidence,
-        'xgb_prediction': label_map.get(xgb_pred, 'N/A') if xgb_pred is not None else None,
-        'rf_prediction': label_map.get(rf_pred, 'N/A') if rf_pred is not None else None,
-        'ensemble_vote': f"{ensemble_pred} ({ensemble_confidence:.2%})",
+        'probabilities': ensemble_probs.tolist(),
+        'xgb_prediction': int(np.argmax(xgb_probs)) if xgb_probs is not None else None,
+        'rf_prediction': int(np.argmax(rf_probs)) if rf_probs is not None else None,
+        'ensemble_vote': f"{predicted_class} ({ensemble_confidence:.2%})",
         'direction': direction
     }
 
