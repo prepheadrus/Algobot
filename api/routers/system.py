@@ -620,7 +620,7 @@ async def update_risk_config(request: RiskConfigUpdate) -> Dict[str, Any]:
                 paper_engine.risk_engine.kill_switch_active = (
                     False  # Reset on config change
                 )
-                paper_engine.risk_engine.consecutive_losses = 0
+                paper_engine.risk_engine.consecutive_losses.clear()
             paper_engine.risk_engine.config.kill_switch_enabled = (
                 request.kill_switch_enabled
             )
