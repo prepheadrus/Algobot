@@ -87,20 +87,89 @@ class RiskEngine:
         self.config = config or RiskConfig()
         
         # State tracking
-        self.consecutive_losses = 0
+        from collections import defaultdict
+        import asyncio
+        from pathlib import Path
+        import json
+
+        self.consecutive_losses = defaultdict(int)
         self.daily_pnl = 0.0
         self.total_pnl = 0.0
         self.daily_trades = 0
         
         # Kill switch
-        self.kill_switch_active = False
+        self.kill_switch_active = defaultdict(bool)
+
+        self._state_lock = asyncio.Lock()
+        self._state_file = Path("data/state/risk_state.json")
+        self._state_file.parent.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"⚠️ Risk Engine initialized (max_risk={self.config.max_risk_per_trade:.2%})")
+
+        # Event loop varsa state'i yükle
+        try:
+            loop = asyncio.get_running_loop()
+            if loop and loop.is_running():
+                loop.create_task(self.load_state())
+        except RuntimeError:
+            # Loop henüz yoksa pas geç, uygulama kendi state'ini load edecektir.
+            pass
     
     # ========================================================================
     # POZİSYON BOYUTU HESAPLAMA
+
+    async def load_state(self):
+        """Asenkron olarak risk state'ini yükle."""
+        import json
+        import aiofiles
+
+        if not self._state_file.exists():
+            return
+
+        try:
+            async with self._state_lock:
+                async with aiofiles.open(self._state_file, "r") as f:
+                    data = json.loads(await f.read())
+                    if "consecutive_losses" in data:
+                        self.consecutive_losses.update(data["consecutive_losses"])
+                    if "kill_switch_active" in data:
+                        self.kill_switch_active.update(data["kill_switch_active"])
+            logger.info("✅ Risk state yüklendi.")
+        except Exception as e:
+            logger.error(f"Risk state yüklenirken hata oluştu: {e}")
+
+    async def _save_state(self):
+        """Asenkron olarak risk state'ini kaydet."""
+        import json
+        import aiofiles
+
+        try:
+            async with self._state_lock:
+                data = {
+                    "consecutive_losses": dict(self.consecutive_losses),
+                    "kill_switch_active": dict(self.kill_switch_active)
+                }
+                async with aiofiles.open(self._state_file, "w") as f:
+                    await f.write(json.dumps(data, indent=2))
+        except Exception as e:
+            logger.error(f"Risk state kaydedilirken hata oluştu: {e}")
+
+    # ========================================================================
+    # EVENT LISTENERS
     # ========================================================================
     
+    async def on_position_closed(self, event):
+        """
+        position.closed olayını dinler ve ardışık kayıp sayacını günceller.
+        """
+        payload = event.payload
+        bot_id = payload.get("bot_id")
+        pnl = payload.get("pnl", 0.0)
+
+        if bot_id:
+            await self.record_trade_result(bot_id, pnl)
+# ========================================================================
+
     def calculate_position_size(
         self,
         account_balance: float,
@@ -363,56 +432,57 @@ class RiskEngine:
     # RISK LIMIT KONTROLÜ
     # ========================================================================
     
-    def check_kill_switch(self) -> bool:
+    async def check_kill_switch(self, bot_id: str) -> bool:
         """
-        Kill switch aktif mi kontrol et.
-
-        Koşullar:
-        - Kill switch enabled olmalı
-        - Ardışık kayıp >= max_consecutive_losses (ve limit > 0)
-        - Günlük kayıp >= max_daily_loss
-
-        Returns:
-            True ise kill switch aktif
+        Kill switch aktif mi kontrol et ve gerekirse asenkron eventi fırlat.
         """
-        # Kill switch devre dışı ise kontrol etme
         if not self.config.kill_switch_enabled:
-            self.kill_switch_active = False
+            self.kill_switch_active[bot_id] = False
             return False
 
-        # Ardışık kayıp kontrolü (limit 0 ise sınırsız)
+        # Ardışık kayıp kontrolü
         if self.config.max_consecutive_losses > 0 and \
-           self.consecutive_losses >= self.config.max_consecutive_losses:
-            logger.warning(
-                f"🚨 KILL SWITCH: {self.consecutive_losses} ardışık kayıp "
-                f"(limit: {self.config.max_consecutive_losses})"
-            )
-            self.kill_switch_active = True
+           self.consecutive_losses[bot_id] >= self.config.max_consecutive_losses:
+            if not self.kill_switch_active[bot_id]:
+                logger.warning(f"🚨 KILL SWITCH AKTİF: {self.consecutive_losses[bot_id]} ardışık kayıp ({bot_id})")
+                self.kill_switch_active[bot_id] = True
+
+                # Event Bus'a bildir
+                from shared.events.event_bus import event_bus
+                from shared.events.events import Event
+                await event_bus.publish(Event(
+                    type="bot.stopped",
+                    payload={
+                        'bot_id': bot_id,
+                        'reason': 'kill_switch_activated',
+                        'consecutive_losses': self.consecutive_losses[bot_id]
+                    },
+                    source="risk_engine"
+                ))
             return True
 
         # Günlük kayıp kontrolü
         if self.daily_pnl <= -self.config.max_daily_loss:
-            logger.critical(
-                f"🚨 KILL SWITCH: Günlük kayıp {self.daily_pnl:.2%} "
-                f"(limit: {self.config.max_daily_loss:.2%})"
-            )
-            self.kill_switch_active = True
+            if not self.kill_switch_active[bot_id]:
+                logger.critical(
+                    f"🚨 KILL SWITCH: Günlük kayıp {self.daily_pnl:.2%} "
+                    f"(limit: {self.config.max_daily_loss:.2%}) ({bot_id})"
+                )
+                self.kill_switch_active[bot_id] = True
             return True
 
         return False
     
-    def can_open_position(self, current_positions: int) -> bool:
+    def is_kill_switch_active(self, bot_id: str) -> bool:
+        """O(1) hızında Kill Switch kontrolü (senkron)."""
+        return self.kill_switch_active.get(bot_id, False)
+
+    def can_open_position(self, bot_id: str, current_positions: int) -> bool:
         """
         Yeni pozisyon açılabilir mi?
-        
-        Args:
-            current_positions: Şu anki açık pozisyon sayısı
-        
-        Returns:
-            True ise açılabilir
         """
         # Kill switch kontrolü
-        if self.kill_switch_active:
+        if self.is_kill_switch_active(bot_id):
             return False
         
         # Maksimum pozisyon kontrolü
@@ -450,30 +520,38 @@ class RiskEngine:
     # TRADE RESULT TRACKING
     # ========================================================================
     
-    def record_trade_result(self, pnl: float):
+    async def record_trade_result(self, bot_id: str, pnl: float):
         """
-        İşlem sonucunu kaydet.
-        
-        Args:
-            pnl: PnL ($)
+        İşlem sonucunu kaydet ve state'i güncelle (Asenkron).
+        Epsilon/Microscopic loss filtresi içerir.
         """
         # Günlük PnL güncelle
         self.daily_pnl += pnl
         self.total_pnl += pnl
         self.daily_trades += 1
         
-        # Ardışık kayıp sayacı
-        if pnl < 0:
-            self.consecutive_losses += 1
-            logger.debug(f"Ardışık kayıp: {self.consecutive_losses}")
-        else:
-            # Kar ile sıfırla
-            self.consecutive_losses = 0
+        # Epsilon (Microscopic Loss) Filtresi:
+        # PnL <= -0.5 ise zarar say,
+        # -0.5 < PnL <= 0 ise başabaş/komisyon zararı say (pass)
+        # PnL > 0 ise kar say (sıfırla)
+        epsilon = -0.5
         
-        # Kill switch kontrolü
-        self.check_kill_switch()
+        if pnl <= epsilon:
+            self.consecutive_losses[bot_id] += 1
+            logger.debug(f"[{bot_id}] Ardışık kayıp: {self.consecutive_losses[bot_id]}")
+        elif pnl > 0:
+            self.consecutive_losses[bot_id] = 0
+            # Eğer kill switch daha önce açıksa ve kâra geçildiyse kapatılabilmesi için logic eklenebilir,
+            # şimdilik sadece sayacı sıfırlıyoruz.
+        else:
+            # Break-even veya epsilon zararı, hiçbir şey yapma
+            logger.debug(f"[{bot_id}] Break-even/Mikroskobik zarar (PnL: {pnl}), sayaç değiştirilmedi.")
+            pass
+
+        await self.check_kill_switch(bot_id)
+        await self._save_state()
     
-    def reset_daily(self):
+    async def reset_daily(self):
         """
         Günlük sayaçları sıfırla.
         Her yeni gün çağrılmalı.
@@ -485,17 +563,23 @@ class RiskEngine:
         
         self.daily_pnl = 0.0
         self.daily_trades = 0
-        self.consecutive_losses = 0
-        self.kill_switch_active = False
+        self.consecutive_losses.clear()
+        self.kill_switch_active.clear()
+        await self._save_state()
     
-    def reset_kill_switch(self):
+    async def reset_kill_switch(self, bot_id: Optional[str] = None):
         """
         Kill switch'i manuel sıfırla.
-        Kullanıcı onayı ile çağrılmalı.
         """
-        logger.info("🔓 Kill switch manuel olarak sıfırlandı")
-        self.kill_switch_active = False
-        self.consecutive_losses = 0
+        if bot_id:
+            logger.info(f"🔓 Kill switch manuel olarak sıfırlandı ({bot_id})")
+            self.kill_switch_active[bot_id] = False
+            self.consecutive_losses[bot_id] = 0
+        else:
+            logger.info("🔓 Tüm Kill switch'ler manuel olarak sıfırlandı")
+            self.kill_switch_active.clear()
+            self.consecutive_losses.clear()
+        await self._save_state()
     
     # ========================================================================
     # RISK METRICS
@@ -544,16 +628,13 @@ class RiskEngine:
     def get_stats(self) -> Dict[str, Any]:
         """
         Risk istatistikleri.
-        
-        Returns:
-            Dict with all stats
         """
         return {
-            'consecutive_losses': self.consecutive_losses,
+            'consecutive_losses': dict(self.consecutive_losses),
             'daily_pnl': self.daily_pnl,
             'daily_trades': self.daily_trades,
             'total_pnl': self.total_pnl,
-            'kill_switch_active': self.kill_switch_active,
+            'kill_switch_active': dict(self.kill_switch_active),
             'config': {
                 'max_risk_per_trade': self.config.max_risk_per_trade,
                 'max_leverage': self.config.max_leverage,
@@ -566,13 +647,10 @@ class RiskEngine:
     def get_risk_summary(self) -> str:
         """
         Risk özeti (log için).
-        
-        Returns:
-            Summary string
         """
         return (
             f"Risk Summary: "
             f"Daily PnL: ${self.daily_pnl:.2f} ({self.daily_pnl:.2%}), "
-            f"Consecutive Losses: {self.consecutive_losses}, "
-            f"Kill Switch: {'AKTIF' if self.kill_switch_active else 'PASIF'}"
+            f"Consecutive Losses: {dict(self.consecutive_losses)}, "
+            f"Kill Switch: {dict(self.kill_switch_active)}"
         )

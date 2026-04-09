@@ -79,6 +79,13 @@ class PaperTrader:
             fee_rate_spot=fee_rate_spot, fee_rate_futures=fee_rate_futures
         )
         self.risk_engine = RiskEngine(config=risk_config)
+        # Asenkron Risk State Yüklemesi (Paper Engine Event Loop ile Senkronizasyon)
+        try:
+            loop = asyncio.get_running_loop()
+            if loop and loop.is_running():
+                loop.create_task(self.risk_engine.load_state())
+        except RuntimeError:
+            pass
         self.bot_manager = BotManager()
 
         # ============================================
@@ -104,7 +111,7 @@ class PaperTrader:
         self.global_confidence = 0.0
         self.volatility_shield = "SAFE"
         self.kill_switch_activated = False
-        self.consecutive_losses = 0
+
         self.market_regime = "UNKNOWN"
 
         # Thread-safe balance updates
@@ -148,6 +155,7 @@ class PaperTrader:
         # Position handlers
         event_bus.subscribe("position.opened", self.on_position_opened)
         event_bus.subscribe("position.closed", self.on_position_closed)
+        event_bus.subscribe("position.closed", self.risk_engine.on_position_closed)
         event_bus.subscribe("position.partial_closed", self.on_position_partial_closed)
 
         # Bot handlers
@@ -233,7 +241,7 @@ class PaperTrader:
             # RISK ENGINE KONTROL - Detaylı loglama
             # ============================================
             open_positions_count = len(self.position_manager.get_all_positions())
-            risk_ok = self.risk_engine.can_open_position(open_positions_count)
+            risk_ok = self.risk_engine.can_open_position(symbol, open_positions_count)
 
             if not risk_ok:
                 logger.warning(f"❌ [SİNYAL RED] Risk kontrolü başarısız: {symbol}")
@@ -245,7 +253,7 @@ class PaperTrader:
                     f"   Kill switch aktif: {self.risk_engine.kill_switch_active}"
                 )
                 logger.warning(
-                    f"   Ardışık kayıplar: {self.risk_engine.consecutive_losses}"
+                    f"   Ardışık kayıplar: {self.risk_engine.consecutive_losses.get(symbol, 0)}"
                 )
                 logger.warning(
                     f"   Max consecutive losses: {self.risk_engine.config.max_consecutive_losses}"

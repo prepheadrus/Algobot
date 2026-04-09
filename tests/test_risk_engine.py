@@ -140,3 +140,88 @@ def test_position_size_without_ml_confidence(risk_engine):
         ml_confidence=None # None fallback -> default leverage 1x
     )
     assert math.isclose(size, 0.02, rel_tol=1e-5)
+
+# =====================================================================
+# KILL SWITCH & CONSECUTIVE LOSSES TESTS
+# =====================================================================
+
+@pytest.mark.asyncio
+async def test_kill_switch_isolation_multiple_bots(risk_engine):
+    """Farklı botların consecutive losses sayaçları birbirinden izole olmalıdır."""
+    bot1 = "BTC_BOT"
+    bot2 = "ETH_BOT"
+
+    # Bot 1 için 2 zarar (sınır 3)
+    await risk_engine.record_trade_result(bot_id=bot1, pnl=-10.0)
+    await risk_engine.record_trade_result(bot_id=bot1, pnl=-10.0)
+
+    # Bot 2 için 1 zarar
+    await risk_engine.record_trade_result(bot_id=bot2, pnl=-5.0)
+
+    assert risk_engine.consecutive_losses[bot1] == 2
+    assert risk_engine.consecutive_losses[bot2] == 1
+
+    # İkisinin de kill switch'i henüz aktif değil
+    assert not risk_engine.is_kill_switch_active(bot1)
+    assert not risk_engine.is_kill_switch_active(bot2)
+
+@pytest.mark.asyncio
+async def test_kill_switch_activation(risk_engine):
+    """Ardışık kayıplar sınırı aşarsa Kill Switch aktifleşmelidir."""
+    risk_engine.config.kill_switch_enabled = True
+    risk_engine.config.max_daily_loss = 1000.0  # bypass daily loss trigger
+    bot_id = "SOL_BOT"
+
+    # 3 ardışık kayıp
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+
+    assert risk_engine.consecutive_losses[bot_id] == 3
+    assert risk_engine.is_kill_switch_active(bot_id)
+
+    # Yeni pozisyon açılması engellenmeli
+    assert not risk_engine.can_open_position(bot_id, current_positions=0)
+
+@pytest.mark.asyncio
+async def test_microscopic_loss_epsilon_filter(risk_engine):
+    """Epsilon mikroskobik zarar (-0.5 <= PnL <= 0) sayacı artırmamalı veya sıfırlamamalıdır."""
+    bot_id = "BNB_BOT"
+
+    # 1 normal zarar
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+    assert risk_engine.consecutive_losses[bot_id] == 1
+
+    # Epsilon zarar (break-even komisyon kaybı)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-0.2)
+    assert risk_engine.consecutive_losses[bot_id] == 1  # Sayaç sabit kalmalı
+
+    # Kâr gelirse sıfırlanmalı
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=5.0)
+    assert risk_engine.consecutive_losses[bot_id] == 0
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_event_published(risk_engine, mocker):
+    """Sınır aşıldığında bot.stopped (kill_switch_activated) olayı fırlatılmalıdır."""
+    # event_bus'ı mockla
+    from shared.events.event_bus import event_bus
+
+    # event_bus.publish bir coroutine
+    mock_publish = mocker.patch.object(event_bus, "publish", new_callable=mocker.AsyncMock)
+
+    risk_engine.config.kill_switch_enabled = True
+    risk_engine.config.max_daily_loss = 1000.0  # bypass daily loss trigger
+    bot_id = "TEST_EVENT_BOT"
+
+    # 3 zarar (sınır 3)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+    await risk_engine.record_trade_result(bot_id=bot_id, pnl=-10.0)
+
+    assert mock_publish.call_count == 1
+    published_event = mock_publish.call_args[0][0]
+    assert published_event.type == "bot.stopped"
+    assert published_event.payload["bot_id"] == bot_id
+    assert published_event.payload["reason"] == "kill_switch_activated"
+    assert published_event.payload["consecutive_losses"] == 3
