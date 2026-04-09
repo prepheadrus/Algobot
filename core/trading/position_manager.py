@@ -180,6 +180,7 @@ class PositionManager:
                 leverage=leverage,
                 opened_at=datetime.utcnow(),
                 stop_loss=stop_loss,
+                initial_stop_loss=stop_loss,
                 take_profit=take_profit,
                 margin=margin,
                 commission=fee,
@@ -363,7 +364,9 @@ class PositionManager:
                 # Bloke etme, devam et - belki önceki kapatma başarısız oldu
 
             # Kısmi kapanış mı yoksa tam kapanış mı?
-            is_partial_close = size_to_close is not None and size_to_close < position.size
+            is_partial_close = size_to_close is not None and round(size_to_close, 4) < round(position.size, 4)
+            if size_to_close is not None:
+                size_to_close = round(size_to_close, 4)
 
             if not is_partial_close:
                 # Tam Kapanış Kilidi
@@ -598,50 +601,50 @@ class PositionManager:
         current_price = current_high if position.direction == PositionDirection.LONG else current_low
 
         # ========================================================================
-        # AŞAMA 1: KISMI KÂR ALMA (50% TP) & BREAKEVEN KORUMASI
+        # AŞAMA 1: KISMI KÂR ALMA (R-Multiple) & BREAKEVEN KORUMASI
         # ========================================================================
-        if position.should_take_partial_profit(current_price):
-            logger.info(
-                f"[RISK] 3 Aşamalı Kâr Koruma ve Throttle Aktif - AŞAMA 1 & 2: "
-                f"{position.symbol} Kısmi kâr alma tetiklendi! "
-                f"Fiyat: ${current_price:.2f}, TP: ${position.take_profit:.2f}"
-            )
+        triggered_levels = position.get_triggered_tp_levels(current_price)
+        if triggered_levels:
+            total_percentage = sum(level.get("percentage", 0.0) for level in triggered_levels)
+            if total_percentage > 0:
+                size_to_close = round(position.size * total_percentage, 4)
 
-            # Kapanacak miktarı hesapla (%50)
-            size_closed = position.size * 0.5
-            remaining_size = position.size - size_closed
+                logger.info(
+                    f"[RISK] 3 Aşamalı Kâr Koruma - AŞAMA 1 & 2: "
+                    f"{position.symbol} {len(triggered_levels)} hedef vuruldu! "
+                    f"Fiyat: ${current_price:.2f}, Kapanacak Miktar: {size_to_close}"
+                )
 
-            # PnL hesapla
-            pnl = position.unrealized_pnl(current_price) * 0.5
-            pnl_percent = position.unrealized_pnl_percent(current_price)
+                # Update take_profit_levels state synchronously
+                new_tp_levels = []
+                for level in position.take_profit_levels:
+                    new_level = dict(level)
+                    for triggered in triggered_levels:
+                        if abs(new_level.get("level", 0.0) - triggered.get("level", 0.0)) < 1e-6:
+                            new_level["hit"] = True
+                    new_tp_levels.append(new_level)
 
-            # Bayrağı, boyutu, marjini ve Breakeven'i güncelle (immutable)
-            # Not: Kısmi kâr alınınca doğrudan Breakeven (Giriş Fiyatı) uygulanır (Risk = 0)
-            breakeven_price = position.entry_price
-            position = dataclasses.replace(
-                position,
-                size=remaining_size,
-                margin=position.margin * 0.5,
-                stop_loss=breakeven_price,
-                partial_profit_taken=True,
-                breakeven_activated=True
-            )
+                breakeven_price = position.entry_price * (1 + 0.0008) if position.direction.value == 'LONG' else position.entry_price * (1 - 0.0008)
 
-            # Self dictionary'yi güncelle
-            self.positions[position.bot_id] = position
+                # SENKRON STATE GÜNCELLEMESİ (Race Condition Koruması)
+                position = dataclasses.replace(
+                    position,
+                    take_profit_levels=new_tp_levels,
+                    stop_loss=breakeven_price,
+                    partial_profit_taken=True,
+                    breakeven_activated=True
+                )
+                self.positions[position.bot_id] = position
 
-            # Event fırlat
-            partial_event = PositionPartialClosedEvent(
-                bot_id=position.bot_id,
-                symbol=position.symbol,
-                direction=position.direction,
-                exit_price=current_price,
-                size_closed=size_closed,
-                pnl=pnl,
-                pnl_percent=pnl_percent,
-                remaining_size=remaining_size
-            )
-            await event_bus.publish(partial_event.to_event())
+                # EVENT LOOP ASENKRON ÇAĞRI (State koruması sonrası fırlat)
+                asyncio.create_task(
+                    self.close_position(
+                        bot_id=position.bot_id,
+                        exit_price=current_price,
+                        reason="partial_tp_hit",
+                        size_to_close=size_to_close
+                    )
+                )
 
         # ========================================================================
         # AŞAMA 2: BAŞA BAŞ (BREAKEVEN) KORUMASI (Kısmi kar alınmamışsa)
