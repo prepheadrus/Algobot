@@ -30,6 +30,7 @@ from data.indicators.momentum import MomentumIndicators
 from data.indicators.volatility import VolatilityIndicators
 from data.indicators.volume import VolumeIndicators
 from data.indicators.advanced import AdvancedIndicators
+from data.indicators.price_action import PriceActionIndicators
 
 # Set global pandas option to avoid FutureWarning on downcasting object dtype arrays
 # E402 (Module level import not at top of file) is silenced intentionally,
@@ -875,6 +876,40 @@ class StrategyIndicators:
         except Exception as e:
             logger.warning(f"⚠️ [IND] TTM Squeeze hesaplama hatası: {e}")
 
+
+        # --- ORDER FLOW (Sipariş Akışı) & META LABELING ÖZELLİKLERİ ---
+        try:
+            # Wick Imbalance
+            df["wick_imbalance"] = PriceActionIndicators.wick_imbalance(
+                df["open"], df["high"], df["low"], df["close"]
+            )
+
+            # Göreceli Hacim (Relative Volume 20)
+            if "volume" in df.columns:
+                df["rel_volume_20"] = VolumeIndicators.rel_volume(df["volume"], 20)
+
+            # Distance to VWAP
+            if "VWAP" not in df.columns and "volume" in df.columns:
+                df["VWAP"] = VolumeIndicators.vwap(df["high"], df["low"], df["close"], df["volume"])
+
+            if "VWAP" in df.columns:
+                df["vwap_dist"] = VolumeIndicators.vwap_dist(df["close"], df["VWAP"])
+
+            # ATR Ratio
+            if "ATR_14" not in df.columns:
+                df["ATR_14"] = VolatilityIndicators.atr(df["high"], df["low"], df["close"], 14)
+            df["atr_ratio"] = VolatilityIndicators.atr_ratio(df["ATR_14"], df["close"])
+
+            # Uyarlanabilir Konkorde (Akıllı Para vs Küçük Yatırımcı)
+            if "volume" in df.columns:
+                koncorde_res = AdvancedIndicators.calculate_koncorde(
+                    df["close"], df["high"], df["low"], df["volume"], period=15
+                )
+                df["KONKORDE_AZUL"] = koncorde_res["azul"]
+                df["KONKORDE_VERDE"] = koncorde_res["verde"]
+
+        except Exception as e:
+            logger.error(f"⚠️ [IND] Sipariş Akışı (Order Flow) hesaplama hatası: {e}")
 
         # Veri Integrity: NaN/Inf Temizliği (SKILL.md)
         df = df.replace([np.inf, -np.inf], np.nan).fillna(0)

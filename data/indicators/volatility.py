@@ -292,3 +292,13 @@ class VolatilityIndicators:
             hv = hv * np.sqrt(365)
         
         return hv
+
+    @staticmethod
+    def atr_ratio(atr_val: pd.Series, close: pd.Series) -> pd.Series:
+        """
+        Volatilite Rejimi (ATR Ratio).
+        ATR'nin fiyata oranı (Normalleştirilmiş ATR).
+        """
+        close_safe = close.replace(0, np.nan)
+        ratio = (atr_val / close_safe) * 100
+        return ratio.replace([np.inf, -np.inf], np.nan).fillna(0)
