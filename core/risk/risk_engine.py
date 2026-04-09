@@ -107,23 +107,28 @@ class RiskEngine:
         entry_price: float,
         stop_loss_price: float,
         risk_percentage: Optional[float] = None,
-        leverage: float = 1.0,
+        ml_confidence: Optional[float] = None,
+        max_leverage: float = 10.0,
         free_margin: Optional[float] = None
     ) -> float:
         """
-        Pozisyon boyutu hesapla (risk bazlı).
+        Pozisyon boyutu hesapla (Hedge Fund Standartları).
         
-        Formül: min((Bakiye × Risk%) / |Giriş - Stop|, (Bakiye × Kaldıraç) / Giriş)
+        Formül: Büyüklük hesaplaması KESİNLİKLE Stop-Loss mesafesine göre dinamiktir.
+        Hesaplanan notional değer, Machine Learning (ML) Confidence tabanlı dinamik kaldıraç
+        ile belirlenen (Balance * DynamicLeverage) sınırını (Hard Cap) aşamaz.
         
         Args:
             account_balance: Hesap bakiyesi
             entry_price: Giriş fiyatı
             stop_loss_price: Stop loss fiyatı
             risk_percentage: Risk yüzdesi (None ise config.max_risk_per_trade kullanılır)
-            leverage: Kullanılan kaldıraç (boyut sınırlandırması için)
+            ml_confidence: ML modelinin güven skoru (0.0-1.0 veya None)
+            max_leverage: Üst sınır kaldıraç değeri
+            free_margin: Serbest bakiye limiti (opsiyonel)
         
         Returns:
-            Pozisyon boyutu (coin miktarı)
+            Pozisyon boyutu (coin/base asset miktarı)
         """
         # Risk yüzdesini belirle
         if risk_percentage is None:
@@ -138,50 +143,62 @@ class RiskEngine:
             )
             risk_percentage = 1.0  # Güvenli fallback
         
-        # Risk miktarı ($)
+        # İşlem başına riske edilecek tutar ($)
         risk_amount = account_balance * (risk_percentage / 100.0)
         
-        # Fiyat mesafesi
-        price_distance = abs(entry_price - stop_loss_price)
+        # Stop-Loss Mesafesi
+        sl_distance = abs(entry_price - stop_loss_price)
         
-        if price_distance <= 0:
+        # ZeroDivisionError Kalkanı
+        if sl_distance <= 0:
+            logger.warning("⚠️ [RISK] sl_distance == 0. Pozisyon açılamaz.")
             return 0.0
         
-        # 1. Risk bazlı boyut
-        size_by_risk = risk_amount / price_distance
+        # Ham Büyüklük (Coin Miktarı)
+        raw_size = risk_amount / sl_distance
         
-        # 2. İşlem Başına Maksimum Sermaye Limiti (Account limitine göre cap)
-        # Örn: max_open_positions = 10 ise, bir işleme en fazla %10 marjin ayrılabilir.
-        max_positions = getattr(self.config, 'max_open_positions', 10)
-        max_positions = max(1, max_positions)
-        max_margin_per_trade = account_balance / max_positions
-        
-        # Seçilen kaldıraç ile ulaşılabilecek maksimum notional limit (Kullanılan Marjin Limiti ile)
-        max_notional_by_margin = max_margin_per_trade * leverage * 0.98 # %2 margin buffer
-        size_by_margin_limit = max_notional_by_margin / entry_price
-        
-        # 3. Serbest Bakiye Limiti (Gerçekte kullanılabilir olan bakiye kısıtlaması)
-        # Eğer free_margin belirtildiyse, yeni açılacak pozisyon free_margin'i de aşmamalı
-        size_by_free_margin = float('inf')
-        if free_margin is not None:
-            max_notional_by_free_margin = free_margin * leverage * 0.98
-            size_by_free_margin = max_notional_by_free_margin / entry_price
-
-        # En küçüğünü al
-        position_size = min(size_by_risk, size_by_margin_limit, size_by_free_margin)
-        
-        logger.debug(
-            f"📏 Boyut Hesabı | Risk: {size_by_risk:.4f}, MarginLimit: {size_by_margin_limit:.4f}, "
-            f"FreeMarginLimit: {size_by_free_margin:.4f} -> Final: {position_size:.4f}"
+        # Dinamik Kaldıraç Çarpanı (Hard Cap)
+        dynamic_leverage = self.calculate_dynamic_leverage(
+            confidence_score=ml_confidence,
+            max_leverage=max_leverage
         )
-        
+
+        if dynamic_leverage <= 0.0:
+            logger.warning(f"⚠️ [RISK] ML Confidence VETO. dynamic_leverage={dynamic_leverage}. İşlem açılamaz.")
+            return 0.0
+
+        # Clipping (Kırpma) işlemi
+        max_notional_allowed = account_balance * dynamic_leverage
+        raw_notional = raw_size * entry_price
+
+        if raw_notional > max_notional_allowed:
+            logger.debug(
+                f"✂️ [RISK] Clipping uygulandı! Ham Notional: {raw_notional:.2f} > "
+                f"İzin Verilen: {max_notional_allowed:.2f} (Kaldıraç: {dynamic_leverage}x)"
+            )
+            raw_size = max_notional_allowed / entry_price
+
+        # Serbest Bakiye Limiti (Gerçekte kullanılabilir olan bakiye kısıtlaması)
+        if free_margin is not None:
+            max_notional_by_free_margin = free_margin * dynamic_leverage * 0.98
+            size_by_free_margin = max_notional_by_free_margin / entry_price
+            raw_size = min(raw_size, size_by_free_margin)
+
         # Risk Doğrulaması (Assert) - Kayan nokta hassasiyetiyle
-        calculated_risk = position_size * abs(entry_price - stop_loss_price)
+        calculated_risk = raw_size * sl_distance
         max_allowed_risk = account_balance * (risk_percentage / 100.0)
 
-        assert calculated_risk <= (max_allowed_risk * 1.01), f"Sistem Hatası: Planlanan risk ({calculated_risk:.2f}) anapara limitini ({max_allowed_risk:.2f}) aşıyor!"
+        assert calculated_risk <= (max_allowed_risk * 1.01), (
+            f"Sistem Hatası: Planlanan risk ({calculated_risk:.2f}) "
+            f"anapara limitini ({max_allowed_risk:.2f}) aşıyor!"
+        )
 
-        return position_size
+        logger.debug(
+            f"📏 [RISK] Boyut Hesabı | RiskAmount={risk_amount:.2f}, SL_Distance={sl_distance:.4f}, "
+            f"DynamicLev={dynamic_leverage}x -> Final Size (Coin): {raw_size:.6f}"
+        )
+
+        return raw_size
     
     # ========================================================================
     # DİNAMİK KALDIRAÇ HESAPLAMA
@@ -189,7 +206,7 @@ class RiskEngine:
     
     def calculate_dynamic_leverage(
         self,
-        confidence_score: float,
+        confidence_score: Optional[float],
         base_leverage: Optional[float] = None,
         max_leverage: Optional[float] = None,
         timeframe: str = "1h"  # YENİ: Timeframe bilgisi
@@ -197,33 +214,46 @@ class RiskEngine:
         """
         Güven skoruna göre dinamik kaldıraç (Meta-Labeling).
 
-        TRADING_RULES_AND_RISK.md standartlarına göre:
+        Hedge Fund standartlarına göre:
+        - confidence None: return default_leverage (Fallback Kalkanı)
         - confidence < 0.50: return 0 (İşlemi VETO ET)
-        - 0.50 <= confidence < 0.65: return 2 (Düşük Risk, 2x Kaldıraç)
-        - 0.65 <= confidence < 0.80: return 4 (Orta Risk, 4x sabitle)
-        - confidence >= 0.80: return 8 (Yüksek Risk, 8x sabitle)
+        - 0.50 <= confidence < 0.65: return min(3.0, max_leverage)
+        - 0.65 <= confidence <= 0.80: return min(5.0, max_leverage)
+        - confidence > 0.80: return min(10.0, max_leverage)
 
         Args:
-            confidence_score: Güven skoru (0.0 - 1.0)
-            base_leverage: Baz kaldıraç (None ise config.default_leverage) - kullanılmaz, uyumluluk için var
-            max_leverage: Maksimum kaldıraç (None ise config.max_leverage) - kullanılmaz, uyumluluk için var
+            confidence_score: Güven skoru (0.0 - 1.0) veya None
+            base_leverage: Baz kaldıraç (None ise config.default_leverage)
+            max_leverage: Maksimum kaldıraç (None ise config.max_leverage)
             timeframe: Zaman dilimi (örn: "1m", "15m", "1h")
 
         Returns:
-            Dinamik kaldıraç (0.0, 2.0, 4.0 veya 8.0)
+            Dinamik kaldıraç
         """
+        # Fallback Kalkanı
+        if confidence_score is None:
+            fallback_leverage = base_leverage if base_leverage is not None else getattr(self.config, 'default_leverage', 1.0)
+            logger.debug(
+                f"🛡️ [RISK] ML Confidence None geldi. Fallback (default_leverage) kullanılıyor: {fallback_leverage}x"
+            )
+            return float(fallback_leverage)
+
+        # Maksimum Kaldıraç Sınırı
+        actual_max_leverage = max_leverage if max_leverage is not None else getattr(self.config, 'max_leverage', 10.0)
+
+        # Dinamik Aralıklar (Upper Bounds)
         if confidence_score < 0.50:
             final_leverage = 0.0
         elif confidence_score < 0.65:
-            final_leverage = 2.0
-        elif confidence_score < 0.80:
-            final_leverage = 4.0
+            final_leverage = min(3.0, actual_max_leverage)
+        elif confidence_score <= 0.80:
+            final_leverage = min(5.0, actual_max_leverage)
         else:
-            final_leverage = 8.0
+            final_leverage = min(10.0, actual_max_leverage)
 
         logger.debug(
             f"🚀 Dinamik kaldıraç (Meta-Labeling): Confidence={confidence_score:.2%}, "
-            f"Leverage={final_leverage}x"
+            f"Leverage={final_leverage}x (Max Limit: {actual_max_leverage}x)"
         )
 
         return float(final_leverage)
