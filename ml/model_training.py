@@ -542,8 +542,19 @@ class ModelTrainer:
             xgb_final_params = self.xgb_model.get_params()
             if 'num_class' in xgb_final_params and num_classes == 2:
                 xgb_final_params.pop('num_class', None)
+
             xgb_final_params.update(dynamic_xgb_params)
-            self.xgb_model.set_params(**xgb_final_params)
+
+            # Ana modelin donanım ve seed ayarlarını koru
+            hardware_params = {
+                'n_jobs': getattr(self.xgb_model, 'n_jobs', -1),
+                'tree_method': getattr(self.xgb_model, 'tree_method', 'hist'),
+                'random_state': getattr(self.xgb_model, 'random_state', 42)
+            }
+            xgb_final_params.update(hardware_params)
+
+            # Modeli sıfırdan oluşturarak olası kalıntı hataları engelle
+            self.xgb_model = xgb.XGBClassifier(**xgb_final_params)
 
             # Final modeli en iyi parametrelerle eğit
             logger.info("🔄 En iyi parametrelerle final XGBoost modeli eğitiliyor...")
@@ -562,8 +573,19 @@ class ModelTrainer:
             xgb_final_params = self.xgb_model.get_params()
             if 'num_class' in xgb_final_params and num_classes == 2:
                 xgb_final_params.pop('num_class', None)
+
             xgb_final_params.update(dynamic_xgb_params)
-            self.xgb_model.set_params(**xgb_final_params)
+
+            # Ana modelin donanım ve seed ayarlarını koru
+            hardware_params = {
+                'n_jobs': getattr(self.xgb_model, 'n_jobs', -1),
+                'tree_method': getattr(self.xgb_model, 'tree_method', 'hist'),
+                'random_state': getattr(self.xgb_model, 'random_state', 42)
+            }
+            xgb_final_params.update(hardware_params)
+
+            # Modeli sıfırdan oluşturarak olası kalıntı hataları engelle
+            self.xgb_model = xgb.XGBClassifier(**xgb_final_params)
 
             eval_set = [(X_train, y_train), (X_test, y_test)]
             self.xgb_model.fit(
