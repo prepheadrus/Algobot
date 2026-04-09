@@ -671,3 +671,62 @@ class TrendIndicators:
         }, index=close.index)
 
         return df
+
+    @staticmethod
+    def vhf(close: pd.Series, **kwargs) -> pd.DataFrame:
+        """
+        Vertical Horizontal Filter (VHF)
+        XGBoost'un piyasa rejimi dedektörünü tamamlayan yatay piyasa (Flat Market) filtresi.
+        pandas_ta kullanılmadan, %100 vektörize NumPy/Pandas işlemleri ile hesaplanır.
+
+        Args:
+            close (pd.Series): Kapanış fiyatları
+            **kwargs: Optuna hiperparametreleri (period, vhf_sma_period)
+
+        Returns:
+            pd.DataFrame: 'vhf_val', 'vhf_sma' ve 'vhf_signal' kolonlarını içerir.
+        """
+        period = kwargs.get('period', 28)
+        sma_period = kwargs.get('vhf_sma_period', 20)
+
+        n = len(close)
+        if n < period:
+            return pd.DataFrame({
+                'vhf_val': np.full(n, 0.0),
+                'vhf_sma': np.full(n, 0.0),
+                'vhf_signal': np.full(n, 1)
+            }, index=close.index)
+
+        # 1. Pay (Numerator - Dikey Hareket)
+        hcp = close.rolling(window=period, min_periods=1).max()
+        lcp = close.rolling(window=period, min_periods=1).min()
+        numerator = hcp - lcp
+
+        # 2. Payda (Denominator - Yatay Gürültü) ve Sıfıra Bölünme Kalkanı
+        # Piyasa hareketsizse (Flat Market) payda tam olarak 0 çıkar. Infinity fırlatılmasını engellemek
+        # için .replace(0, np.nan) kullanıyoruz.
+        denominator = abs(close.diff()).rolling(window=period, min_periods=1).sum().replace(0, np.nan)
+
+        # 3. VHF Formülü
+        vhf_val = numerator / denominator
+
+        # 4. Sinyal Hattı (Signal Line) ve Sinyal Matrisi
+        vhf_sma = vhf_val.rolling(window=sma_period, min_periods=1).mean()
+
+        # Sinyal Mantığı: 2 (TRENDING), 0 (CHOPPY), 1 (NEUTRAL)
+        vhf_signal = np.where(vhf_val > vhf_sma, 2, np.where(vhf_val < vhf_sma, 0, 1))
+
+        # 5. Data Integrity (Veri Bütünlüğü) Kalkanı
+        vhf_val = vhf_val.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        vhf_sma = vhf_sma.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        # Sinyali düzgün indexle ve eksikleri 1 ile doldur (NEUTRAL)
+        vhf_signal = pd.Series(vhf_signal, index=close.index).fillna(1).astype(int)
+
+        df = pd.DataFrame({
+            'vhf_val': vhf_val,
+            'vhf_sma': vhf_sma,
+            'vhf_signal': vhf_signal
+        }, index=close.index)
+
+        return df

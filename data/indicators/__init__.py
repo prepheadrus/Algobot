@@ -306,6 +306,13 @@ class StrategyIndicators:
         """
         return TrendIndicators.di_spread(high=df['high'], low=df['low'], close=df['close'], **kwargs)
 
+    @classmethod
+    def vhf(cls, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """
+        Vertical Horizontal Filter (VHF) wrapper
+        """
+        return TrendIndicators.vhf(close=df['close'], **kwargs)
+
     @staticmethod
     def resample_data(df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
         """
@@ -839,6 +846,20 @@ class StrategyIndicators:
             df[f"DI_SPREAD_SIGNAL_{di_spread_period}"] = di_spread_df["spread_signal"]
         except Exception as e:
             logger.error(f"[INDICATOR ERROR] DI Spread calculation failed for period {di_spread_period}: {e}")
+
+        # --- VHF (Vertical Horizontal Filter) ---
+        try:
+            vhf_period = kwargs.get("vhf_period", 28)
+
+            vhf_df = StrategyIndicators.vhf(
+                df, period=vhf_period
+            )
+
+            # Sadece ivme ve sinyal kolonlarını aktarıyoruz (Curse of Dimensionality koruması için vhf_sma hariç)
+            df[f"VHF_{vhf_period}"] = vhf_df["vhf_val"]
+            df[f"VHF_SIGNAL_{vhf_period}"] = vhf_df["vhf_signal"]
+        except Exception as e:
+            logger.error(f"[INDICATOR ERROR] VHF calculation failed for period {vhf_period}: {e}")
 
         # --- TTM SQUEEZE ---
         try:
