@@ -24,6 +24,7 @@ except ImportError:
 import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils.class_weight import compute_sample_weight
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -308,6 +309,7 @@ class ModelTrainer:
         trial,
         X_train: pd.DataFrame,
         y_train: pd.Series,
+        dynamic_xgb_params: dict,
     ) -> float:
         """
         Optuna için Negative Log Loss Optimizasyon Hedef Fonksiyonu
@@ -323,12 +325,10 @@ class ModelTrainer:
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2, log=True),
             'subsample': trial.suggest_float('subsample', 0.5, 1.0),
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-            'objective': 'multi:softprob',
-            'num_class': self.num_class,
-            'eval_metric': 'mlogloss',
             'random_state': self.random_state,
             'n_jobs': self.n_jobs
         }
+        params.update(dynamic_xgb_params)
 
         # Sızıntı kalkanı (Purged K-Fold/Embargoing): test/val ufku kadar boşluk bırakıyoruz
         tscv = TimeSeriesSplit(n_splits=5, gap=self.time_horizon)
@@ -364,9 +364,8 @@ class ModelTrainer:
                 loss = log_loss(y_val_fold, preds_proba, labels=model.classes_)
                 neg_logloss_scores.append(-1.0 * loss)
             except Exception as e:
-                # Olası bir xgboost hatası (örn: sadece tek class kalması durumu)
-                logger.debug(f"Fold atlandı, hata: {e}")
-                pass
+                logger.warning(f"Trial pruned due to exception: {str(e)}")
+                raise optuna.TrialPruned()
             finally:
                 # MEMORY BLOAT KALKANI
                 del X_train_fold, y_train_fold, X_val_fold, y_val_fold
@@ -416,13 +415,35 @@ class ModelTrainer:
         else:
             self.feature_names = [f"feature_{i}" for i in range(X_train.shape[1])]
 
-        # Sınıf Ağırlıklandırması (Class Imbalance) hesapla
+        # Eğitim setinde yeterli sınıf çeşitliliği var mı kontrolü (Fail-Fast)
+        unique_classes_set = set(np.unique(y_train))
+        if len(unique_classes_set) < 2:
+            raise ValueError(f"⚠️ [ML] Eğitim setinde yalnızca tek bir sınıf mevcut: {unique_classes_set}. Sınıflandırma yapılamaz. Yeterli sinyal oluşmamış olabilir.")
+
+        # Sınıf uyumsuzluğunu (Anomaly) düzeltme: LabelEncoder ile ardışık index (0, 1, 2...)
+        le = LabelEncoder()
+        y_train = pd.Series(le.fit_transform(y_train), index=y_train.index)
+        y_test = pd.Series(le.transform(y_test), index=y_test.index)
+
+        # Karar Motoru (Decision Engine) için orjinal sınıfları kaydet
+        self.class_mapping = {int(encoded_val): int(original_val) for encoded_val, original_val in enumerate(le.classes_)}
+        logger.info(f"🔄 [ML] Sınıf eşleştirmesi güncellendi: {self.class_mapping}")
+
+        # Sınıf Ağırlıklandırması (Class Imbalance) hesapla (Dönüştürülmüş sınıflarla)
         sample_weights = compute_sample_weight('balanced', y_train)
 
-        # Eğitim setinde yeterli sınıf çeşitliliği var mı kontrolü (Fail-Fast)
-        unique_classes = set(np.unique(y_train))
-        if len(unique_classes) < 2:
-            raise ValueError(f"⚠️ [ML] Eğitim setinde yalnızca tek bir sınıf mevcut: {unique_classes}. Binary classification yapılamaz. Yeterli sinyal oluşmamış olabilir.")
+        # Dinamik Objective ve Num_Class Seçimi
+        num_classes = len(le.classes_)
+        dynamic_xgb_params = {}
+        if num_classes == 2:
+            dynamic_xgb_params['objective'] = 'binary:logistic'
+            dynamic_xgb_params['eval_metric'] = 'logloss'
+            logger.info("ℹ️ [ML] 2 sınıf tespit edildi. XGBoost binary:logistic modunda çalışacak.")
+        else:
+            dynamic_xgb_params['objective'] = 'multi:softprob'
+            dynamic_xgb_params['eval_metric'] = 'mlogloss'
+            dynamic_xgb_params['num_class'] = num_classes
+            logger.info(f"ℹ️ [ML] {num_classes} sınıf tespit edildi. XGBoost multi:softprob modunda çalışacak.")
 
         if protected_features is None:
             protected_features = ["dist_to_vwap", "OBV_EMA", "frac_diff_04", "BTC_VIX"]
@@ -430,15 +451,15 @@ class ModelTrainer:
         logger.info("🛡️ [ML] Feature Selection (Curse of Dimensionality Shield) başlatılıyor...")
 
         def fit_base_model():
-            base_model = xgb.XGBClassifier(
-                n_estimators=100,
-                max_depth=4,
-                learning_rate=0.1,
-                objective='multi:softprob',
-                num_class=self.num_class,
-                random_state=self.random_state,
-                n_jobs=self.n_jobs
-            )
+            base_params = {
+                'n_estimators': 100,
+                'max_depth': 4,
+                'learning_rate': 0.1,
+                'random_state': self.random_state,
+                'n_jobs': self.n_jobs
+            }
+            base_params.update(dynamic_xgb_params)
+            base_model = xgb.XGBClassifier(**base_params)
             base_model.fit(X_train, y_train, sample_weight=sample_weights, verbose=False)
             return base_model
 
@@ -496,7 +517,7 @@ class ModelTrainer:
             study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=self.random_state))
 
             # Objective fonksiyonunu lambda ile wrap ediyoruz (Sadece train gönderilir, Hold-Out kuralı)
-            objective_wrapper = lambda trial: self._objective(trial, X_train, y_train)
+            objective_wrapper = lambda trial: self._objective(trial, X_train, y_train, dynamic_xgb_params)
 
             # n_trials=50 sabiti
             study.optimize(objective_wrapper, n_trials=50)
@@ -517,6 +538,13 @@ class ModelTrainer:
             })
             self._update_models()
 
+            # Dinamik parametreleri xgb_model'e ekle
+            xgb_final_params = self.xgb_model.get_params()
+            if 'num_class' in xgb_final_params and num_classes == 2:
+                xgb_final_params.pop('num_class', None)
+            xgb_final_params.update(dynamic_xgb_params)
+            self.xgb_model.set_params(**xgb_final_params)
+
             # Final modeli en iyi parametrelerle eğit
             logger.info("🔄 En iyi parametrelerle final XGBoost modeli eğitiliyor...")
             eval_set = [(X_train, y_train), (X_test, y_test)]
@@ -530,6 +558,13 @@ class ModelTrainer:
             logger.info("✅ Optuna + XGBoost eğitimi tamamlandı.")
         else:
             logger.info("📊 XGBoost eğitiliyor (Statik)...")
+            # Dinamik parametreleri xgb_model'e ekle
+            xgb_final_params = self.xgb_model.get_params()
+            if 'num_class' in xgb_final_params and num_classes == 2:
+                xgb_final_params.pop('num_class', None)
+            xgb_final_params.update(dynamic_xgb_params)
+            self.xgb_model.set_params(**xgb_final_params)
+
             eval_set = [(X_train, y_train), (X_test, y_test)]
             self.xgb_model.fit(
                 X_train,
@@ -634,7 +669,7 @@ class ModelTrainer:
             }
 
         # Raporlar (dinamik target_names - sadece mevcut sınıflar)
-        target_names = [self.class_mapping.get(i, f'Class_{i}') for i in unique_labels]
+        target_names = [str(self.class_mapping.get(i, f'Class_{i}')) for i in unique_labels]
         report = classification_report(
             y_true,
             y_pred,
