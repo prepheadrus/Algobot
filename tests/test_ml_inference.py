@@ -75,19 +75,19 @@ class TestMLInferenceAndTraining:
     def test_feature_selection_dropping(self, mock_xgb_class):
         """
         Model Eğitimi: Zayıf özelliklerin düşürülmesi (Curse of Dimensionality Shield) testi.
-        Beklenti: 'dist_to_vwap' düşük öneme sahip olsa bile protected olduğu için düşürülmez.
+        Beklenti: 'vwap_dist' düşük öneme sahip olsa bile protected olduğu için düşürülmez.
         'noise_feature' düşük öneme sahip olduğu için düşürülür.
         'strong_feature' yüksek öneme sahip olduğu için düşürülmez.
         """
         # Mock base XGBoost
         mock_base_model = MagicMock()
-        # f_names: ['dist_to_vwap', 'noise_feature', 'strong_feature']
-        # importances: dist_to_vwap (0.001), noise_feature (0.005), strong_feature (0.99)
+        # f_names: ['vwap_dist', 'noise_feature', 'strong_feature']
+        # importances: vwap_dist (0.001), noise_feature (0.005), strong_feature (0.99)
         mock_base_model.feature_importances_ = np.array([0.001, 0.005, 0.99])
         mock_xgb_class.return_value = mock_base_model
 
         trainer = ModelTrainer(enable_auto_regularization=False)
-        trainer.feature_names = ['dist_to_vwap', 'noise_feature', 'strong_feature']
+        trainer.feature_names = ['vwap_dist', 'noise_feature', 'strong_feature']
 
         X_train = pd.DataFrame(np.random.rand(100, 3), columns=trainer.feature_names)
         X_test = pd.DataFrame(np.random.rand(20, 3), columns=trainer.feature_names)
@@ -103,12 +103,12 @@ class TestMLInferenceAndTraining:
                 trainer.train(
                     X_train, y_train, X_test, y_test,
                     min_importance=0.01,
-                    protected_features=['dist_to_vwap']
+                    protected_features=['vwap_dist']
                 )
 
         # 'noise_feature' elenmiş olmalı
         assert 'noise_feature' not in trainer.feature_names
-        # 'dist_to_vwap' korunmuş olmalı
-        assert 'dist_to_vwap' in trainer.feature_names
+        # 'vwap_dist' korunmuş olmalı
+        assert 'vwap_dist' in trainer.feature_names
         # 'strong_feature' güçlü olduğu için kalmalı
         assert 'strong_feature' in trainer.feature_names

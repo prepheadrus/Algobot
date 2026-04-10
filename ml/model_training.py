@@ -332,6 +332,9 @@ class ModelTrainer:
         }
         params.update(dynamic_xgb_params)
 
+        # Dinamik Karar Eşiği (Karar Ağacı Optimizasyonunda İzole Kullanım)
+        threshold = trial.suggest_float('threshold', 0.52, 0.65)
+
         # Sızıntı kalkanı (Purged K-Fold/Embargoing): test/val ufku kadar boşluk bırakıyoruz
         tscv = TimeSeriesSplit(n_splits=5, gap=self.time_horizon)
         precision_scores = []
@@ -364,14 +367,14 @@ class ModelTrainer:
 
                 preds_proba = model.predict_proba(X_val_fold)
 
-                # Olasılık Eşiği (Threshold Gate) Kalkanı (>= 0.60)
-                # Model predict() yerine 0.60 eşiğini kullanarak manuel tahmin oluştururuz
+                # Olasılık Eşiği (Threshold Gate) Kalkanı (Dinamik Optuna)
+                # Model predict() yerine Optuna eşiğini kullanarak manuel tahmin oluştururuz
 
                 # Model sınıfları içerisinde hedef sınıfın (1) olasılık indeksini bul
                 if 1 in model.classes_:
                     pos_class_idx = list(model.classes_).index(1)
-                    # Sadece >= 0.60 olasılıkla 1(Trade) sinyali üret
-                    preds_custom = (preds_proba[:, pos_class_idx] >= 0.60).astype(int)
+                    # Sadece >= threshold olasılıkla 1(Trade) sinyali üret
+                    preds_custom = (preds_proba[:, pos_class_idx] >= threshold).astype(int)
                 else:
                     # Model sadece sınıf 0 üretiyorsa hiç sinyal oluşmaz
                     preds_custom = np.zeros(len(X_val_fold))
@@ -555,8 +558,13 @@ class ModelTrainer:
             # n_trials=50 sabiti
             study.optimize(objective_wrapper, n_trials=50)
 
-            best_params = study.best_params
+            best_params = study.best_params.copy()
+
+            # 🎯 Kritik Mühendislik İzolasyonu: Threshold'u ayır ki XGBoost çökmesin
+            self.custom_optimal_threshold = best_params.pop('threshold', 0.60)
+
             logger.info(f"🏆 Optuna En İyi Parametreler: {best_params}")
+            logger.info(f"🏆 En İyi Threshold: {self.custom_optimal_threshold:.3f}")
             logger.info(f"🏆 En İyi Purged Precision Skoru: {study.best_value:.4f}")
 
             # Best parametreleri set et
@@ -945,6 +953,7 @@ class ModelTrainer:
                 if k not in ['classification_report', 'confusion_matrix']
             },
             'class_mapping': self.class_mapping,
+            'optimal_threshold': getattr(self, 'custom_optimal_threshold', 0.60),
             'hyperparameters': {
                 'n_estimators': self.n_estimators,
                 'max_depth': self.max_depth,
