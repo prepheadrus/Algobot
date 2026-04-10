@@ -791,6 +791,101 @@ class PositionManager:
         
         return roe, pnl_usd
     
+    async def execute_dynamic_partial_tp(self, position: Position, current_price: float, ml_confidence: float, partial_tp_multiplier: float = 1.5) -> Position:
+        """
+        Dinamik Kısmi TP İşlemi (Hedge Fund standartlarında)
+        ML Confidence bazlı çıkış miktarı hesaplar ve stop_loss'u entry_price'a çeker (Breakeven).
+
+        Aksiyon:
+            - LONG: tp_level = entry_price + (atr * partial_tp_multiplier)
+            - SHORT: tp_level = entry_price - (atr * partial_tp_multiplier)
+            - ML Confidence < 0.65 -> %75 çıkış
+            - Aksi takdirde -> %50 çıkış
+
+        Args:
+            position: Position object
+            current_price: Şu anki fiyat
+            ml_confidence: Model confidence skoru
+            partial_tp_multiplier: ATR hedef çarpanı (WFO uyumlu)
+
+        Returns:
+            Yeni Position nesnesi (Immutable)
+        """
+        import dataclasses
+        from shared.events.event_bus import event_bus, Event
+
+        # 1. Yön Asimetrisine Göre Dinamik TP1 Hedefi Hesapla (Kantitatif Katman)
+        atr = position.metadata.get('atr', 0.0)
+        if position.direction.value == 'LONG':
+            tp1_level = position.entry_price + (atr * partial_tp_multiplier)
+            target_hit = current_price >= tp1_level
+        else: # SHORT
+            tp1_level = position.entry_price - (atr * partial_tp_multiplier)
+            target_hit = current_price <= tp1_level
+
+        if not target_hit:
+            # Hedef vurulmadıysa orijinal pozisyonu değiştirme
+            return position
+
+        # 2. Kapanış yüzdesini Confidence'a göre hesapla
+        exit_percentage = 0.75 if ml_confidence < 0.65 else 0.50
+        size_to_close = position.size * exit_percentage
+
+        # 3. Asenkron Çıkış Tetiklemesi
+        # Kısmi kapatma işlemini event üzerinden PositionManager.close_position handle eder
+        # Komisyon veya gerçekleşme fiyatı (slippage vb.) arka planda yönetilir.
+        asyncio.create_task(
+            self.close_position(
+                bot_id=position.bot_id,
+                exit_price=current_price,
+                reason="dynamic_partial_tp",
+                size_to_close=size_to_close
+            )
+        )
+
+        # 3. Kalan pozisyon boyutu ve yeni state için Dataclass Replacement (Immutable Object)
+        new_size = position.size - size_to_close
+
+        updated_position = dataclasses.replace(
+            position,
+            size=new_size,
+            stop_loss=position.entry_price,
+            partial_profit_taken=True,
+            breakeven_activated=True
+        )
+
+        # 4. Dictionary'de mevcut pozisyonu güncelle
+        self.positions[updated_position.bot_id] = updated_position
+
+        logger.info(
+            f"🎯 [DYNAMIC PARTIAL TP] {updated_position.symbol} | "
+            f"Direction: {updated_position.direction.value} | "
+            f"Confidence: {ml_confidence:.2f} -> %{exit_percentage*100:.0f} çıkış | "
+            f"Kapanan: {size_to_close:.4f}, Kalan: {new_size:.4f} | "
+            f"Stop-Loss Breakeven'a çekildi: {updated_position.stop_loss:.2f}"
+        )
+
+        # 5. UI ve Loglar için Event fırlat (Zaten close_position kısmi kapanışta bu event'i fırlatıyor
+        # ancak gereksinimde bu fonksiyon içinden de yayınlanması istendi. close_position da partial_closed
+        # fırlattığı için çifte event olabilir, ancak gereksinime sadık kalıyoruz ya da explicit payload ile gönderiyoruz)
+        event = Event(
+            type="position.partial_closed",
+            payload={
+                "bot_id": updated_position.bot_id,
+                "symbol": updated_position.symbol,
+                "direction": updated_position.direction.value,
+                "exit_price": current_price,
+                "size_closed": size_to_close,
+                "remaining_size": new_size,
+                "reason": "dynamic_partial_tp",
+                "ml_confidence": ml_confidence
+            },
+            source="position_manager"
+        )
+        await event_bus.publish(event)
+
+        return updated_position
+
     # ========================================================================
     # LIKIDASYON KONTROLÜ
     # ========================================================================

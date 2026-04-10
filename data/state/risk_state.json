@@ -1,0 +1,8 @@
+{
+  "consecutive_losses": {
+    "TEST_EVENT_BOT": 3
+  },
+  "kill_switch_active": {
+    "TEST_EVENT_BOT": true
+  }
+}

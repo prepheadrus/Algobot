@@ -215,7 +215,10 @@ class MLService:
                     enable_auto_regularization=False
                 )
 
-                trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
+                train_result = trainer.train(X_train, y_train, X_test, y_test, ret_test=ret_test)
+
+                if train_result is None:
+                    raise ValueError(f"VETO_REJECTED_{current_direction.upper()}")
 
                 model_save_path = f"artifacts/models/xgb_model_{symbol_clean}_{request.timeframe}_{model_id}_{current_direction}.json"
                 os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
@@ -255,6 +258,27 @@ class MLService:
                         direction=current_direction
                     )
                     logger.info(f"✅ [ML] {current_direction.upper()} modeli başarıyla eğitildi ve kaydedildi.")
+                except ValueError as ve:
+                    if str(ve).startswith("VETO_REJECTED_"):
+                        logger.error(f"❌ [VETO KALKANI] {current_direction.upper()} modeli eğitimi VETO yedi.")
+                        from shared.events.event_bus import event_bus
+                        from shared.events.event_bus import Event
+                        await event_bus.publish(
+                            Event(
+                                type="ml.training_rejected",
+                                payload={
+                                    "symbol": request.symbol,
+                                    "timeframe": request.timeframe,
+                                    "direction": current_direction,
+                                    "reason": "VETO shield triggered: best_score < 0.55"
+                                },
+                                source="ml_service"
+                            )
+                        )
+                        continue
+                    else:
+                        logger.warning(f"⚠️ [ML] {current_direction.upper()} modeli eğitimi başarısız oldu (Hata: {ve}). Diğer yön için devam ediliyor...")
+                        continue
                 except Exception as e:
                     logger.warning(f"⚠️ [ML] {current_direction.upper()} modeli eğitimi başarısız oldu (Hata: {e}). Diğer yön için devam ediliyor...")
                     continue
