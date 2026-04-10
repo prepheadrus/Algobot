@@ -27,9 +27,10 @@ Dosya Yapısı:
 import asyncio
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import numpy as np
+import polars as pl
 from core.logger import logger
 
 try:
@@ -149,32 +150,41 @@ class DataLakeStorage:
             return None
 
         try:
-            # Sadece son satırı oku (hızlı)
-            df = pd.read_parquet(file_path, filters=[('timestamp', '>=', pd.Timestamp.now() - pd.Timedelta(days=1))])
+            # Sadece timestamp kolonunu lazy oku, filtrele ve maksimumunu al
+            lf = pl.scan_parquet(file_path)
             
-            if df.empty:
-                return None
-
-            # Timestamp kolonunu bul
+            # Zaman serisi sütununu belirle
+            columns = lf.collect_schema().names()
             ts_col = None
             for col in ['timestamp', 'time', 'date']:
-                if col in df.columns:
+                if col in columns:
                     ts_col = col
                     break
 
-            if ts_col and len(df) > 0:
-                last_ts = df[ts_col].max()
-                if isinstance(last_ts, (int, float)):
-                    return pd.to_datetime(last_ts, unit='ms' if last_ts > 1e12 else 's')
-                return pd.to_datetime(last_ts)
+            if not ts_col:
+                return None
 
-            return None
+            # Sadece timestamp kolonunu seç ve son 1 günlük veriyi filtreleyip maks bul (Optimizasyon)
+            day_ago = pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=1)
+            # Eğer datetime ise polars ile doğrudan filtreleyebiliriz, değilse ms formatında filtreleriz.
+            # LazyFrame olduğu için hatasız maksimumu da alabiliriz doğrudan.
+
+            # Sadece en büyük timestamp'i almak için:
+            max_df = lf.select(pl.col(ts_col).max()).collect().to_pandas()
+
+            if max_df.empty or pd.isna(max_df.iloc[0, 0]):
+                return None
+
+            last_ts = max_df.iloc[0, 0]
+            if isinstance(last_ts, (int, float, np.number)):
+                return pd.to_datetime(last_ts, unit='ms' if last_ts > 1e12 else 's', utc=True)
+            return pd.to_datetime(last_ts, utc=True)
 
         except Exception as e:
             logger.warning(f"⚠️ [DATA LAKE] Son timestamp okuma hatası: {e}")
             return None
 
-    def load(self, symbol: str, timeframe: str, start_date: datetime = None, end_date: datetime = None) -> Optional[pd.DataFrame]:
+    def load(self, symbol: str, timeframe: str, start_date: datetime = None, end_date: datetime = None, columns: Optional[List[str]] = None) -> Optional[pd.DataFrame]:
         """
         Veriyi parquet dosyasından yükle.
 
@@ -183,6 +193,7 @@ class DataLakeStorage:
             timeframe: Zaman dilimi
             start_date: Başlangıç tarihi (opsiyonel)
             end_date: Bitiş tarihi (opsiyonel)
+            columns: Yalnızca okunacak kolonlar (opsiyonel, Predicate Pushdown)
 
         Returns:
             DataFrame veya None
@@ -194,21 +205,48 @@ class DataLakeStorage:
             return None
 
         try:
-            # Parquet oku
-            if start_date or end_date:
-                # Filtre ile oku (daha hızlı)
-                filters = []
-                if start_date:
-                    filters.append(('timestamp', '>=', start_date))
-                if end_date:
-                    filters.append(('timestamp', '<=', end_date))
+            # Parquet oku (LazyFrame Zero-Copy)
+            lf = pl.scan_parquet(file_path)
 
-                df = pd.read_parquet(file_path, filters=filters if filters else None)
-            else:
-                df = pd.read_parquet(file_path)
+            # Kolon Seçimi (Column Pruning)
+            if columns:
+                cols_to_select = list(columns)
+                # Timestamp her zaman gereklidir, yoksa ekleyelim
+                if 'timestamp' not in cols_to_select:
+                    schema_cols = lf.collect_schema().names()
+                    # Zaman serisi sütununu belirle
+                    ts_col = next((c for c in ['timestamp', 'time', 'date'] if c in schema_cols), None)
+                    if ts_col and ts_col not in cols_to_select:
+                        cols_to_select.append(ts_col)
+
+                # Mevcut olmayan kolonları ekarte edip seç (hata vermemesi için)
+                available_cols = lf.collect_schema().names()
+                valid_cols = [c for c in cols_to_select if c in available_cols]
+                if valid_cols:
+                    lf = lf.select(valid_cols)
+
+            # Tarih Filtresi (Row Pruning)
+            if start_date or end_date:
+                # Zaman serisi sütununu belirle
+                schema_cols = lf.collect_schema().names()
+                ts_col = next((c for c in ['timestamp', 'time', 'date'] if c in schema_cols), 'timestamp')
+
+                if ts_col in schema_cols:
+                    if start_date:
+                        # timezone naive çevrimi (Parquet schema'sına göre değişebilir, safe cast)
+                        if start_date.tzinfo is not None:
+                            start_date = start_date.astimezone(pd.Timestamp.utcnow().tz)
+                        lf = lf.filter(pl.col(ts_col) >= start_date)
+                    if end_date:
+                        if end_date.tzinfo is not None:
+                            end_date = end_date.astimezone(pd.Timestamp.utcnow().tz)
+                        lf = lf.filter(pl.col(ts_col) <= end_date)
+
+            # Lazy Frame'i işle ve Pandas'a dönüştür
+            df = lf.collect().to_pandas()
 
             if df.empty:
-                logger.debug(f"⏭️ [DATA LAKE] Dosya boş: {file_path}")
+                logger.debug(f"⏭️ [DATA LAKE] Dosya boş veya filtreye uyan veri yok: {file_path}")
                 return None
 
             # Data integrity kontrolü
@@ -497,13 +535,13 @@ class DataLakeStorage:
                 stats['symbols'][symbol]['files'] += 1
                 stats['symbols'][symbol]['size_mb'] += file_path.stat().st_size / (1024 * 1024)
 
-                # Satır sayısı
+                # Satır sayısı (LazyFrame ile hızlı satır sayımı)
                 try:
-                    df = pd.read_parquet(file_path)
-                    row_count = len(df)
+                    # select ve len() daha hızlı çalışır (belleğe tüm datayı almaz)
+                    row_count = pl.scan_parquet(file_path).select(pl.len()).collect().item()
                     stats['total_rows'] += row_count
                     stats['symbols'][symbol]['total_rows'] += row_count
-                except:
+                except Exception as e:
                     pass
 
         # Yuvarla

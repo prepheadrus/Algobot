@@ -1,3 +1,11 @@
+import os
+import multiprocessing
+
+# Polars'ın sunucudaki tüm CPU'ları sömürmesini engelle (Event-Loop ve WSS koruması)
+# Sistem çekirdeklerinin sadece yarısına izin veriyoruz
+safe_threads = max(1, multiprocessing.cpu_count() // 2)
+os.environ["POLARS_MAX_THREADS"] = str(safe_threads)
+
 import uvicorn
 import asyncio
 from core.logger import logger

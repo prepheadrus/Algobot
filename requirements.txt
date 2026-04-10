@@ -12,6 +12,7 @@ websockets>=12.0         # WebSocket support for real-time data
 # Data Processing
 numpy>=1.24.0            # Numerical computing
 pandas>=2.0.0            # Data manipulation
+polars>=0.20.0           # LazyFrame Parquet engine (Zero-Copy)
 scipy>=1.10.0            # Scientific computing
 statsmodels>=0.14.0      # Statistical models
 
@@ -64,7 +65,7 @@ requests>=2.31.0         # HTTP library for testing
 # Optional: Performance monitoring
 # psutil>=5.9.0          # System monitoring
 # memory-profiler>=0.61.0 # Memory profiling
-pyarrow
+pyarrow>=14.0.0
 uvicorn
 cachetools>=5.3.0
 pydantic-settings>=2.0.0

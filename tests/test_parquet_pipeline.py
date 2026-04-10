@@ -15,7 +15,7 @@ from pathlib import Path
 import sys
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.logger import logger
 from data.storage.parquet_lake import ParquetDataLake
@@ -196,23 +196,29 @@ class ParquetPipelineTest:
             logger.info(f"📅 [TEST] Tarih aralığı: {start_date.date()} - {end_date.date()}")
             logger.info(f"📊 [TEST] Sembol: {self.test_symbol}, Timeframe: {self.test_timeframe}")
             
-            # 2. Binance'den veri çek
-            logger.info("📥 [TEST] Binance'den veri çekiliyor...")
-            klines = await self.exchange.fetch_ohlcv(
-                self.test_symbol,
-                self.test_timeframe,
-                since=int(start_date.timestamp() * 1000),
-                limit=1000  # 15m * 1000 = ~10 gün
-            )
+            # 2. Dummy Data oluştur
+            logger.info("📥 [TEST] Dummy veri oluşturuluyor (Binance fetch bypass)...")
+            import numpy as np
             
-            if not klines or len(klines) == 0:
-                logger.error("❌ [FAIL] Binance'den veri çekilemedi!")
-                return False
+            num_candles = 1000
+            end_time = datetime.now()
+            start_time = end_time - timedelta(minutes=num_candles * 15)
+
+            timestamps = [int((start_time + timedelta(minutes=15*i)).timestamp() * 1000) for i in range(num_candles)]
+            prices = np.linspace(60000, 65000, num_candles)
+
+            df = pd.DataFrame({
+                'timestamp': timestamps,
+                'open': prices,
+                'high': prices * 1.01,
+                'low': prices * 0.99,
+                'close': prices + 10,
+                'volume': np.random.uniform(10, 100, num_candles)
+            })
             
-            logger.info(f"✅ [TEST] {len(klines)} mum çekildi")
+            logger.info(f"✅ [TEST] {num_candles} mumluk dummy veri oluşturuldu")
             
             # 3. DataFrame'e dönüştür
-            df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
             df.set_index('timestamp', inplace=True)
             
@@ -226,12 +232,9 @@ class ParquetPipelineTest:
             save_success = await self.lake.save(self.test_symbol, self.test_timeframe, df, append=False)
 
             # 🔥 DÜZELTME: ParquetDataLake MTF-Daily yapısı kullanıyor
-            # Gerçek path: data/ohlcv/binance/BTC/USDT/15m/YYYY/MM/DD/data.parquet
-            # 🔍 ÖNEMLİ: Symbol path'i "/" ile kalıyor, "_" değil!
-            test_path = self.lake.BASE_DIR / "binance" / self.test_symbol / self.test_timeframe
+            # Gerçek path: data/ohlcv/binance/BTC_USDT/15m/YYYY/MM/DD/data.parquet
+            test_path = self.lake._get_base_path(self.test_symbol, self.test_timeframe)
 
-            if not save_success:
-                logger.warning("⚠️ [TEST] save() False döndü ama dosyaları kontrol ediyoruz...")
 
             # 🔍 YENİ: MTF-Daily yapısını kontrol et (YYYY/MM/DD/data.parquet)
             parquet_files = []
@@ -260,11 +263,15 @@ class ParquetPipelineTest:
             
             # 5. Parquet'ten oku
             logger.info("📖 [TEST] Parquet'ten okunuyor...")
+            # We want to read back the whole range we just created to test gap detection properly
+            # Adding small buffer to capture bounds correctly
+            start_time_dt = pd.to_datetime(start_time, utc=True) - pd.Timedelta(days=2)
+            end_time_dt = pd.to_datetime(end_time, utc=True) + pd.Timedelta(days=2)
             loaded_df = await self.lake.load_datasets(
                 self.test_symbol,
                 self.test_timeframe,
-                start_date,
-                end_date
+                start_time_dt,
+                end_time_dt
             )
             
             if loaded_df is None or loaded_df.empty:
@@ -332,7 +339,8 @@ class ParquetPipelineTest:
         """Test verilerini temizle."""
         try:
             import shutil
-            test_path = self.lake.BASE_DIR / self.exchange / self.test_symbol.replace('/', '_') / self.test_timeframe
+            # Doğru path'i `_get_base_path` kullanarak alalım
+            test_path = self.lake._get_base_path(self.test_symbol, self.test_timeframe)
             if test_path.exists():
                 shutil.rmtree(test_path)
                 logger.info(f"🗑️ [CLEANUP] {test_path} silindi")
