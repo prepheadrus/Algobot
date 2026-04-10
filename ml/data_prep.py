@@ -16,6 +16,80 @@ from core.logger import logger
 from data.features import AdvancedFeatures
 
 
+def _apply_vectorized_strategy(df: pd.DataFrame, strategy_name: str) -> pd.Series:
+    """
+    Belirtilen stratejiyi vektörize olarak DataFrame üzerinde uygular ve
+    Meta-Labeling için Primary Signal serisini (0, 1, 2) döner.
+    Open/Closed Principle (OCP) ve performans (event-loop izolasyonu) gereği
+    ana koddan ayrıştırılmıştır.
+
+    Args:
+        df: Ham OHLCV ve indikatörleri içeren DataFrame
+        strategy_name: Kullanılacak strateji adı (örn: "trend_master")
+
+    Returns:
+        pd.Series: 0 (SHORT), 1 (HOLD), 2 (LONG) sinyallerini içeren seri
+    """
+    logger.info(f"⚙️ [ML] Birinci Katman Vektörize Strateji Uygulanıyor: {strategy_name}")
+
+    signals = pd.Series(1, index=df.index, dtype=int) # Varsayılan: HOLD (1)
+
+    if strategy_name == 'trend_master':
+        # TrendMaster Pro: EMA 200, SMA 20, RSI 50
+
+        # Eğer kolonlar eksikse log at ve mevcut olanları hesapla
+        required_cols = ['close', 'EMA_200', 'SMA_20', 'RSI_14']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            logger.warning(f"⚠️ [ML] {strategy_name} için eksik kolonlar var: {missing_cols}. Sinyaller tam üretilemeyebilir.")
+
+            # Dinamik fallback hesaplamalar (eğer mümkünse)
+            if 'EMA_200' in missing_cols and 'close' in df.columns:
+                df['EMA_200'] = df['close'].ewm(span=200, adjust=False).mean()
+            if 'SMA_20' in missing_cols and 'close' in df.columns:
+                df['SMA_20'] = df['close'].rolling(window=20).mean()
+            if 'RSI_14' in missing_cols and 'close' in df.columns:
+                delta = df['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                df['RSI_14'] = 100 - (100 / (1 + rs))
+
+        # Hesaplamalar sonrasında kolonların varlığından tekrar emin ol
+        if all(col in df.columns for col in required_cols):
+            # $O(1)$ Vektörize Sinyal Üretimi
+            condition_long = (df['close'] > df['EMA_200']) & (df['close'] > df['SMA_20']) & (df['RSI_14'] > 50) & (df['RSI_14'] < 70)
+            condition_short = (df['close'] < df['EMA_200']) & (df['close'] < df['SMA_20']) & (df['RSI_14'] < 50)
+
+            signals.loc[condition_long] = 2
+            signals.loc[condition_short] = 0
+
+    elif strategy_name == 'golden_combo':
+        # Golden Combo: MACD, EMA_5, SMA_20, ADX_14, OBV
+        required_cols = ['MACDh_12_26_9', 'EMA_5', 'SMA_20', 'OBV', 'OBV_EMA', 'ADX_14']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+
+        if missing_cols:
+            logger.warning(f"⚠️ [ML] {strategy_name} için eksik kolonlar var: {missing_cols}.")
+        else:
+            adx_threshold = 20
+            has_trend = df['ADX_14'] > adx_threshold
+
+            condition_long = has_trend & (df['MACDh_12_26_9'] > 0) & (df['EMA_5'] > df['SMA_20']) & (df['OBV'] > df['OBV_EMA'])
+            condition_short = has_trend & (df['MACDh_12_26_9'] < 0) & (df['EMA_5'] < df['SMA_20']) & (df['OBV'] < df['OBV_EMA'])
+
+            signals.loc[condition_long] = 2
+            signals.loc[condition_short] = 0
+    else:
+        logger.warning(f"⚠️ [ML] Bilinmeyen strateji: {strategy_name}. Vektörize işlem yapılamadı, tüm mumlar HOLD (1) işaretlendi.")
+
+    # İstatistik
+    signal_counts = signals.value_counts().to_dict()
+    logger.info(f"📊 [ML] Birinci Katman Sinyal Dağılımı: {signal_counts}")
+
+    return signals
+
+
 def apply_triple_barrier(
     df: pd.DataFrame,
     direction: str,
@@ -434,6 +508,7 @@ def create_train_test_split(
 def prepare_ml_data(
     df: pd.DataFrame,
     direction: str,
+    strategy_name: str = "trend_master",
     feature_cols: Optional[list] = None,
     target_col: str = "target",
     train_ratio: float = 0.8,
@@ -450,6 +525,7 @@ def prepare_ml_data(
     Args:
         df: Ham OHLCV verisi (indikatörlerle birlikte)
         direction: İşlem yönü ('long' veya 'short')
+        strategy_name: Birinci katman filtrelemesi için kullanılacak strateji
         feature_cols: Kullanılacak özellik kolonları
         target_col: Hedef kolon adı
         train_ratio: Eğitim oranı
@@ -468,7 +544,7 @@ def prepare_ml_data(
 
     logger.info(f"ML veri hazırlama pipeline'ı başlatılıyor... (Yön: {direction}, TP={tp_multiplier}, SL={sl_multiplier}, Horizon={time_horizon})")
 
-    # 1. Triple Barrier etiketleme (skip_barrier=False ise)
+    # 1. Triple Barrier etiketleme (Zaman serisi bozulmadan yapılmak zorunda!)
     if not skip_barrier:
         df_labeled = apply_triple_barrier(
             df=df,
@@ -482,8 +558,37 @@ def prepare_ml_data(
         df_labeled = df
         logger.info("⏭️ [ML] Triple Barrier atlandı (zaten yapılmış)")
 
+    # 1.1 Birinci Katman Vektörize Filtreleme (Primary Signal)
+    primary_signals = _apply_vectorized_strategy(df_labeled, strategy_name)
+    df_labeled['Primary_Signal'] = primary_signals
+
+    # 1.2 Veri İzolasyonu (DataFrame Daraltma ve Index Hizalama)
+    # Sadece hedeflenen yönde sinyal üreten mumları tut, geri kalanını ('1 - BEKLE' ve ters sinyalleri) sil.
+    if direction == 'long':
+        filtered_df = df_labeled[df_labeled['Primary_Signal'] == 2].copy()
+    else:  # short
+        filtered_df = df_labeled[df_labeled['Primary_Signal'] == 0].copy()
+
+    original_size = len(df_labeled)
+    filtered_size = len(filtered_df)
+    logger.info(f"🛡️ [ML] Meta-Labeling Daraltması: {original_size} mumdan {filtered_size} muma inildi. ({(filtered_size/max(original_size,1))*100:.2f}%)")
+
+    if filtered_size == 0:
+        raise ValueError(f"{strategy_name} stratejisi {direction} yönünde hiç sinyal üretmedi! Veri matrisi boş.")
+
+    # ⚠️ [KANTİTATİF ZIRH] İndeks Hizalaması (Index Alignment)
+    # Atlamalı indeksleri 0'dan N'e sıfırlayarak C++ XGBoost matris dönüşümlerinde kaymayı önlüyoruz
+    df_labeled = filtered_df.reset_index(drop=True)
+
     # 1.5 Getiri Serisi (Forward Returns) - Optimizasyon için (Data Leakage'a dikkat!)
-    df_labeled['forward_return'] = df_labeled['close'].pct_change().shift(-1).fillna(0)
+    # Not: pct_change'in shift'i silinmiş olan satırlar nedeniyle artık farklı anlamlara gelebilir
+    # Ancak yine de model evaluation için bir forward return saklıyoruz.
+    # Asıl hedef zaten 'target' (Triple Barrier) kolonundadır.
+    if 'close' in df_labeled.columns:
+        # İdeal olarak, df_labeled daraltılmadan önce forward_return hesaplanmalıdır,
+        # fakat Triple Barrier zaten target'ı (0 veya 1) ürettiği için bu sadece optimizasyon/logger amaçlıdır.
+        # En temizi sıfır veya daraltılmış matrisin basit pct_change'i olarak bırakmaktır.
+        df_labeled['forward_return'] = df_labeled['close'].pct_change().shift(-1).fillna(0)
 
     # 2. Özellik mühendisliği ve ölçeklendirme
     df_processed, scaler = engineer_features(

@@ -197,6 +197,7 @@ class MLService:
                 X_train, X_test, y_train, y_test, ret_train, ret_test, scaler = prepare_ml_data(
                     df,
                     direction=current_direction,
+                    strategy_name=request.strategy_name,
                     tp_multiplier=tp_val if current_direction == 'long' else sl_val,
                     sl_multiplier=sl_val if current_direction == 'long' else tp_val,
                     time_horizon=hz_val,
