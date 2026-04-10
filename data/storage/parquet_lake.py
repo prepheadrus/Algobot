@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import pandas as pd
+import polars as pl
 from core.logger import logger
 
 try:
@@ -274,12 +275,13 @@ class ParquetDataLake:
 
         logger.debug(f"💾 [PARQUET] {path.relative_to(self.BASE_DIR)} kaydedildi ({len(write_df)} satır)")
 
-    def _read_parquet_thread(self, path: Path) -> Optional[pd.DataFrame]:
+    def _read_parquet_thread(self, path: Path, columns: Optional[List[str]] = None) -> Optional[pd.DataFrame]:
         """
-        Parquet okuma işlemi (thread'de çalışır).
+        Parquet okuma işlemi (thread'de çalışır). (Zero-Copy LazyFrame)
 
         Args:
             path: Dosya yolu
+            columns: Okunacak kolonlar (opsiyonel)
 
         Returns:
             DataFrame veya None
@@ -288,7 +290,27 @@ class ParquetDataLake:
             return None
 
         try:
-            df = pd.read_parquet(path, engine='pyarrow' if PYARROW_AVAILABLE else 'auto')
+            lf = pl.scan_parquet(path)
+
+            if columns:
+                available_cols = lf.collect_schema().names()
+
+                # İndeks olarak kullanılacak timestamp kolonunu her ihtimale karşı dahil et
+                ts_cols = [c for c in ['timestamp', 'time', 'date'] if c in available_cols]
+
+                cols_to_select = list(set(columns))
+                for ts_col in ts_cols:
+                    if ts_col not in cols_to_select:
+                        cols_to_select.append(ts_col)
+
+                valid_cols = [c for c in cols_to_select if c in available_cols]
+                if valid_cols:
+                    lf = lf.select(valid_cols)
+
+            df = lf.collect().to_pandas()
+
+            if df.empty:
+                return None
 
             # Index'i DatetimeIndex'e çevir
             if not isinstance(df.index, pd.DatetimeIndex):
@@ -416,16 +438,18 @@ class ParquetDataLake:
         symbol: str,
         timeframe: str,
         start_date: datetime,
-        end_date: datetime
+        end_date: datetime,
+        columns: Optional[List[str]] = None
     ) -> Optional[pd.DataFrame]:
         """
-        Vektörize okuma - tarih aralığındaki tüm partition'ları oku ve birleştir.
+        Vektörize okuma - tarih aralığındaki tüm partition'ları oku ve birleştir. (LazyFrame)
 
         Args:
             symbol: Sembol adı
             timeframe: Zaman dilimi
             start_date: Başlangıç tarihi
             end_date: Bitiş tarihi
+            columns: Sadece okunacak kolonlar (Predicate Pushdown / Column Pruning)
 
         Returns:
             Birleştirilmiş DataFrame veya None
@@ -485,20 +509,41 @@ class ParquetDataLake:
                     logger.debug(f"⏭️ [PARQUET] Partition bulunamadı: {symbol} {timeframe}")
                     return None
 
-                # Tüm dosyaları paralel oku (thread pool)
-                dfs = await asyncio.gather(*[
-                    asyncio.to_thread(self._read_parquet_thread, f)
-                    for f in parquet_files
-                ])
+                def _load_lazy_concat(files: List[Path], cols: Optional[List[str]]) -> Optional[pd.DataFrame]:
+                    try:
+                        # pl.scan_parquet liste kabul edebilir ve concat edebilir
+                        lf = pl.scan_parquet([str(p) for p in files])
 
-                # None'ları filtrele ve birleştir
-                dfs = [df for df in dfs if df is not None and not df.empty]
+                        if cols:
+                            schema_cols = lf.collect_schema().names()
+                            ts_cols = [c for c in ['timestamp', 'time', 'date'] if c in schema_cols]
+                            cols_to_select = list(set(cols))
+                            for ts_col in ts_cols:
+                                if ts_col not in cols_to_select:
+                                    cols_to_select.append(ts_col)
 
-                if not dfs:
+                            valid_cols = [c for c in cols_to_select if c in schema_cols]
+                            if valid_cols:
+                                lf = lf.select(valid_cols)
+
+                        df_res = lf.collect().to_pandas()
+                        return df_res
+                    except Exception as e:
+                        logger.error(f"❌ [PARQUET] Lazy concat hatası: {e}")
+                        return None
+
+                combined_df = await asyncio.to_thread(_load_lazy_concat, parquet_files, columns)
+
+                if combined_df is None or combined_df.empty:
                     return None
 
-                # RAM'de birleştir (vektörize)
-                combined_df = pd.concat(dfs)
+                if not isinstance(combined_df.index, pd.DatetimeIndex):
+                    if 'timestamp' in combined_df.columns:
+                        combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'], utc=True)
+                        combined_df = combined_df.set_index('timestamp')
+                    elif 'time' in combined_df.columns:
+                        combined_df['time'] = pd.to_datetime(combined_df['time'], utc=True)
+                        combined_df = combined_df.set_index('time')
 
                 # ⏰ TIMEZONE STANDARDIZASYONU (UTC'ye zorla)
                 if combined_df.index.tzinfo is None:
@@ -514,9 +559,6 @@ class ParquetDataLake:
                     combined_df = combined_df[combined_df.index >= start_ts]
                 if end_ts is not None:
                     combined_df = combined_df[combined_df.index <= end_ts]
-
-                # NaN temizliği
-                combined_df = combined_df.dropna(how='all')
 
                 # Duplicate temizliği
                 combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
@@ -535,7 +577,7 @@ class ParquetDataLake:
                     logger.debug(f"⏭️ [PARQUET] Market dosyası yok: {partition_path}")
                     return None
 
-                df = await asyncio.to_thread(self._read_parquet_thread, partition_path)
+                df = await asyncio.to_thread(self._read_parquet_thread, partition_path, columns)
 
                 if df is None or df.empty:
                     return None
@@ -554,9 +596,6 @@ class ParquetDataLake:
                     df = df[df.index >= start_ts]
                 if end_ts is not None:
                     df = df[df.index <= end_ts]
-
-                # NaN temizliği
-                df = df.dropna(how='all')
 
                 logger.info(f"📖 [PARQUET] {symbol} {timeframe} → {len(df)} satır")
                 return df
@@ -910,14 +949,13 @@ class ParquetDataLake:
                     stats['total_size_mb'] += file_path.stat().st_size / (1024 * 1024)
                     stats['symbols'][symbol]['size_mb'] += file_path.stat().st_size / (1024 * 1024)
 
-                    # Satır sayısı (sadece market.parquet için hızlı)
+                    # Satır sayısı (LazyFrame)
                     if file_path.name == "market.parquet":
                         try:
-                            df = pd.read_parquet(file_path, columns=[file_path.columns[0]] if hasattr(file_path, 'columns') else None)
-                            row_count = len(df)
+                            row_count = pl.scan_parquet(file_path).select(pl.len()).collect().item()
                             stats['total_rows'] += row_count
                             stats['symbols'][symbol]['total_rows'] += row_count
-                        except:
+                        except Exception:
                             pass
 
         # Yuvarla
