@@ -567,6 +567,11 @@ class ModelTrainer:
             logger.info(f"🏆 En İyi Threshold: {self.custom_optimal_threshold:.3f}")
             logger.info(f"🏆 En İyi Purged Precision Skoru: {study.best_value:.4f}")
 
+            # VETO KALKANI
+            if study.best_value < 0.55:
+                logger.error(f"❌ [VETO] Model performansı çok düşük! Purged Precision Skoru: {study.best_value:.4f} < 0.55")
+                return None
+
             # Best parametreleri set et
             self._apply_params({
                 'n_estimators': self.n_estimators,
