@@ -300,7 +300,7 @@ def engineer_features(
     # Distance to VWAP Oranı
     if "close" in df.columns and "VWAP" in df.columns:
         # VWAP sıfır olma ihtimaline karşı epsilon koruması
-        df["dist_to_vwap"] = (df["close"] - df["VWAP"]) / (df["VWAP"] + 1e-8)
+        df["vwap_dist"] = (df["close"] - df["VWAP"]) / (df["VWAP"] + 1e-8)
 
     # Distance to EMA Oranı
     if "close" in df.columns and "EMA_50" in df.columns:
@@ -332,7 +332,7 @@ def engineer_features(
         "BBM_20_2.0_2.0",
         "PVI",
         "NVI",
-        "VWAP",  # VWAP'ın kendisi de fiyat içerir, biz oranını ('dist_to_vwap') kullanacağız.
+        "VWAP",  # VWAP'ın kendisi de fiyat içerir, biz oranını ('vwap_dist') kullanacağız.
         "ADX_14",
         "KONKORDE_MARRON",
         "SWING_HIGH",
@@ -349,7 +349,7 @@ def engineer_features(
     target_features = [
         "kalman_ret",
         "frac_diff_04",
-        "dist_to_vwap",
+        "vwap_dist",
         "dist_to_ema50",
         "MACDh_12_26_9",
         "RSI_14",
