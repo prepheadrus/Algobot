@@ -44,6 +44,7 @@ class MLTrainRequest(BaseModel):
     timeframe: str = Field(default="1h", description="Zaman dilimi")
     limit: int = Field(default=5000, description="Mum sayısı (DB'deki veriye göre otomatik ayarlanır)", ge=100)
     model_type: str = Field(default="xgboost", description="Model tipi")
+    strategy_name: str = Field(default="trend_master", description="Birinci katman filtrelemesi için kullanılacak strateji")
     tp: float = Field(default=2.0, description="Take profit multiplier", gt=0.0, le=10.0)
     sl: float = Field(default=2.0, description="Stop loss multiplier", gt=0.0, le=10.0)
     time_horizon: int = Field(default=10, description="Dikey bariyer mum sayısı (Horizon)", ge=5, le=200)

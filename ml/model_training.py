@@ -459,6 +459,18 @@ class ModelTrainer:
         if num_classes == 2:
             dynamic_xgb_params['objective'] = 'binary:logistic'
             dynamic_xgb_params['eval_metric'] = 'logloss'
+
+            # Sınıf Dengesizliği Koruması (Class Imbalance Shield)
+            # Binary sınıflandırmada, eğer 1 (başarılı) sınıfı çok az ise scale_pos_weight kullan.
+            class_counts = y_train.value_counts()
+            if 0 in class_counts and 1 in class_counts:
+                neg_count = class_counts[0]
+                pos_count = class_counts[1]
+                if pos_count > 0:
+                    scale_pos_weight = neg_count / pos_count
+                    dynamic_xgb_params['scale_pos_weight'] = scale_pos_weight
+                    logger.info(f"⚖️ [ML] Sınıf Dengesizliği Koruması Aktif: pos={pos_count}, neg={neg_count}, scale_pos_weight={scale_pos_weight:.2f}")
+
             logger.info("ℹ️ [ML] 2 sınıf tespit edildi. XGBoost binary:logistic modunda çalışacak.")
         else:
             dynamic_xgb_params['objective'] = 'multi:softprob'
