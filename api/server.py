@@ -172,8 +172,8 @@ async def lifespan(app: FastAPI):
                 f"failures={breaker_stats['total_failures']}, "
                 f"rejected={breaker_stats['total_rejected']}"
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"⚠️ [API] Circuit Breaker stats logging error: {e}")
 
     logger.info("=" * 60)
     logger.info("✅ [API] GÜVENLİ KAPATMA TAMAMLANDI")
