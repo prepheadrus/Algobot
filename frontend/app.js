@@ -289,15 +289,20 @@ function renderPositions(positions) {
         const roeSign = roe >= 0 ? '+' : '';
         const notional = (pos.size || 0) * (pos.entry_price || 0) * (pos.leverage || 1);
 
+        const safeStrategy = escapeHTML(pos.strategy_id || pos.strategy || 'Unknown');
+        const safeTimeframe = escapeHTML(pos.timeframe || 'N/A');
+        const safeSymbol = escapeHTML(pos.symbol || 'N/A');
+        const safeBotId = escapeHTML(pos.bot_id || pos.id || '');
+
         return `
             <tr>
                 <td>
-                    <div style="font-weight:600; color:var(--text-main);">${pos.strategy_id || pos.strategy || 'Unknown'}</div>
-                    <div style="font-size:0.7rem; color:var(--text-muted);">${pos.timeframe || 'N/A'}</div>
+                    <div style="font-weight:600; color:var(--text-main);">${safeStrategy}</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">${safeTimeframe}</div>
                 </td>
                 <td>
                     <div style="color:${directionColor}; font-weight:600;">${directionIcon} ${direction}</div>
-                    <div style="font-size:0.75rem; color:var(--text-main);">${pos.symbol || 'N/A'}</div>
+                    <div style="font-size:0.75rem; color:var(--text-main);">${safeSymbol}</div>
                 </td>
                 <td>
                     <div style="font-family:monospace;">${(pos.size || 0).toFixed(4)}</div>
@@ -320,7 +325,7 @@ function renderPositions(positions) {
                     <div style="color:var(--text-muted);">Liq: $${(pos.liquidation_price || 0).toFixed(2)}</div>
                 </td>
                 <td>
-                    <button onclick="closePosition('${pos.bot_id || pos.id || ''}', '${pos.symbol || ''}')"
+                    <button onclick="closePosition('${safeBotId}', '${safeSymbol}')"
                         style="padding:4px 8px; background:var(--neon-red); color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.7rem; font-weight:600;">
                         🚫 Kapat
                     </button>
@@ -525,32 +530,38 @@ function renderDatabaseInventory(inventory, stats) {
                     const marketTypeColor = isFutures ? 'var(--neon-blue)' : 'var(--neon-green)';
                     const marketTypeKey = isFutures ? 'future' : 'spot';
 
+                    const safeSymbol = escapeHTML(symbol);
+                    const safeTimeframe = escapeHTML(item.timeframe || '1m');
+                    const safeMinDate = escapeHTML(item.min_date || 'N/A');
+                    const safeMaxDate = escapeHTML(item.max_date || 'N/A');
+                    const safeMarketTypeKey = escapeHTML(marketTypeKey);
+
                     return `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition: background 0.2s;"
                             onmouseover="this.style.background='rgba(255,255,255,0.03)'"
                             onmouseout="this.style.background='transparent'">
                             <td style="padding:12px 10px;">
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <span style="font-weight:700; font-size:0.95rem; color:var(--text-main);">${symbol}</span>
+                                    <span style="font-weight:700; font-size:0.95rem; color:var(--text-main);">${safeSymbol}</span>
                                     <span style="font-size:0.7rem; padding:2px 8px; border-radius:4px;
                                                 background:${isFutures ? 'rgba(88, 166, 255, 0.2)' : 'rgba(46, 220, 135, 0.2)'}; color:${marketTypeColor}; font-weight:600;">
                                         ${marketTypeLabel}
                                     </span>
                                 </div>
                                 <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">
-                                    ⏱️ ${item.timeframe || '1m'}
+                                    ⏱️ ${safeTimeframe}
                                 </div>
                             </td>
                             <td style="padding:12px 10px;">
-                                <span style="font-size:0.85rem; color:#ffa500; font-weight:600;">📅 ${item.min_date || 'N/A'}</span>
+                                <span style="font-size:0.85rem; color:#ffa500; font-weight:600;">📅 ${safeMinDate}</span>
                             </td>
                             <td style="padding:12px 10px;">
-                                <span style="font-size:0.85rem; color:#ff6b6b; font-weight:600;">📅 ${item.max_date || 'N/A'}</span>
+                                <span style="font-size:0.85rem; color:#ff6b6b; font-weight:600;">📅 ${safeMaxDate}</span>
                             </td>
                             <td style="padding:12px 10px; text-align:right;">
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:12px;">
-                                    <button class="data-btn data-btn-danger" onclick="deleteSymbolData('${symbol}', '${marketTypeKey}')"
-                                        title="${symbol} verilerini sil"
+                                    <button class="data-btn data-btn-danger" onclick="deleteSymbolData('${safeSymbol}', '${safeMarketTypeKey}')"
+                                        title="${safeSymbol} verilerini sil"
                                         style="padding:4px 10px; font-size:0.75rem; background: linear-gradient(135deg, #dc2626, #991b1b);">
                                         🗑️ Sil
                                     </button>
@@ -637,14 +648,22 @@ function renderActiveTasks(downloads) {
             symbolName = parts.slice(0, -1).join('_');
         }
 
+        const safeKey = escapeHTML(key);
+        const safeMarketType = escapeHTML(marketType);
+        const safeSymbolName = escapeHTML(symbolName);
+        const safeStatusDisplay = escapeHTML(statusDisplay);
+        const safeTimeframe = escapeHTML(task.timeframe || '1m');
+        const safeStartDate = escapeHTML(startDate);
+        const safeLastCandleDate = escapeHTML(lastCandleDate);
+
         // Silme butonları
         const deleteButtons = `
             <div style="display:flex; gap:4px;">
-                <button class="task-btn task-btn-delete" onclick="deleteDownloadTask('${key}', '${marketType}')" title="Sadece görevi sil (veri korunur)"
+                <button class="task-btn task-btn-delete" onclick="deleteDownloadTask('${safeKey}', '${safeMarketType}')" title="Sadece görevi sil (veri korunur)"
                     style="background: linear-gradient(135deg, #6b7280, #4b5563); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
                     🗑️
                 </button>
-                <button class="task-btn task-btn-danger" onclick="deleteDownloadTaskWithData('${key}', '${marketType}')" title="Görev + TÜM veriyi sil (DB + Flat files)"
+                <button class="task-btn task-btn-danger" onclick="deleteDownloadTaskWithData('${safeKey}', '${safeMarketType}')" title="Görev + TÜM veriyi sil (DB + Flat files)"
                     style="background: linear-gradient(135deg, #dc2626, #991b1b); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; animation: pulse 2s infinite;">
                     ⚠️
                 </button>
@@ -652,7 +671,7 @@ function renderActiveTasks(downloads) {
         `;
 
         const pauseButton = (task.status === 'running' || task.status === 'paused') ? `
-            <button class="task-btn" onclick="togglePause('${key}', '${task.status === 'paused' ? 'resume' : 'pause'}')" title="${task.status === 'paused' ? 'Devam Et' : 'Duraklat'}"
+            <button class="task-btn" onclick="togglePause('${safeKey}', '${task.status === 'paused' ? 'resume' : 'pause'}')" title="${task.status === 'paused' ? 'Devam Et' : 'Duraklat'}"
                 style="background: var(--neon-blue); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
                 ${task.status === 'paused' ? '▶️' : '⏸️'}
             </button>
@@ -661,14 +680,14 @@ function renderActiveTasks(downloads) {
         return `
             <div class="task-item ${statusClass}">
                 <div class="task-header">
-                    <span class="task-symbol">${symbolName}</span>
-                    <span class="task-status status-${statusClass}">${statusDisplay}</span>
+                    <span class="task-symbol">${safeSymbolName}</span>
+                    <span class="task-status status-${statusClass}">${safeStatusDisplay}</span>
                 </div>
 
                 <div class="task-body">
                     <div class="task-info">
                         <span class="task-info-label">Timeframe</span>
-                        <span class="task-info-value">${task.timeframe || '1m'}</span>
+                        <span class="task-info-value">${safeTimeframe}</span>
                     </div>
                     <div class="task-info">
                         <span class="task-info-label">Market</span>
@@ -676,11 +695,11 @@ function renderActiveTasks(downloads) {
                     </div>
                     <div class="task-info">
                         <span class="task-info-label">Başlangıç</span>
-                        <span class="task-info-value">${startDate}</span>
+                        <span class="task-info-value">${safeStartDate}</span>
                     </div>
                     <div class="task-info">
                         <span class="task-info-label">Son Mum</span>
-                        <span class="task-info-value">${lastCandleDate}</span>
+                        <span class="task-info-value">${safeLastCandleDate}</span>
                     </div>
                 </div>
 
@@ -742,12 +761,18 @@ function renderMarketList(markets) {
     const marketListEl = document.getElementById('market-selection-list');
     if (!marketListEl) return;
 
-    marketListEl.innerHTML = markets.map(m => `
-        <div class="market-item" onclick="selectMarket('${m.symbol}', '${m.raw_type}')">
-            <span>${m.symbol}</span>
-            <span class="market-type">${m.type}</span>
-        </div>
-    `).join('');
+    marketListEl.innerHTML = markets.map(m => {
+        const safeSymbol = escapeHTML(m.symbol);
+        const safeRawType = escapeHTML(m.raw_type);
+        const safeType = escapeHTML(m.type);
+
+        return `
+            <div class="market-item" onclick="selectMarket('${safeSymbol}', '${safeRawType}')">
+                <span>${safeSymbol}</span>
+                <span class="market-type">${safeType}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 /**
@@ -1006,6 +1031,23 @@ window.togglePause = async function(symbol, action) {
 // ============================================================================
 
 /**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string
+ */
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return String(str).replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+/**
  * Add line to AI Terminal
  * @param {string} message - Message to add
  */
@@ -1065,9 +1107,10 @@ function showToast(message, type = 'info') {
     if (type === 'error') icon = '❌';
     if (type === 'warning') icon = '⚠️';
 
+    const safeMessage = escapeHTML(message);
     toast.innerHTML = `
         <span class="toast-icon">${icon}</span>
-        <span class="toast-message">${message}</span>
+        <span class="toast-message">${safeMessage}</span>
     `;
 
     container.appendChild(toast);
@@ -1583,7 +1626,8 @@ async function loadTradeHistory() {
         console.error('Stack trace:', error.stack);
         const tbody = document.getElementById('history-body');
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:40px; color:var(--neon-red);">Hata: ${error.message}</td></tr>`;
+            const safeError = escapeHTML(error.message);
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:40px; color:var(--neon-red);">Hata: ${safeError}</td></tr>`;
         }
     }
 }
@@ -1621,11 +1665,16 @@ function renderTradeHistory(trades) {
             }
         }
 
+        const safeDate = escapeHTML(dateStr);
+        const safeSymbol = escapeHTML(trade.symbol || 'N/A');
+        const safeStrategy = escapeHTML(trade.strategy_id || trade.strategy || 'N/A');
+        const safeReason = escapeHTML(trade.reason || '-');
+
         return `
             <tr>
-                <td>${dateStr}</td>
-                <td style="font-weight:600; color:var(--text-main);">${trade.symbol || 'N/A'}</td>
-                <td style="font-size:0.85rem; color:var(--text-muted);">${trade.strategy_id || trade.strategy || 'N/A'}</td>
+                <td>${safeDate}</td>
+                <td style="font-weight:600; color:var(--text-main);">${safeSymbol}</td>
+                <td style="font-size:0.85rem; color:var(--text-muted);">${safeStrategy}</td>
                 <td><span style="color:${direction === 'LONG' ? 'var(--neon-green)' : 'var(--neon-red)'};">${directionIcon} ${direction}</span></td>
                 <td style="font-family:monospace;">$${(trade.entry_price || 0).toFixed(4)}</td>
                 <td style="font-family:monospace;">$${(trade.exit_price || 0).toFixed(4)}</td>
@@ -1637,7 +1686,7 @@ function renderTradeHistory(trades) {
                     ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
                 </td>
                 <td style="font-size:0.75rem; color:var(--text-muted); max-width:150px; overflow:hidden; text-overflow:ellipsis;">
-                    ${trade.reason || '-'}
+                    ${safeReason}
                 </td>
             </tr>
         `;
@@ -2014,11 +2063,13 @@ window.startMLTraining = async function() {
                 const accuracy = (result.accuracy || 0).toFixed(2);
                 const datasetSize = result.dataset_size || 0;
 
+                const safeSymbol = escapeHTML(symbol);
+                const safeTimeframe = escapeHTML(timeframe);
                 resultDiv.innerHTML = `
                     <h4 style="color: var(--neon-green); margin-bottom: 10px;">🎉 ML Model Eğitimi Başarılı!</h4>
                     <div style="text-align: left; max-width: 500px; margin: 0 auto; color: var(--text-main);">
-                        <p><strong>Sembol:</strong> ${symbol}</p>
-                        <p><strong>Timeframe:</strong> ${timeframe}</p>
+                        <p><strong>Sembol:</strong> ${safeSymbol}</p>
+                        <p><strong>Timeframe:</strong> ${safeTimeframe}</p>
                         <p><strong>Dataset:</strong> ${datasetSize.toLocaleString()} örnek</p>
                         <p><strong>Accuracy:</strong> ${accuracy}%</p>
                         <p style="color: var(--neon-blue); margin-top: 15px;">
@@ -2046,10 +2097,11 @@ window.startMLTraining = async function() {
             resultDiv.style.display = 'block';
             resultDiv.style.background = 'rgba(248, 83, 73, 0.1)';
             resultDiv.style.border = '1px solid var(--neon-red)';
+            const safeError = escapeHTML(error.message || 'Bilinmeyen hata');
             resultDiv.innerHTML = `
                 <h4 style="color: var(--neon-red); margin-bottom: 10px;">❌ Eğitim Hatası!</h4>
                 <p style="color: var(--text-main); font-size: 0.85rem;">
-                    ${error.message || 'Bilinmeyen hata'}
+                    ${safeError}
                 </p>
                 <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 10px;">
                     Server hatası olabilir. Console'u (F12) kontrol edin.
@@ -2119,11 +2171,16 @@ window.loadMLTrainingHistory = async function() {
                             const rfColor = rfAcc >= 50 ? 'var(--neon-green)' : (rfAcc >= 40 ? '#ffcc00' : 'var(--neon-red)');
                             const ensembleColor = ensembleAcc >= 50 ? 'var(--neon-green)' : (ensembleAcc >= 40 ? '#ffcc00' : 'var(--neon-red)');
 
+                            const safeDateStr = escapeHTML(dateStr);
+                            const safeSymbol = escapeHTML(item.symbol || 'N/A');
+                            const safeTimeframe = escapeHTML(item.timeframe || 'N/A');
+                            const safeTimePart = escapeHTML(typeof date === 'string' && date.includes('T') ? date.split('T')[1].split('.')[0] : '');
+
                             return `
                                 <tr style="vertical-align: top;">
-                                    <td style="font-size: 0.7rem;">${dateStr}<br><span style="color: var(--text-muted);">${typeof date === 'string' && date.includes('T') ? date.split('T')[1].split('.')[0] : ''}</span></td>
-                                    <td style="font-weight:600; color:var(--text-main);">${item.symbol || 'N/A'}</td>
-                                    <td>${item.timeframe || 'N/A'}</td>
+                                    <td style="font-size: 0.7rem;">${safeDateStr}<br><span style="color: var(--text-muted);">${safeTimePart}</span></td>
+                                    <td style="font-weight:600; color:var(--text-main);">${safeSymbol}</td>
+                                    <td>${safeTimeframe}</td>
                                     <td>${(item.dataset_size || 0).toLocaleString()}</td>
                                     <td>${item.feature_count || 0}</td>
                                     <td>
@@ -2142,7 +2199,7 @@ window.loadMLTrainingHistory = async function() {
                                         </div>
                                     </td>
                                     <td>
-                                        <button onclick="deleteMLModel('${item.symbol || ''}', '${item.timeframe || ''}')"
+                                        <button onclick="deleteMLModel('${safeSymbol}', '${safeTimeframe}')"
                                             style="padding:4px 8px; background:rgba(255,255,255,0.1); color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.65rem;"
                                             title="Modeli sil">
                                             🗑️
@@ -2160,9 +2217,10 @@ window.loadMLTrainingHistory = async function() {
 
     } catch (error) {
         console.error('❌ [ML] History load error:', error);
+        const safeError = escapeHTML(error.message);
         container.innerHTML = `
             <p style="text-align: center; padding: 40px; color: var(--neon-red);">
-                ❌ Geçmiş yüklenemedi: ${error.message}
+                ❌ Geçmiş yüklenemedi: ${safeError}
             </p>
         `;
     }
@@ -2240,24 +2298,28 @@ function renderStrategyLibrary(strategies) {
         const longConditions = strategy.conditions?.LONG || [];
         const shortConditions = strategy.conditions?.SHORT || [];
 
+        const safeStrategyId = escapeHTML(strategyId);
+        const safeName = escapeHTML(name);
+        const safeDescription = escapeHTML(description);
+
         return `
             <div class="strategy-card glass-panel" style="padding: 15px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column;">
                 <div class="strategy-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                    <h3 style="color: var(--neon-blue); margin: 0; font-size: 1.1rem; line-height: 1.2;">${name}</h3>
+                    <h3 style="color: var(--neon-blue); margin: 0; font-size: 1.1rem; line-height: 1.2;">${safeName}</h3>
                     <span style="font-size: 0.65rem; padding: 3px 6px; background: rgba(88, 166, 255, 0.1); color: var(--neon-blue); border-radius: 4px; white-space: nowrap;">
                         ${indicators.length} İndikatör
                     </span>
                 </div>
 
                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4; flex-grow: 1; max-height: 3.4rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                    ${description}
+                    ${safeDescription}
                 </p>
 
                 <div style="margin-bottom: 12px;">
                     <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                         ${indicators.map(ind => `
                             <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(255,255,255,0.05); border-radius: 3px; color: var(--text-main);">
-                                ${ind.name || ind}
+                                ${escapeHTML(ind.name || ind)}
                             </span>
                         `).join('')}
                     </div>
@@ -2267,23 +2329,23 @@ function renderStrategyLibrary(strategies) {
                     <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(46, 220, 135, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(46, 220, 135, 0.2);">
                         <div style="min-width: 45px; font-size: 0.7rem; color: var(--neon-green); font-weight: bold; padding-top: 1px;">🟢 LONG</div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
-                            ${longConditions.length > 0 ? longConditions.map(c => `• ${c.description || c}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
+                            ${longConditions.length > 0 ? longConditions.map(c => `• ${escapeHTML(c.description || c)}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
                         </div>
                     </div>
 
                     <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(248, 83, 73, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(248, 83, 73, 0.2);">
                         <div style="min-width: 45px; font-size: 0.7rem; color: var(--neon-red); font-weight: bold; padding-top: 1px;">🔴 SHORT</div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
-                            ${shortConditions.length > 0 ? shortConditions.map(c => `• ${c.description || c}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
+                            ${shortConditions.length > 0 ? shortConditions.map(c => `• ${escapeHTML(c.description || c)}`).join('<br>') : 'ℹ️ Koşul tanımlanmamış'}
                         </div>
                     </div>
                 </div>
 
                 <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--glass-border); display: flex; gap: 8px;">
-                    <button onclick="useStrategy('${strategyId}')" style="flex: 1; padding: 8px 12px; background: var(--neon-blue); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <button onclick="useStrategy('${safeStrategyId}')" style="flex: 1; padding: 8px 12px; background: var(--neon-blue); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
                         <span>🚀</span> Bu Stratejiyi Kullan
                     </button>
-                    <button onclick="editStrategy('${strategyId}')" style="padding: 8px 12px; background: rgba(255,255,255,0.08); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <button onclick="editStrategy('${safeStrategyId}')" style="padding: 8px 12px; background: rgba(255,255,255,0.08); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px;">
                         <span>✏️</span> Düzenle
                     </button>
                 </div>
