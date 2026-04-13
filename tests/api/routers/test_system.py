@@ -1,6 +1,33 @@
 import pytest
+import math
+from enum import Enum
+from unittest.mock import MagicMock
+import sys
 
-from api.routers.system import sanitize_value, sanitize_dict
+# Mock missing dependencies to allow importing the module under test in an environment without them.
+# Using a local mock strategy to avoid polluting the global sys.modules for other tests if possible,
+# although in this restricted environment it's necessary for the import to succeed.
+MOCK_MODULES = [
+    "fastapi",
+    "fastapi.responses",
+    "yaml",
+    "shared.events.event_bus",
+    "core.logger",
+    "core.config",
+    "core.paper",
+    "core.exchange",
+    "api.schemas.config",
+]
+
+for mod in MOCK_MODULES:
+    if mod not in sys.modules:
+        sys.modules[mod] = MagicMock()
+
+from api.routers.system import sanitize_value, sanitize_dict, sanitize_list
+
+class MockEnum(Enum):
+    TEST = "test_value"
+    ALPHA = 1
 
 def test_sanitize_value_none():
     """Test sanitize_value with None."""
@@ -103,3 +130,45 @@ def test_sanitize_dict_complex_nested():
         "status": "ok"
     }
     assert sanitize_dict(input_data) == expected
+
+def test_sanitize_value_bool():
+    """Test sanitize_value with boolean values (should stay boolean)."""
+    assert sanitize_value(True) is True
+    assert sanitize_value(False) is False
+
+def test_sanitize_value_set():
+    """Test sanitize_value with a set (should convert to list and sanitize elements)."""
+    input_set = {1, float('nan'), 3}
+    result = sanitize_value(input_set)
+    assert isinstance(result, list)
+    # NaN becomes 0.0
+    assert sorted(result) == [0.0, 1, 3]
+
+def test_sanitize_value_enum():
+    """Test sanitize_value with an Enum."""
+    assert sanitize_value(MockEnum.TEST) == "test_value"
+    assert sanitize_value(MockEnum.ALPHA) == 1
+
+def test_sanitize_list_flat():
+    """Test sanitize_list with simple types and NaN/Inf."""
+    input_list = [1, "test", float('nan'), float('inf'), None]
+    expected = [1, "test", 0.0, 0.0, 0.0]
+    assert sanitize_list(input_list) == expected
+
+def test_sanitize_list_nested():
+    """Test sanitize_list with nested lists and dicts."""
+    input_list = [
+        [float('nan'), 2],
+        {"a": float('inf'), "b": [3, float('-inf')]},
+        {1, 2} # set
+    ]
+    # Note: set {1, 2} becomes [1, 2]
+    result = sanitize_list(input_list)
+    assert result[0] == [0.0, 2]
+    assert result[1] == {"a": 0.0, "b": [3, 0.0]}
+    assert isinstance(result[2], list)
+    assert sorted(result[2]) == [1, 2]
+
+def test_sanitize_list_empty():
+    """Test sanitize_list with empty list."""
+    assert sanitize_list([]) == []
