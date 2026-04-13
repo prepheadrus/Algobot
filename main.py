@@ -186,16 +186,16 @@ if __name__ == "__main__":
                         f"failures={breaker_stats['total_failures']}, "
                         f"rejected={breaker_stats['total_rejected']}"
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Circuit Breaker stats logging error: {e}")
             
             # 7. Event Tracer istatistiklerini göster
             logger.info("7️⃣ Event Tracer istatistikleri:")
             try:
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(event_tracer.stop())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Event Tracer stop error: {e}")
             
             logger.info("=" * 60)
             logger.info("✅ GÜVENLİ KAPATMA TAMAMLANDI")
