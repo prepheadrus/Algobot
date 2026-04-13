@@ -4,7 +4,7 @@ ML Service
 Business logic for ML operations.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import os
 import json
 import asyncio
@@ -34,6 +34,47 @@ class MLService:
             "current_step": ""
         }
         self.training_history = []
+        self.history_file = "artifacts/ml_training_history.json"
+
+    async def _load_history_from_disk(self) -> List[Dict[str, Any]]:
+        """
+        Eğitim geçmişini diskten asenkron (thread) olarak yükler.
+
+        Returns:
+            Eğitim geçmişi listesi
+        """
+        def _load():
+            try:
+                if os.path.exists(self.history_file):
+                    with open(self.history_file, 'r') as f:
+                        return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"❌ [ML] History load error: {e}")
+            return []
+
+        return await asyncio.to_thread(_load)
+
+    async def _save_history_to_disk(self, history: List[Dict[str, Any]]) -> bool:
+        """
+        Eğitim geçmişini diske asenkron (thread) olarak kaydeder.
+
+        Args:
+            history: Kaydedilecek geçmiş listesi
+
+        Returns:
+            Başarı durumu
+        """
+        def _save():
+            try:
+                os.makedirs(os.path.dirname(self.history_file), exist_ok=True)
+                with open(self.history_file, 'w') as f:
+                    json.dump(history, f, indent=2)
+                return True
+            except IOError as e:
+                logger.error(f"❌ [ML] History save error: {e}")
+                return False
+
+        return await asyncio.to_thread(_save)
 
     async def train_model(self, request: MLTrainRequest) -> Dict[str, Any]:
         """
@@ -340,20 +381,6 @@ class MLService:
     async def _save_training_history(self, request: MLTrainRequest, model_path: str, dataset_size: int, feature_count: int, training_metrics: dict = None, start_time: datetime = None, model_id: str = None, direction: str = 'long'):
         """Eğitim geçmişini kaydet."""
         try:
-            history_file = "artifacts/ml_training_history.json"
-
-            # Blocking I/O operations for reading/writing history
-            def _load_history():
-                if os.path.exists(history_file):
-                    with open(history_file, 'r') as f:
-                        return json.load(f)
-                return []
-
-            def _save_history(data):
-                os.makedirs("artifacts", exist_ok=True)
-                with open(history_file, 'w') as f:
-                    json.dump(data, f, indent=2)
-
             # Training metrics'den TÜM metrikleri al
             accuracy = 0.0
             precision = 0.0
@@ -411,8 +438,8 @@ class MLService:
                 "model_path": model_path
             }
 
-            # Mevcut geçmişi yükle (Asyncio to thread ile bloklanmayı engelle)
-            history = await asyncio.to_thread(_load_history)
+            # Mevcut geçmişi yükle
+            history = await self._load_history_from_disk()
 
             # Yeni kaydı ekle
             history.append(new_entry)
@@ -420,8 +447,8 @@ class MLService:
             # Son 100 kaydı sakla
             history = history[-100:]
 
-            # Kaydet (Asyncio to thread ile bloklanmayı engelle)
-            await asyncio.to_thread(_save_history, history)
+            # Kaydet
+            await self._save_history_to_disk(history)
 
             logger.info(f"📝 [ML] Eğitim geçmişi güncellendi: {len(history)} kayıt")
             logger.info(f"📊 [ML] Metrics kaydedildi: Acc={accuracy:.4f}, Prec={precision:.4f}, Rec={recall:.4f}, F1={f1_score:.4f}")
@@ -454,17 +481,9 @@ class MLService:
             Eğitim geçmişi
         """
         try:
-            history_file = "artifacts/ml_training_history.json"
+            history = await self._load_history_from_disk()
 
-            def _load_history():
-                if os.path.exists(history_file):
-                    with open(history_file, 'r') as f:
-                        return json.load(f)
-                return None
-
-            history = await asyncio.to_thread(_load_history)
-
-            if history is not None:
+            if history:
                 return {
                     "status": "success",
                     "history": history[-limit:],
@@ -489,11 +508,9 @@ class MLService:
             Silme yanıtı
         """
         try:
-            history_file = "artifacts/ml_training_history.json"
-
             def _delete_history():
-                if os.path.exists(history_file):
-                    os.remove(history_file)
+                if os.path.exists(self.history_file):
+                    os.remove(self.history_file)
                     return True
                 return False
 
@@ -553,13 +570,11 @@ class MLService:
             # Training history'den de sil (eğer varsa)
             history_deleted = False
 
-            def _update_history_sync():
+            async def _update_history_async():
                 h_deleted = False
-                history_file = "artifacts/ml_training_history.json"
-                if os.path.exists(history_file):
-                    with open(history_file, 'r') as f:
-                        history = json.load(f)
+                history = await self._load_history_from_disk()
 
+                if history:
                     # Bu modele ait kayıtları filtrele
                     original_count = len(history)
                     history = [
@@ -569,13 +584,12 @@ class MLService:
 
                     if len(history) < original_count:
                         # Güncellenmiş history'yi kaydet
-                        with open(history_file, 'w') as f:
-                            json.dump(history, f, indent=2)
+                        await self._save_history_to_disk(history)
                         h_deleted = True
                 return h_deleted
 
             try:
-                history_deleted = await asyncio.to_thread(_update_history_sync)
+                history_deleted = await _update_history_async()
                 if history_deleted:
                     logger.info(f"✅ [ML] Training history güncellendi (ilgili kayıtlar silindi)")
             except Exception as e:
@@ -584,7 +598,7 @@ class MLService:
             if deleted_files or history_deleted:
                 return {
                     "status": "success",
-                    "message": f"{len(deleted_files)} dosya ve {len([h for h in history if h.get('symbol') == symbol and h.get('timeframe') == timeframe])} history kaydı silindi" if history_deleted else f"{len(deleted_files)} dosya silindi",
+                    "message": f"{len(deleted_files)} dosya silindi ve geçmiş güncellendi",
                     "deleted_files": deleted_files,
                     "errors": errors if errors else None
                 }
