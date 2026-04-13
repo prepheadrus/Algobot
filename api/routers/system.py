@@ -34,18 +34,29 @@ router = APIRouter(prefix="/api/v1", tags=["System"])
 
 
 def sanitize_value(value: Any) -> Any:
-    """NaN/Infinity değerlerini 0.0'a çevir"""
+    """
+    Sanitize a single configuration value for safe YAML saving.
+    Handles sets, enums, and NaN/Infinity values.
+    """
     if value is None:
         return 0.0
+    if isinstance(value, bool):
+        return value
     if isinstance(value, (int, float)):
         if math.isnan(value) or math.isinf(value):
             logger.warning(f"⚠️ [SANITIZE] NaN/Infinity detected: {value} → 0.0")
             return 0.0
+    if isinstance(value, set):
+        return [sanitize_value(v) for v in value]
+    if hasattr(value, "value"):  # Handle Enums
+        return value.value
     return value
 
 
 def sanitize_list(data: list) -> list:
-    """Listedeki Infinity ve NaN değerlerini iç içe temizler"""
+    """
+    Sanitize all items in a list, including nested structures.
+    """
     clean_data = []
     for item in data:
         if isinstance(item, dict):
