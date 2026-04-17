@@ -42,6 +42,7 @@ class BacktestRequest(BaseModel):
     strategy: Dict[str, Any] = Field(
         ..., description="Strateji JSON (name, indicators, conditions, risk)"
     )
+
     strategy_filename: Optional[str] = Field(
         default=None, description="Kaydedilmiş strateji dosya adı"
     )
@@ -55,6 +56,14 @@ class BacktestRequest(BaseModel):
     )
     risk_per_trade: float = Field(
         default=0.01, description="İşlem başına risk (%)", ge=0.001, le=0.1
+    )
+
+
+class OptimizeRequest(BacktestRequest):
+    """Grid Search Optimizasyon isteği"""
+
+    param_grid: Dict[str, List[Any]] = Field(
+        ..., description="Test edilecek parametre kombinasyonları. Örn: {'RSI_period': [10, 14]}"
     )
 
 
@@ -464,15 +473,145 @@ async def get_backtest_results(backtest_id: str):
 
 
 @router.post("/optimize")
-async def optimize_strategy(request: BacktestRequest):
+async def optimize_strategy(request: OptimizeRequest):
     """
-    Strateji optimizasyonu (Grid Search).
-
-    Args:
-        request: BacktestRequest
-
-    Returns:
-        Dict: Optimizasyon sonuçları
+    Strateji optimizasyonu (Grid Search / Walk-Forward).
+    Hedge Fund standartlarında WFO metrikleri döner.
     """
-    # TODO: Grid search implementasyonu
-    return {"status": "error", "message": "Not implemented yet"}
+    import copy
+    import itertools
+    import asyncio
+    from api.routers.adapter import DynamicJSONStrategyAdapter
+
+    try:
+        logger.info(f"🧪 Optimizasyon isteği: {request.symbol} ({request.timeframe}, {request.days} gün)")
+
+        # 1. Strateji JSON'u al
+        if request.strategy_filename:
+            strategies_dir = Path("artifacts/strategies")
+            filepath = strategies_dir / request.strategy_filename
+            if not filepath.exists():
+                raise HTTPException(status_code=404, detail=f"Strateji dosyası bulunamadı: {request.strategy_filename}")
+            strategy_data = await asyncio.to_thread(read_strategy_file_sync, filepath)
+        else:
+            strategy_data = request.strategy
+
+        # 2. Veriyi Çek
+        logger.info("📊 Gerçek veri çekiliyor...")
+        try:
+            df = await fetch_real_data(request.symbol, request.timeframe, request.days)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # WFO Split (In-Sample / Out-of-Sample) -> %70 IS, %30 OOS
+        total_days = request.days
+        is_days = int(total_days * 0.7)
+        oos_days = total_days - is_days
+
+        train_end_idx = int(len(df) * 0.7)
+        train_data = df.iloc[:train_end_idx].copy()
+        test_data = df.iloc[train_end_idx:].copy()
+
+        # 3. Grid Search Kombinasyonları
+        param_names = list(request.param_grid.keys())
+        param_values = list(request.param_grid.values())
+
+        combinations = list(itertools.product(*param_values))
+        total_combinations = len(combinations)
+
+        logger.info(f"⚙️ Grid Search: {total_combinations} kombinasyon (IS: {len(train_data)} mum, OOS: {len(test_data)} mum)")
+
+        from core.wfo_engine import get_wfo_engine
+
+        # We need a small local function to run backtest using WFO logic asynchronously
+        def _run_single_trial(combo):
+            params = dict(zip(param_names, combo))
+            adapter = DynamicJSONStrategyAdapter(copy.deepcopy(strategy_data))
+            adapter.update_params(params)
+
+            wfo = get_wfo_engine()
+
+            # WFOEngine is a singleton, let's borrow its _backtest logic which does commission/slippage
+            is_metrics = wfo._backtest(adapter, train_data)
+            oos_metrics = wfo._backtest(adapter, test_data)
+
+            # Robustness: IS / OOS sharpe oranı (ideal olarak 1'e yakın olmalı, 1'den küçükse OOS IS'den iyi)
+            is_sharpe = is_metrics.get("sharpe_ratio", 0)
+            oos_sharpe = oos_metrics.get("sharpe_ratio", 0)
+
+            robustness = 0.0
+            if is_sharpe > 0 and oos_sharpe > 0:
+                robustness = min(oos_sharpe / is_sharpe, 1.0)
+            elif oos_sharpe > 0:
+                robustness = 1.0
+
+            return {
+                "params": params,
+                "is_sharpe": is_sharpe,
+                "oos_sharpe": oos_sharpe,
+                "oos_net_pnl": oos_metrics.get("net_pnl", 0),
+                "robustness": robustness
+            }
+
+        # 4. Asenkron ProcessPool (veya ThreadPool via asyncio) ile çalıştır
+        import concurrent.futures
+
+        # ThreadPoolExecutor Event Loop'u bloklamamak için
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, total_combinations)) as executor:
+            loop = asyncio.get_running_loop()
+            tasks = [
+                loop.run_in_executor(executor, _run_single_trial, combo)
+                for combo in combinations
+            ]
+            results = await asyncio.gather(*tasks)
+
+        # 5. Sonuçları Sırala (OOS Sharpe ve Robustness'a göre)
+        # Hedge fund standartı: OOS performansı iyi ve overfit olmamış olanlar.
+        # Sıralama: oos_sharpe * robustness (custom metric)
+        def score_func(x):
+            return x["oos_sharpe"] * x["robustness"]
+
+        sorted_results = sorted(results, key=score_func, reverse=True)
+        top_results = sorted_results[:5]
+
+        if not top_results:
+            return {
+                "status": "error",
+                "message": "Geçerli sonuç bulunamadı."
+            }
+
+        best = top_results[0]
+
+        response = {
+            "status": "success",
+            "total_combinations": total_combinations,
+            "best_parameters": best["params"],
+            "best_metrics": {
+                "is_sharpe_ratio": round(best["is_sharpe"], 4),
+                "oos_sharpe_ratio": round(best["oos_sharpe"], 4),
+                "oos_net_pnl": round(best["oos_net_pnl"], 4)
+            },
+            "wfo_robustness_score": round(best["robustness"], 4),
+            "top_5_iterations": [
+                {
+                    "params": r["params"],
+                    "metrics": {
+                        "is_sharpe_ratio": round(r["is_sharpe"], 4),
+                        "oos_sharpe_ratio": round(r["oos_sharpe"], 4),
+                        "oos_net_pnl": round(r["oos_net_pnl"], 4),
+                        "wfo_robustness_score": round(r["robustness"], 4)
+                    }
+                } for r in top_results
+            ]
+        }
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Optimizasyon hatası: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Optimizasyon başarısız: {str(e)}",
+        )
